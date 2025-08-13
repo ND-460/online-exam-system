@@ -14,26 +14,29 @@ passport.use(
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_SECRET_ID,
       callbackURL: `${process.env.BASE_URL}/api/user/oauth2/redirect/google`,
+      passReqToCallback: true,
     },
-    async (accessToken, refreshToken, profile, done) => {
+    async (req, accessToken, refreshToken, profile, done) => {
       try {
         console.log("Google Profile received:", profile);
 
         const email = profile.emails[0].value;
         let user = await User.findOne({ email });
 
+        const roleFromFrontend = req.query.state || "student";
+
         if (!user) {
           console.log("Creating new user for:", email);
           user = await User.create({
             firstName: profile.name.givenName || "NoFirst",
             lastName: profile.name.familyName || "NoLast",
+            phone: "N/A", 
             email,
             password: await bcrypt.hash(Math.random().toString(36).slice(-8), 10),
-            role: "student", 
+            role: roleFromFrontend, 
           });
         }
 
-        
         return done(null, user);
       } catch (err) {
         console.error("Google Auth Error:", err);
@@ -42,18 +45,6 @@ passport.use(
     }
   )
 );
-
-
-// For One Tap login (JWT verification)
-async function verifyGoogleToken(idToken) {
-  const ticket = await googleClient.verifyIdToken({
-    idToken,
-    audience: process.env.GOOGLE_CLIENT_ID,
-  });
-
-  const payload = ticket.getPayload();
-  return payload; 
-}
 
 passport.serializeUser((user, done) => {
   done(null, user.id);

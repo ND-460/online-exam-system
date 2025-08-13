@@ -563,7 +563,14 @@ router.get("/confirm/:token", async (req, res) => {
 
 
 // Redirect login start
-router.get("/auth/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+router.get("/auth/google", (req, res, next) => {
+  const role = req.query.role || "student"; 
+  passport.authenticate("google", {
+    scope: ["profile", "email"],
+    state: role, 
+  })(req, res, next);
+});
+
 
 
 /**
@@ -581,11 +588,27 @@ router.get(
     session: false,
     failureRedirect: `${process.env.FRONTEND_URL}/login?error=GoogleAuthFailed`,
   }),
-  (req, res) => {
-    const token = jwt.sign({ id: req.user._id, role: req.user.role }, process.env.JWT_SECRET, { expiresIn: "7d" });
-    res.redirect(`${process.env.FRONTEND_URL}/login?googleSuccess=true&token=${token}`);
+  async (req, res) => {
+   
+    const role = req.query.state || "student";
+    if (!req.user.role) {
+      req.user.role = role;
+      await req.user.save();
+    }
+
+    const token = jwt.sign(
+      { id: req.user._id, role: req.user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.redirect(
+      `${process.env.FRONTEND_URL}/login?googleSuccess=true&token=${token}`
+    );
   }
 );
+
+
 
 
 /**

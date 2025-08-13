@@ -561,7 +561,7 @@ export default function Login() {
         {/* Google Redirect Login */}
         <div className="flex flex-col gap-3 mb-3 w-full">
           <a
-            href={`${import.meta.env.VITE_API_URL}/api/user/auth/google`}
+            href={`${import.meta.env.VITE_API_URL}/api/user/auth/google?role=${selectedRole}`}
             className="w-full py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-center font-bold shadow-md transition-transform hover:scale-105"
           >
             Continue with Google
