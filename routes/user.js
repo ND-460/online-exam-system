@@ -11,6 +11,7 @@ const { STUDENT, TEACHER } = require("../utils/roles");
 const nodemailer = require("nodemailer");
 var smtpTransport = require("nodemailer-smtp-transport");
 const { baseURL } = require("../utils/roles");
+const passport = require("passport");
 require("dotenv").config();
 
 //transporter for nodemailer
@@ -184,10 +185,10 @@ router.post(
         return res.status(400).json({
           message: "Incorrect Password !",
         });
-        console.log(process.env.JWT_SECRET)
+      console.log(process.env.JWT_SECRET);
       const payload = {
-        user:{
-            id:user._id
+        user: {
+          id: user._id,
         },
       };
 
@@ -493,7 +494,9 @@ router.get("/confirm/:token", async (req, res) => {
     );
 
     if (result.modifiedCount === 0) {
-      return res.status(400).json({ message: "User not found or already verified" });
+      return res
+        .status(400)
+        .json({ message: "User not found or already verified" });
     }
 
     return res.status(200).json({ message: "Email Verified!" });
@@ -503,5 +506,70 @@ router.get("/confirm/:token", async (req, res) => {
   }
 });
 
+/**
+ * @method - POST
+ * @param - /google-login
+ * @description - This route redirects the user to Google, where they will authenticate.
+ */
+
+router.post(
+  "/google-login",
+  passport.authenticate("google", { scope: ["profile", "email"] })
+);
+
+/**
+ * @method - POST
+ * @param - /oauth2/redirect/google
+ * @description -  This route completes the authentication sequence when Google redirects the
+    user back to the application.  When a new user signs in, a user account is
+    automatically created and their Google account is linked.  When an existing
+    user returns, they are signed in to their linked account.
+ */
+
+router.get("/oauth2/redirect/google", async (req, res, next) => {
+  passport.authenticate("google", async (err, user, info) => {
+    if (err) {
+      console.error("- Google Auth Error:", err);
+      return res.redirect(
+        `${process.env.FRONTEND_URL}/login?error=GoogleAuthFailed`
+      );
+    }
+    if (!user) {
+      console.warn("- Google Auth Failed: No user found");
+      return res.redirect(
+        `${process.env.FRONTEND_URL}/login?error=GoogleAuthFailed`
+      );
+    }
+    req.login(user, (err) => {
+      if (err) {
+        console.error("- Error logging in user:", err);
+        return res.redirect(
+          `${process.env.FRONTEND_URL}/login?error=GoogleAuthFailed`
+        );
+      }
+      console.log("- Redirecting to frontend with user ID:", user._id);
+      return res.redirect(
+        `${process.env.FRONTEND_URL}/login?googleSuccess=true&userId=${user._id}`
+      );
+    });
+  })(req, res, next);
+});
+
+/**
+ * @method - POST
+ * @param - /logout
+ * @description -  This route completes the authentication sequence when Google redirects the
+    user back to the application.  When a new user signs in, a user account is
+    automatically created and their Google account is linked.  When an existing
+    user returns, they are signed in to their linked account.
+ */
+router.post("/logout", function (req, res, next) {
+  req.logout(function (err) {
+    if (err) {
+      return next(err);
+    }
+    res.redirect("/");
+  });
+});
 
 module.exports = router;
