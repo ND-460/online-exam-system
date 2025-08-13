@@ -4,7 +4,6 @@ import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
 import axios from 'axios';
 import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google';
-
 const LoginSchema = Yup.object().shape({
   role: Yup.string().required('Role is required'),
   email: Yup.string().email('Invalid email').required('Email is required'),
@@ -179,7 +178,7 @@ export default function Login() {
         credential: credentialResponse.credential,
         role: selectedRole,
       });
-      navigate('/dashboard');
+      navigate(`${selectedRole}`);
     } catch (err) {
       setError(err.response?.data?.message || 'Google login failed');
     }
@@ -299,15 +298,16 @@ export default function Login() {
             onSubmit={async (values, { setSubmitting }) => {
               setError('');
               try {
-                const response = await axios.post('/api/user/login', {
+                const response = await axios.post( `${import.meta.env.VITE_API_URL}/api/user/login`, {
                   email: values.email,
                   password: values.password,
                   role: selectedRole,
                 });
                 localStorage.setItem('token', response.data.token);
-                navigate('/dashboard');
+                navigate(`/${selectedRole}`);
               } catch (err) {
                 setError(err.response?.data?.message || 'Login failed');
+                console.log(err)
               } finally {
                 setSubmitting(false);
               }
