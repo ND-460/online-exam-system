@@ -21,9 +21,9 @@ app.use(cookieParser());
 
 
 //routes
-app.use('/user',user)
-app.use('/student',student)
-app.use('/teacher',teacher)
+app.use('/api/user',user)
+app.use('/api/student',student)
+app.use('/api/teacher',teacher)
 
 //listening to the server
 const port = process.env.PORT || 3000;
