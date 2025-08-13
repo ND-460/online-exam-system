@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const cookieParser = require("cookie-parser");
-const session = require("express-session")
+// const session = require("express-session")
 const passport = require("passport")
 require("dotenv").config();
 require("./config/passport");
@@ -28,15 +28,15 @@ app.use("/api/student", student);
 app.use("/api/teacher", teacher);
 
 //passport part for google sign in
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "secret-key",
-    resave: false,
-    saveUninitialized: true,
-  })
-);
+// app.use(
+//   session({
+//     secret: process.env.SESSION_SECRET || "secret-key",
+//     resave: false,
+//     saveUninitialized: true,
+//   })
+// );
 app.use(passport.initialize());
-app.use(passport.session());
+// app.use(passport.session());
 
 //listening to the server
 const port = process.env.PORT || 3000;

@@ -1,54 +1,59 @@
 const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
+const { OAuth2Client } = require("google-auth-library");
+const bcrypt = require("bcryptjs");
 const User = require("../model/User");
+const generateRandomPassword = require("../utils/randomPass");
 require("dotenv").config();
-const generateRandomPassword = require('../utils/randomPass');
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
 passport.use(
   new GoogleStrategy(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      clientSecret: process.env.GOOGLE_SECRET_ID,
       callbackURL: `${process.env.BASE_URL}/api/user/oauth2/redirect/google`,
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
-        console.log("- Google Profile:", profile);
+        console.log("Google Profile received:", profile);
 
-        const email = profile.emails?.[0]?.value || null;
-
-        if (!email) {
-          console.error("- Google Auth Error: No email received from Google");
-          return done(null, false, {
-            message: "No email received from Google",
-          });
-        }
-
+        const email = profile.emails[0].value;
         let user = await User.findOne({ email });
 
         if (!user) {
-          const randomPassword = generateRandomPassword(6);
-          const salt = await bcrypt.genSalt(10);
-          const pass = await bcrypt.hash(randomPassword, salt);
-
-          user = new User({
-            name: profile.displayName || "No Name",
+          console.log("Creating new user for:", email);
+          user = await User.create({
+            firstName: profile.name.givenName || "NoFirst",
+            lastName: profile.name.familyName || "NoLast",
             email,
-            phone: "N/A",
-            // birthdate: new Date("2000-01-01"),
-            password: pass,
-            role: "student",
+            password: await bcrypt.hash(Math.random().toString(36).slice(-8), 10),
+            role: "student", 
           });
-          await user.save();
         }
-        console.log("- Google Auth Successful:", user);
+
+        
         return done(null, user);
-      } catch (error) {
-        console.error("- Google Auth Error:", error);
-        return done(error, null);
+      } catch (err) {
+        console.error("Google Auth Error:", err);
+        return done(err, null);
       }
     }
   )
 );
+
+
+// For One Tap login (JWT verification)
+async function verifyGoogleToken(idToken) {
+  const ticket = await googleClient.verifyIdToken({
+    idToken,
+    audience: process.env.GOOGLE_CLIENT_ID,
+  });
+
+  const payload = ticket.getPayload();
+  return payload; 
+}
 
 passport.serializeUser((user, done) => {
   done(null, user.id);
@@ -63,4 +68,4 @@ passport.deserializeUser(async (id, done) => {
   }
 });
 
-module.exports = passport;
+module.exports = { passport, verifyGoogleToken };

@@ -14,6 +14,9 @@ const { baseURL } = require("../utils/roles");
 const passport = require("passport");
 require("dotenv").config();
 
+const { OAuth2Client } = require('google-auth-library');
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
+
 //transporter for nodemailer
 var transporter = nodemailer.createTransport(
   smtpTransport({
@@ -512,10 +515,59 @@ router.get("/confirm/:token", async (req, res) => {
  * @description - This route redirects the user to Google, where they will authenticate.
  */
 
-router.post(
-  "/google-login",
+// router.post(
+//   "/google-login",
+//   passport.authenticate("google", { scope: ["profile", "email"] })
+// );
+
+// One Tap JWT Google Login
+router.post("/google-login", async (req, res) => {
+  try {
+    const { credential, role } = req.body;
+    if (!credential) {
+      return res.status(400).json({ message: "Google credential is required" });
+    }
+
+    const payload = await verifyGoogleToken(credential);
+    const email = payload.email;
+
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      const randomPassword = generateRandomPassword(6);
+      const salt = await bcrypt.genSalt(10);
+      const pass = await bcrypt.hash(randomPassword, salt);
+
+      user = new User({
+        firstName: payload.given_name || payload.name?.split(" ")[0] || "First",
+        lastName: payload.family_name || payload.name?.split(" ")[1] || "Last",
+        email,
+        phone: "N/A",
+        password: pass,
+        role: role || "student",
+      });
+
+      await user.save();
+    }
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+    });
+
+    res.json({ token, user });
+  } catch (err) {
+    console.error("One Tap Google Login Error:", err);
+    res.status(500).json({ message: "Google login failed" });
+  }
+});
+
+
+// Redirect login start
+router.get(
+  "/auth/google",
   passport.authenticate("google", { scope: ["profile", "email"] })
 );
+
 
 /**
  * @method - POST
@@ -526,34 +578,23 @@ router.post(
     user returns, they are signed in to their linked account.
  */
 
-router.get("/oauth2/redirect/google", async (req, res, next) => {
-  passport.authenticate("google", async (err, user, info) => {
-    if (err) {
-      console.error("- Google Auth Error:", err);
-      return res.redirect(
-        `${process.env.FRONTEND_URL}/login?error=GoogleAuthFailed`
-      );
-    }
-    if (!user) {
-      console.warn("- Google Auth Failed: No user found");
-      return res.redirect(
-        `${process.env.FRONTEND_URL}/login?error=GoogleAuthFailed`
-      );
-    }
-    req.login(user, (err) => {
-      if (err) {
-        console.error("- Error logging in user:", err);
-        return res.redirect(
-          `${process.env.FRONTEND_URL}/login?error=GoogleAuthFailed`
-        );
-      }
-      console.log("- Redirecting to frontend with user ID:", user._id);
-      return res.redirect(
-        `${process.env.FRONTEND_URL}/login?googleSuccess=true&userId=${user._id}`
-      );
-    });
-  })(req, res, next);
-});
+router.get(
+  "/oauth2/redirect/google",
+  passport.authenticate("google", {
+    session: false,
+    failureRedirect: `${process.env.FRONTEND_URL}/login?error=GoogleAuthFailed`,
+  }),
+  (req, res) => {
+    const token = jwt.sign(
+      { id: req.user._id, role: req.user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.redirect(`${process.env.FRONTEND_URL}/login?googleSuccess=true&token=${token}`);
+  }
+);
+
 
 /**
  * @method - POST

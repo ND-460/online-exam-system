@@ -171,6 +171,19 @@ export default function Login() {
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
+  useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("googleSuccess") === "true" && params.get("token")) {
+    const token = params.get("token");
+    localStorage.setItem("token", token);
+
+    // Decode token to get role
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    navigate(`/${payload.role}`);
+  }
+}, [navigate]);
+
+
   const handleGoogleLogin = async (credentialResponse) => {
     setError('');
     try {
