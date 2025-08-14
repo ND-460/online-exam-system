@@ -59,4 +59,4 @@ passport.deserializeUser(async (id, done) => {
   }
 });
 
-module.exports = { passport, verifyGoogleToken };
+module.exports = { passport };
