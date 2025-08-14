@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Google OAuth Client Tester</title>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <h1>Google OAuth Client Tester</h1>
+  <p>Client ID: <strong>868918115211-7jbott5glh4vrhn0ide78lbp6jh5grv5.apps.googleusercontent.com</strong></p>
+
+  <button id="testOneTap">Test One Tap</button>
+  <button id="testRedirect">Test Redirect URI</button>
+
+  <pre id="log"></pre>
+
+  <script>
+    const CLIENT_ID = "868918115211-7jbott5glh4vrhn0ide78lbp6jh5grv5.apps.googleusercontent.com";
+    const REDIRECT_URI = "http://localhost:5000/api/user/oauth2/redirect/google";
+
+    const log = (msg) => {
+      document.getElementById("log").textContent += msg + "\n";
+    };
+
+    document.getElementById("testOneTap").addEventListener("click", () => {
+      google.accounts.id.initialize({
+        client_id: CLIENT_ID,
+        callback: (response) => {
+          log("✅ One Tap token received: " + response.credential.substring(0, 30) + "...");
+        }
+      });
+      google.accounts.id.prompt((notification) => {
+        if (notification.isNotDisplayed()) log("❌ One Tap not displayed: " + notification.getNotDisplayedReason());
+        if (notification.isSkippedMoment()) log("⚠ One Tap skipped: " + notification.getSkippedReason());
+      });
+    });
+
+    document.getElementById("testRedirect").addEventListener("click", () => {
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=email%20profile`;
+      window.open(authUrl, "_blank");
+    });
+  </script>
+</body>
+</html>

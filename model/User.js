@@ -17,6 +17,7 @@ const userSchema = new moongose.Schema({
     phone: {
         type: String,
         required: true,
+        default:"N/A"
         // unique: true
     },
     section:{
