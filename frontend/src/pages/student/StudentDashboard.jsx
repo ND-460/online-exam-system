@@ -2,10 +2,16 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
+import {useAuthStore} from "../../store/authStore"
 
 export default function StudentDashboard() {
   const [language, setLanguage] = useState("JavaScript");
   const navigate = useNavigate();
+  const {logout} = useAuthStore()
+  const handleLogout = () => {
+    logout(); 
+    navigate("/");
+  };
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#151e2e] to-[#1a2236] p-6 text-white">
       <div className="flex justify-between items-center mb-4">
@@ -15,6 +21,12 @@ export default function StudentDashboard() {
           </Link>
           <h2 className="text-2xl font-bold ml-2">Student Dashboard</h2>
         </div>
+        <button
+          onClick={handleLogout}
+          className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-md text-white font-semibold"
+        >
+          Logout
+        </button>
         {/* Removed notifications, toggle theme, and blue circle */}
       </div>
 

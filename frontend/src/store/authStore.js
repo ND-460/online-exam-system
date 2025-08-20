@@ -31,7 +31,7 @@ export const useAuthStore = create(
 
       setToken: (token) => set({ token }),
 
-      /** ✅ Fetch full profile using ID from token */
+    
       fetchProfile: async () => {
         try {
           const { token } = get();

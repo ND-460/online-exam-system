@@ -54,7 +54,7 @@ const ProfilePage = () => {
       }
     );
 
-    updateUser(res.data.obj);  // ✅ this updates Zustand
+    updateUser(res.data.obj); 
     setEditing(false);
   } catch (err) {
     console.error("Error updating profile:", err);
