@@ -5,6 +5,7 @@ const Test = require("../model/Test");
 const Teacher = require("../model/Teacher");
 const User = require("../model/User");
 require("dotenv").config();
+const Student = require("../model/Student");
 
 /**
  * @method - GET
@@ -154,20 +155,28 @@ router.post("/create-test", auth, async (req, res) => {
     answers,
     questions,
   } = req.body;
-  console.log(questions, answers, rules);
+
   try {
-    let createTest = await Test.findOne({
-      testName,
-      className,
-      category,
-    });
-    if (createTest) {
-      return res.status(400).json({
-        msg: "Test Already Created",
-      });
+    // Check if test already exists
+    let existingTest = await Test.findOne({ testName, className, category });
+    if (existingTest) {
+      return res.status(400).json({ msg: "Test Already Created" });
     }
 
-    createTest = new Test({
+    // Get all students of the class via populate
+    const students = await Student.find()
+      .populate({
+        path: 'profileInfo',
+        match: { className },
+        select: '_id className'
+      });
+
+    const studentIds = students
+      .filter(s => s.profileInfo)
+      .map(s => s.profileInfo._id.toString());
+
+    // Create test
+    const createTest = new Test({
       teacherId,
       testName,
       category,
@@ -177,22 +186,18 @@ router.post("/create-test", auth, async (req, res) => {
       rules,
       outOfMarks,
       questions,
+      assignedTo: studentIds,
     });
 
-    let data = await createTest.save();
-
-    const payload = {
-      data,
-    };
-
-    res.status(200).json({
-      payload,
-    });
+    const data = await createTest.save();
+    res.status(200).json({ payload: { data } });
   } catch (err) {
     console.log(err.message);
     res.status(500).send("Error in Saving");
   }
 });
+
+
 
 /**
  * @method - PUT
@@ -226,14 +231,32 @@ router.post("/create-test", auth, async (req, res) => {
 
 router.put("/update-test/:testid", auth, async (req, res) => {
   const testID = req.params.testid;
-  console.log(testID);
-
-  const questionsData = req.body.questions;
+  const { questions, className } = req.body;
 
   try {
-    const updatedTest = await Test.findOneAndUpdate(
-      { _id: testID },
-      { questions: questionsData },
+    let updateData = { questions };
+
+    // If className is provided or changed, update assignedTo
+    if (className) {
+      // Fetch all students of this class
+      const students = await Student.find()
+        .populate({
+          path: 'profileInfo',
+          match: { className },
+          select: '_id className'
+        });
+
+      const studentIds = students
+        .filter(s => s.profileInfo) // remove unmatched
+        .map(s => s.profileInfo._id.toString());
+
+      updateData.className = className;
+      updateData.assignedTo = studentIds;
+    }
+
+    const updatedTest = await Test.findByIdAndUpdate(
+      testID,
+      updateData,
       { new: true }
     );
 
@@ -241,12 +264,14 @@ router.put("/update-test/:testid", auth, async (req, res) => {
       return res.status(404).json({ message: "Test not found" });
     }
 
-    res.status(200).json({ message: "Questions successfully updated" });
+    res.status(200).json({ message: "Test successfully updated", updatedTest });
   } catch (err) {
     console.log(err.message);
     res.status(500).send("Error in Updating");
   }
 });
+
+
 
 
 /**

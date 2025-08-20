@@ -94,6 +94,7 @@ router.post(
             student = Student({
               profileInfo: userData._id,
               attemptedTests: [],
+              testStatus:[]
             });
             await student.save();
           } catch (err) {

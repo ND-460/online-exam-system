@@ -6,6 +6,22 @@ const Test = require("../model/Test");
 const User = require("../model/User");
 require("dotenv").config();
 
+// Get test counts for a student
+router.get("/tests/student/:studentId", auth, async (req, res) => {
+  const studentId = req.params.studentId;
+
+  try {
+    const upcoming = await Test.countDocuments({ assignedTo: studentId, attempted: false });
+    const ongoing = await Test.countDocuments({ assignedTo: studentId, attempted: false, /* add extra filter if you track time */ });
+    const completed = await Test.countDocuments({ assignedTo: studentId, attempted: true });
+
+    res.status(200).json({ upcoming, ongoing, completed });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error fetching student tests");
+  }
+});
+
 /**
  * @method - GET
  * @param - /profile/:profileID

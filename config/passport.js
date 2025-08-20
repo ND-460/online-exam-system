@@ -4,6 +4,8 @@ const { OAuth2Client } = require("google-auth-library");
 const bcrypt = require("bcryptjs");
 const User = require("../model/User");
 const generateRandomPassword = require("../utils/randomPass");
+const Teacher = require("../model/Teacher");
+const Student = require("../model/Student");
 require("dotenv").config();
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -35,6 +37,18 @@ passport.use(
             password: await bcrypt.hash(Math.random().toString(36).slice(-8), 10),
             role: roleFromFrontend, 
           });
+          if(roleFromFrontend === 'student'){
+            student = await Student.create({
+               profileInfo: user._id,
+              attemptedTests: [],
+              testStatus: [],
+            })
+          }else if (roleFromFrontend === 'teacher'){
+            teacher = await Teacher.create({
+              profileInfo: user._id,
+             
+            })
+          }
         }
 
         return done(null, user);
