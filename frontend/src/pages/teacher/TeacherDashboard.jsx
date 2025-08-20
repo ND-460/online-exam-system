@@ -37,23 +37,60 @@ export default function TeacherDashboard() {
 
     fetchTests();
   }, [user._id, token]);
-
-  const handleUpdateTest = async () => {
+  const refreshTests = async () => {
     try {
-      const res = await axios.put(
-        `${import.meta.env.VITE_API_URL}/api/test/update-test/${testId}`,
-        { questions },
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_URL}/api/teacher/tests/${user._id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setTeacherTests(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+  useEffect(() => {
+    if (user?._id) refreshTests();
+  }, [user]);
+  
+
+  // const handleUpdateTest = async () => {
+  //   try {
+  //     const res = await axios.put(
+  //       `${import.meta.env.VITE_API_URL}/api/test/update-test/${testId}`,
+  //       { questions },
+  //       {
+  //         headers: {
+  //           Authorization: `Bearer ${token}`,
+  //         },
+  //       }
+  //     );
+
+  //     alert(res.data.message);
+  //   } catch (err) {
+  //     console.error("Error updating test:", err);
+  //     alert("Failed to update test");
+  //   }
+  // };
+  const handleDeleteTest = async (test) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete test "${test.testName}"?`
+      )
+    )
+      return;
+
+    try {
+      await axios.delete(
+        `${import.meta.env.VITE_API_URL}/api/teacher/delete-test/${test._id}`,
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
-
-      alert(res.data.message);
+      alert("Test deleted successfully!");
+      await refreshTests();
     } catch (err) {
-      console.error("Error updating test:", err);
-      alert("Failed to update test");
+      console.error(err);
+      alert("Error deleting test");
     }
   };
 
@@ -61,54 +98,55 @@ export default function TeacherDashboard() {
     setShowQuestions(true);
   };
   const handleSaveQuestions = async (qs) => {
-  setQuestions(qs);
-  setShowQuestions(false);
+    setQuestions(qs);
+    setShowQuestions(false);
 
-  try {
-    if (editingTest) {
-      // Only send the questions array for update
-      await axios.put(
-        `${import.meta.env.VITE_API_URL}/api/teacher/update-test/${editingTest._id}`,
-        { questions: qs }, // <- send only questions
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      alert("Test updated successfully!");
-      setEditingTest(null);
-    } else {
-      // Full payload for creating a new test
-      const payload = {
-        teacherId: user._id,
-        testName: testTitle,
-        category: testType,
-        className,
-        minutes,
-        rules,
-        outOfMarks,
-        questions: qs,
-      };
+    try {
+      if (editingTest) {
+        // Only send the questions array for update
+        await axios.put(
+          `${import.meta.env.VITE_API_URL}/api/teacher/update-test/${
+            editingTest._id
+          }`,
+          { questions: qs }, // <- send only questions
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        alert("Test updated successfully!");
+        setEditingTest(null);
+      } else {
+        // Full payload for creating a new test
+        const payload = {
+          teacherId: user._id,
+          testName: testTitle,
+          category: testType,
+          className,
+          minutes,
+          rules,
+          outOfMarks,
+          questions: qs,
+        };
 
-      await axios.post(
-        `${import.meta.env.VITE_API_URL}/api/teacher/create-test`,
-        payload,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      alert("Test created successfully!");
+        await axios.post(
+          `${import.meta.env.VITE_API_URL}/api/teacher/create-test`,
+          payload,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        alert("Test created successfully!");
+      }
+
+      await refreshTests();
+    } catch (err) {
+      console.error(err);
+      alert("Error saving test");
     }
-
-    await refreshTests();
-  } catch (err) {
-    console.error(err);
-    alert("Error saving test");
-  }
-};
-
+  };
 
   const handleEditTest = (test) => {
-    setEditingTest(test)
+    setEditingTest(test);
     setTestTitle(test.testName);
     setTestType(test.category);
     setClassName(test.className);
@@ -126,17 +164,7 @@ export default function TeacherDashboard() {
     logout();
     navigate("/login");
   };
-  const refreshTests = async () => {
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_URL}/tests/${user._id}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setTeacherTests(res.data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#151e2e] to-[#1a2236] p-6 text-white">
@@ -296,6 +324,11 @@ export default function TeacherDashboard() {
                             <td>
                               <button onClick={() => handleEditTest(t)}>
                                 Edit
+                              </button>
+                            </td>
+                            <td>
+                              <button onClick={() => handleDeleteTest(t)}>
+                                Delete
                               </button>
                             </td>
                           </tr>
