@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState ,useEffect} from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AddQuestions from "./AddQuestions";
 import { useAuthStore } from "../../store/authStore";
@@ -14,67 +14,84 @@ export default function TeacherDashboard() {
   const [minutes, setMinutes] = useState(30);
   const [rules, setRules] = useState([""]);
   const [editingTest, setEditingTest] = useState(null);
+  const [teacherTests, setTeacherTests] = useState([]);
+  const [outOfMarks, setOutOfMarks] = useState(0); 
 
+  useEffect(() => {
+    const fetchTests = async () => {
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_API_URL}/api/teacher/tests/${user._id}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setTeacherTests(res.data);
+      } catch (err) {
+        console.error(err);
+        alert("Error fetching tests");
+      }
+    };
 
+    fetchTests();
+  }, []);
   const { logout, token, user } = useAuthStore();
   const navigate = useNavigate();
   const handleNextQuestions = () => {
     setShowQuestions(true);
   };
   const handleSaveQuestions = async (qs) => {
-  setQuestions(qs);
-  setShowQuestions(false);
+    setQuestions(qs);
+    setShowQuestions(false);
 
-  const testPayload = {
-    teacherId: user._id,
-    testName: testTitle,
-    category: testType,
-    className,
-    minutes,
-    rules,
-    outOfMarks: qs.length,
-    questions: qs, // store the full question objects now
+    const testPayload = {
+      teacherId: user._id,
+      testName: testTitle,
+      category: testType,
+      className,
+      minutes,
+      rules,
+      outOfMarks: qs.length,
+      questions: qs, // store the full question objects now
+    };
+
+    try {
+      if (editingTest) {
+        await axios.put(
+          `${import.meta.env.VITE_API_URL}/api/teacher/update-test/${
+            editingTest._id
+          }`,
+          testPayload,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        alert("Test updated successfully!");
+        setEditingTest(null);
+      } else {
+        await axios.post(
+          `${import.meta.env.VITE_API_URL}/api/teacher/create-test`,
+          testPayload,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        alert("Test created successfully!");
+      }
+      await refreshTests()
+    } catch (err) {
+      console.error(err);
+      alert("Error saving test");
+    }
   };
 
-  try {
-    if (editingTest) {
-      await axios.put(
-        `${import.meta.env.VITE_API_URL}/api/teacher/update-test/${editingTest._id}`,
-        testPayload,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      alert("Test updated successfully!");
-      setEditingTest(null);
-    } else {
-      await axios.post(
-        `${import.meta.env.VITE_API_URL}/api/teacher/create-test`,
-        testPayload,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      alert("Test created successfully!");
-    }
-  } catch (err) {
-    console.error(err);
-    alert("Error saving test");
-  }
+  const handleEditTest = (test) => {
+  setEditingTest(test);
+  setTestTitle(test.testName || "");
+  setTestType(test.category || "MCQ");
+  setClassName(test.className || "");
+  setMinutes(test.minutes || 0);
+  setRules(test.rules || []);
+  setOutOfMarks(test.outOfMarks || 0); 
+  setQuestions(Array.isArray(test.questions) ? test.questions : []);
+  setShowQuestions(true);
 };
 
-const handleEditTest = (test) => {
-  setEditingTest(test);
-  setTestTitle(test.testName);
-  setTestType(test.category);
-  setClassName(test.className);
-  setMinutes(test.minutes);
-  setRules(test.rules);
-  setQuestions(
-    test.questions.map((q, idx) => ({
-      question: q,
-      options: test.options[idx] || ["", "", "", ""], 
-      answer: test.answers[idx],
-    }))
-  );
-  setShowQuestions(true); 
-};
+
 
   const handleCancelQuestions = () => {
     setShowQuestions(false);
@@ -83,6 +100,18 @@ const handleEditTest = (test) => {
     logout();
     navigate("/login");
   };
+  const refreshTests = async () => {
+  try {
+    const res = await axios.get(
+      `${import.meta.env.VITE_API_URL}/tests/${user._id}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    setTeacherTests(res.data);
+  } catch (err) {
+    console.error(err);
+  }
+};
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#151e2e] to-[#1a2236] p-6 text-white">
       {/* Top Bar */}
@@ -231,21 +260,25 @@ const handleEditTest = (test) => {
                       </tr>
                     </thead>
                     <tbody>
-                      <tr>
-                        <td className="py-3">DS Mock</td>
-                        <td className="py-3">MCQ</td>
-                        <td className="py-3">Public</td>
-                        <td className="py-3">
-                          <span className="text-blue-300 cursor-pointer hover:underline" onClick={() => handleEditTest(test)}>
-                            Edit
-                          </span>{" "}
-                          •{" "}
-                          <span className="text-blue-300 cursor-pointer hover:underline">
-                            Analytics
-                          </span>
-                        </td>
-                      </tr>
-                    </tbody>
+  {Array.isArray(teacherTests) && teacherTests.length > 0
+  ? teacherTests.map((test) => (
+      <tr key={test._id}>
+        <td>{test.testName}</td>
+        <td>{test.className}</td>
+        <td>{test.submitBy?.length || 0}</td>
+        <td>
+          <span onClick={() => handleEditTest(test)}>Edit</span>
+        </td>
+      </tr>
+    ))
+  : (
+    <tr>
+      <td colSpan={4}>No tests created yet.</td>
+    </tr>
+  )}
+
+</tbody>
+
                   </table>
                 </div>
               </div>

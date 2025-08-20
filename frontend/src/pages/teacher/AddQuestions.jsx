@@ -1,11 +1,9 @@
 import React, { useState } from "react";
 
 export default function AddQuestions({ onSave, onCancel, initialQuestions = [] }) {
-  const [questions, setQuestions] = useState(
-    initialQuestions.length > 0
-      ? initialQuestions
-      : [{ question: "", options: ["", "", "", ""], answer: 0 }]
-  );
+  const [questions, setQuestions] = useState(initialQuestions || [{ question: "", options: ["", "", "", ""], answer: 0 }]);
+
+
 
   const handleQuestionChange = (idx, value) => {
     const updated = [...questions];
