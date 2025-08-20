@@ -337,4 +337,22 @@ router.put("/update-test-status/:testID", auth, async (req, res) => {
   }
 });
 
+router.get("/assigned-tests/:userId", auth, async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    // No need to fetch Student here if assignedTo stores User._id
+    const tests = await Test.find({ assignedTo: userId });
+
+    res.status(200).json({ tests });
+  } catch (err) {
+    console.log(err);
+    res.status(500).send("Server error");
+  }
+});
+
+
+
+
+
 module.exports = router;
