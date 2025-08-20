@@ -1,5 +1,6 @@
 
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 
 export default function StudentDashboard() {
@@ -9,7 +10,9 @@ export default function StudentDashboard() {
     <div className="min-h-screen bg-gradient-to-br from-[#151e2e] to-[#1a2236] p-6 text-white">
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-3">
+          <Link to='/profile'>
           <button className="px-4 py-1 bg-[#232f4b] rounded-md text-blue-100 hover:bg-[#2a3957] font-semibold">Profile</button>
+          </Link>
           <h2 className="text-2xl font-bold ml-2">Student Dashboard</h2>
         </div>
         {/* Removed notifications, toggle theme, and blue circle */}
