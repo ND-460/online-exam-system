@@ -1,66 +1,57 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
-export default function AddQuestions({ onSave, onCancel, initialQuestions = [] }) {
-  const [questions, setQuestions] = useState(initialQuestions || [{ question: "", options: ["", "", "", ""], answer: 0 }]);
+export default function AddQuestions({ initialQuestions = [], onSave, onCancel }) {
+  // Initialize with existing questions or default one
+  const [questions, setQuestions] = useState(
+  initialQuestions.length > 0
+    ? initialQuestions
+    : [{ question: "", options: ["", "", "", ""], answer: 0 }]
+);
 
-
-
+  // Handle question text change
   const handleQuestionChange = (idx, value) => {
     const updated = [...questions];
     updated[idx].question = value;
     setQuestions(updated);
   };
 
+  // Handle option change
   const handleOptionChange = (qIdx, oIdx, value) => {
     const updated = [...questions];
     updated[qIdx].options[oIdx] = value;
     setQuestions(updated);
   };
 
+  // Handle correct answer change
   const handleAnswerChange = (qIdx, value) => {
     const updated = [...questions];
     updated[qIdx].answer = parseInt(value);
     setQuestions(updated);
   };
 
+  // Add new empty question
   const addQuestion = () => {
     setQuestions([...questions, { question: "", options: ["", "", "", ""], answer: 0 }]);
   };
 
+  // Remove question
   const removeQuestion = (idx) => {
     setQuestions(questions.filter((_, i) => i !== idx));
   };
 
   const handleSave = () => {
-    // Validate questions before saving
-    const isValid = questions.every(
-      (q) =>
-        q.question.trim() !== "" &&
-        q.options.every((opt) => opt.trim() !== "") &&
-        q.answer >= 0 &&
-        q.answer <= 3
-    );
-    if (!isValid) {
-      alert("Please complete all questions, options, and select correct answers.");
-      return;
-    }
-    onSave(questions);
+    onSave(questions); // return updated questions
   };
 
   return (
     <div className="bg-gradient-to-br from-black via-[#181f2e] to-[#232f4b] rounded-2xl p-8 border border-[#232f4b] shadow-2xl w-full max-w-2xl mx-auto mt-8">
-      <h2 className="text-xl font-bold mb-4">Add Questions</h2>
+      <h2 className="text-xl font-bold mb-4">Add / Edit Questions</h2>
       {questions.map((q, idx) => (
         <div key={idx} className="mb-6 p-4 bg-[#181f2e] rounded-xl border border-[#232f4b]">
           <div className="flex justify-between items-center mb-2">
             <label className="font-semibold text-white">Question {idx + 1}</label>
             {questions.length > 1 && (
-              <button
-                onClick={() => removeQuestion(idx)}
-                className="text-red-400 hover:underline text-xs"
-              >
-                Remove
-              </button>
+              <button onClick={() => removeQuestion(idx)} className="text-red-400 hover:underline text-xs">Remove</button>
             )}
           </div>
           <input
@@ -88,33 +79,16 @@ export default function AddQuestions({ onSave, onCancel, initialQuestions = [] }
               onChange={(e) => handleAnswerChange(idx, e.target.value)}
             >
               {q.options.map((_, oIdx) => (
-                <option key={oIdx} value={oIdx}>
-                  Option {oIdx + 1}
-                </option>
+                <option key={oIdx} value={oIdx}>{`Option ${oIdx + 1}`}</option>
               ))}
             </select>
           </div>
         </div>
       ))}
-      <button
-        onClick={addQuestion}
-        className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-md font-semibold mb-4"
-      >
-        Add Another Question
-      </button>
+      <button onClick={addQuestion} className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-md font-semibold mb-4">Add Another Question</button>
       <div className="flex gap-4 mt-4">
-        <button
-          onClick={handleSave}
-          className="bg-violet-600 hover:bg-violet-700 text-white px-6 py-3 rounded-md font-semibold text-lg"
-        >
-          Save Questions
-        </button>
-        <button
-          onClick={onCancel}
-          className="bg-transparent border border-blue-200 text-blue-200 px-6 py-3 rounded-md font-semibold text-lg"
-        >
-          Cancel
-        </button>
+        <button onClick={handleSave} className="bg-violet-600 hover:bg-violet-700 text-white px-6 py-3 rounded-md font-semibold text-lg">Save Questions</button>
+        <button onClick={onCancel} className="bg-transparent border border-blue-200 text-blue-200 px-6 py-3 rounded-md font-semibold text-lg">Cancel</button>
       </div>
     </div>
   );
