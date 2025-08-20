@@ -465,6 +465,7 @@ import { useNavigate } from "react-router-dom";
 import { Formik, Form, Field, ErrorMessage } from "formik";
 import * as Yup from "yup";
 import axios from "axios";
+import { useAuthStore } from "../../store/authStore";
 
 const RegisterSchema = Yup.object().shape({
   name: Yup.string().required("Name is required"),
@@ -651,6 +652,7 @@ export default function Register() {
   const [success, setSuccess] = useState("");
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const navigate = useNavigate();
+  const {login} = useAuthStore((state) => state.login)
 
   useEffect(() => {
     const handleMouseMove = (e) =>
@@ -755,6 +757,8 @@ export default function Register() {
                   role: selectedRole,
                 }
               );
+              const {token,user} = res.data
+              login(user,token)
               setSuccess("Registration successful! Redirecting to login...");
               resetForm();
               setTimeout(() => navigate("/login"), 2000);

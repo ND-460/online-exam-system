@@ -14,8 +14,8 @@ const { baseURL } = require("../utils/roles");
 const passport = require("passport");
 require("dotenv").config();
 
-const { OAuth2Client } = require('google-auth-library');
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
+const { OAuth2Client } = require("google-auth-library");
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 //transporter for nodemailer
 var transporter = nodemailer.createTransport(
@@ -196,18 +196,18 @@ router.post(
       };
 
       switch (user.role) {
-        case STUDENT:
+        case 'student':
           let studentData = await Student.findOne({
-            profileInfo: user.id,
+            profileInfo: user._id,
           });
 
           const studentProfileID = studentData._id;
           payload.profileID = studentProfileID;
           break;
 
-        case TEACHER:
+        case 'teacher':
           let teacherData = await Teacher.findOne({
-            profileInfo: user.id,
+            profileInfo: user._id,
           });
 
           const teacherProfileID = teacherData._id;
@@ -439,6 +439,7 @@ router.post(
             );
           }
           res.status(200).json({
+            user,
             payload,
             token,
           });
@@ -561,17 +562,14 @@ router.get("/confirm/:token", async (req, res) => {
 //   }
 // });
 
-
 // Redirect login start
 router.get("/auth/google", (req, res, next) => {
-  const role = req.query.role || "student"; 
+  const role = req.query.role || "student";
   passport.authenticate("google", {
     scope: ["profile", "email"],
-    state: role, 
+    state: role,
   })(req, res, next);
 });
-
-
 
 /**
  * @method - POST
@@ -589,7 +587,6 @@ router.get(
     failureRedirect: `${process.env.FRONTEND_URL}/login?error=GoogleAuthFailed`,
   }),
   async (req, res) => {
-   
     const role = req.query.state || "student";
     if (!req.user.role) {
       req.user.role = role;
@@ -608,9 +605,6 @@ router.get(
   }
 );
 
-
-
-
 /**
  * @method - POST
  * @param - /logout
@@ -626,6 +620,72 @@ router.post("/logout", function (req, res, next) {
     }
     res.redirect("/");
   });
+});
+
+/**
+ * @method - GET
+ * @param - /profile/:profileID
+ * @description -  get profiles of common user
+ */
+
+router.get("/profile/:profileID", auth, async (req, res) => {
+  const profileID = req.params.profileID;
+
+  try {
+    let obj = await Student.findOne({ _id: profileID });
+    if (!obj) {
+      obj = await Teacher.findOne({ _id: profileID });
+    }
+    if (!obj) {
+      obj = await User.findOne({ _id: profileID });
+    }
+
+    if (!obj) {
+      return res.status(404).json({ message: "Profile not found" });
+    }
+
+    return res.status(200).json({ obj });
+  } catch (err) {
+    console.log(err.message);
+    res.status(500).send("Error in fetching Profile Data");
+  }
+});
+
+
+/**
+ * @method - PUT
+ * @param - /profile/:profileID
+ * @description -  update profiles of common user
+ */
+
+router.put("/profile/:profileID", auth, async (req, res) => {
+  const profileID = req.params.profileID;
+
+  try {
+    // Check in Student, Teacher, then User
+    let updatedData =
+      (await Student.findOneAndUpdate({ _id: profileID }, req.body, {
+        new: true,
+      })) ||
+      (await Teacher.findOneAndUpdate({ _id: profileID }, req.body, {
+        new: true,
+      })) ||
+      (await User.findOneAndUpdate({ _id: profileID }, req.body, {
+        new: true,
+      }));
+
+    if (!updatedData) {
+      return res.status(404).json({ message: "Profile not found" });
+    }
+
+    return res.status(200).json({
+      message: "Profile successfully updated",
+      updatedData,
+    });
+  } catch (err) {
+    console.log(err.message);
+    res.status(500).send("Error in Updating Profile");
+  }
 });
 
 module.exports = router;

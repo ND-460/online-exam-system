@@ -419,6 +419,7 @@ import { useNavigate } from 'react-router-dom';
 import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
 import axios from 'axios';
+import {useAuthStore} from '../../store/authStore'
 
 const LoginSchema = Yup.object().shape({
   role: Yup.string().required('Role is required'),
@@ -486,6 +487,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const navigate = useNavigate();
+  const {login,fetchProfile} = useAuthStore()
 
   useEffect(() => {
     const handleMouseMove = (e) => setMousePosition({ x: e.clientX, y: e.clientY });
@@ -500,9 +502,11 @@ export default function Login() {
       const token = params.get("token");
       localStorage.setItem("token", token);
       const payload = JSON.parse(atob(token.split(".")[1]));
+      login(payload,token)
+      fetchProfile(payload._id)
       navigate(`/${payload.role}`);
     }
-  }, [navigate]);
+  }, [login,navigate]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-zinc-900 to-black relative overflow-hidden flex items-center justify-center p-4">
@@ -582,6 +586,8 @@ export default function Login() {
                 role: selectedRole,
               });
               localStorage.setItem('token', res.data.token);
+              login(res.data.user,res.data.token)
+              await fetchProfile()
               navigate(`/${selectedRole}`);
             } catch (err) {
               setError(err.response?.data?.message || 'Login failed');

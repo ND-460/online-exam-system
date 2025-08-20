@@ -3,7 +3,8 @@ import { motion } from "framer-motion";
 import {
   Bell, Sun, Moon, User, Users, FileText, TrendingUp, Clock, CheckCircle, XCircle, Trash2, BarChart3, Mail, CreditCard, Plus, MessageCircle, Activity,
 } from "lucide-react";
-
+import {useNavigate,Link} from "react-router-dom"
+import { useAuthStore } from "../../store/authStore";
 const notifications = [
   { id: 1, message: "New user registered: Alice" },
   { id: 2, message: "Test submitted by John" },
@@ -42,7 +43,12 @@ export default function AdminDashboard() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [showAnnounceModal, setShowAnnounceModal] = useState(false);
   const [announceText, setAnnounceText] = useState("");
-
+  const {logout} = useAuthStore()
+  const navigate = useNavigate()
+  const handleLogout = () => {
+    logout(); 
+    navigate("/");
+  };
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#151e2e] to-[#1a2236] relative overflow-x-hidden">
       {/* Top Nav */}
@@ -81,8 +87,10 @@ export default function AdminDashboard() {
             {profileOpen && (
               <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute right-0 mt-2 w-40 bg-[#181f2e] rounded-xl shadow-xl border border-[#232f4b] z-30">
                 <div className="p-4 text-blue-100 font-semibold">Admin</div>
+                <Link to='/profile'>
                 <button className="w-full text-left px-4 py-2 text-blue-200 hover:bg-[#232f4b]">Profile</button>
-                <button className="w-full text-left px-4 py-2 text-blue-200 hover:bg-[#232f4b]">Logout</button>
+                </Link>
+                <button className="w-full text-left px-4 py-2 text-blue-200 hover:bg-[#232f4b]" onClick={handleLogout}>Logout</button>
               </motion.div>
             )}
           </div>

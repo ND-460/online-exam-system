@@ -1,6 +1,9 @@
 
 import React, { useState } from "react";
+import { Link ,useNavigate} from "react-router-dom";
 import AddQuestions from "./AddQuestions";
+import { useAuthStore } from "../../store/authStore";
+
 
 export default function TeacherDashboard() {
   const [testTitle, setTestTitle] = useState("");
@@ -8,7 +11,8 @@ export default function TeacherDashboard() {
   const [testDesc, setTestDesc] = useState("");
   const [showQuestions, setShowQuestions] = useState(false);
   const [questions, setQuestions] = useState([]);
-
+  const {logout} = useAuthStore()
+  const navigate = useNavigate()
   const handleNextQuestions = () => {
     setShowQuestions(true);
   };
@@ -20,15 +24,30 @@ export default function TeacherDashboard() {
   const handleCancelQuestions = () => {
     setShowQuestions(false);
   };
-
+   const handleLogout = () => {
+    logout();
+    navigate("/login"); // redirect to login page
+  };
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#151e2e] to-[#1a2236] p-6 text-white">
+      {/* Top Bar */}
       <div className="flex justify-between items-center mb-4">
-        <div>
+        <div className="flex items-center gap-4">
           <h2 className="text-2xl font-bold">Teacher Dashboard</h2>
-          <p className="text-blue-200 text-sm mt-1">Welcome back — here's what's happening.</p>
         </div>
-        {/* Removed Notifications, Toggle Theme, and blue circle */}
+        <div className="flex items-center gap-3">
+          <Link to="/profile">
+            <button className="px-4 py-1 bg-[#232f4b] rounded-md text-blue-100 hover:bg-[#2a3957] font-semibold">
+              Profile
+            </button>
+          </Link>
+          <button
+            onClick={handleLogout}
+            className="px-4 py-1 bg-red-600 rounded-md text-white hover:bg-red-700 font-semibold"
+          >
+            Logout
+          </button>
+        </div>
       </div>
 
       {showQuestions ? (

@@ -18,6 +18,7 @@ import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import NotFound from './pages/misc/NotFound';
 import Error from './pages/misc/Error';
 import './App.css';
+import ProfilePage from './pages/ProfilePage';
 
 function App() {
   return (
@@ -40,6 +41,7 @@ function App() {
         <Route path="/exam" element={<Exam />} />
         <Route path="/result" element={<Result />} />
         <Route path="/error" element={<Error />} />
+        <Route path='/profile' element={<ProfilePage/>}/>
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Router>
