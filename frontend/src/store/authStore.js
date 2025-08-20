@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import axios from "axios";
 import {jwtDecode} from "jwt-decode"; 
 
+
 export const useAuthStore = create(
   persist(
     (set, get) => ({
@@ -37,7 +38,6 @@ export const useAuthStore = create(
           const { token } = get();
           if (!token) return;
 
-          // decode token to extract user id
           const decoded = jwtDecode(token);
           const userId = decoded.user.id;
 
@@ -50,6 +50,25 @@ export const useAuthStore = create(
 
           set({ user: res.data.obj, isAuthenticated: true });
         } catch (error) {
+          console.error("Failed to fetch profile:", error);
+        }
+      },
+      fetchProfileGoogle: async () =>{
+        try{
+          const {token} = get()
+          if(!token) return
+          const decoded = jwtDecode(token)
+          const userId = decoded.id
+          const res = await axios.get(
+            `${import.meta.env.VITE_API_URL}/api/user/profile/${userId}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+
+          set({ user: res.data.obj, isAuthenticated: true });
+
+        }catch(error){
           console.error("Failed to fetch profile:", error);
         }
       },
