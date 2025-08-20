@@ -487,7 +487,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const navigate = useNavigate();
-  const {login,fetchProfile} = useAuthStore()
+  const {login,fetchProfileGoogle,fetchProfile} = useAuthStore()
 
   useEffect(() => {
     const handleMouseMove = (e) => setMousePosition({ x: e.clientX, y: e.clientY });
@@ -503,7 +503,7 @@ export default function Login() {
       localStorage.setItem("token", token);
       const payload = JSON.parse(atob(token.split(".")[1]));
       login(payload,token)
-      fetchProfile(payload._id)
+      fetchProfileGoogle()
       navigate(`/${payload.role}`);
     }
   }, [login,navigate]);
