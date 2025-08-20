@@ -38,7 +38,7 @@ function App() {
         <Route path="/admin/analytics" element={<Analytics />} />
         <Route path="/student" element={<StudentDashboard />} />
         <Route path="/teacher" element={<TeacherDashboard />} />
-        <Route path="/exam" element={<Exam />} />
+        <Route path="/exam/:testId" element={<Exam />} />
         <Route path="/result" element={<Result />} />
         <Route path="/error" element={<Error />} />
         <Route path='/profile' element={<ProfilePage/>}/>

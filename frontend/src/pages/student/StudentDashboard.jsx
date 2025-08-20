@@ -259,29 +259,44 @@ const fetchMyTests = async () => {
       <h3 className="text-2xl font-bold text-white mb-4">My Tests</h3>
       <div className="max-h-96 overflow-y-auto">
         <ul className="divide-y divide-gray-700">
-          {myTests.length > 0 ? (
-            myTests.map((test) => (
-              <li
-                key={test._id}
-                className="py-3 flex justify-between items-center"
-              >
-                <div>
-                  <span className="font-semibold text-white">
-                    {test.testName}
-                  </span>{" "}
-                  - <span className="text-gray-300">{test.category}</span>
-                </div>
-                <div>
-                  <span className="text-green-400 text-sm font-medium">
-                    Can Attempt
-                  </span>
-                </div>
-              </li>
-            ))
+  {myTests.length > 0 ? (
+    myTests.map((test) => (
+      <li
+        key={test._id}
+        className="py-3 flex justify-between items-center"
+      >
+        <div>
+          <span className="font-semibold text-white">
+            {test.testName}
+          </span>{" "}
+          - <span className="text-gray-300">{test.category}</span>
+        </div>
+        <div>
+          {test.assignedTo.includes(user._id) &&
+          !test.submitBy.includes(user._id) ? (
+            <button
+              className="text-green-400 text-sm font-medium hover:underline"
+              onClick={() => navigate(`/exam/${test._id}`)}
+            >
+              Can Attempt
+            </button>
+          ) : test.submitBy.includes(user._id) ? (
+            <span className="text-purple-400 text-sm font-medium">
+              Completed
+            </span>
           ) : (
-            <li className="py-3 text-gray-400 text-center">No tests assigned</li>
+            <span className="text-gray-500 text-sm font-medium">
+              Not Assigned
+            </span>
           )}
-        </ul>
+        </div>
+      </li>
+    ))
+  ) : (
+    <li className="py-3 text-gray-400 text-center">No tests assigned</li>
+  )}
+</ul>
+
       </div>
     </div>
   </div>
