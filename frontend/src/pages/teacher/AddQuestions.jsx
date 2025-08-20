@@ -1,46 +1,51 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
-export default function AddQuestions({ onSave, onCancel }) {
-  const [questions, setQuestions] = useState([
-    { question: "", options: ["", "", "", ""], answer: 0 }
-  ]);
+export default function AddQuestions({ initialQuestions = [], onSave, onCancel }) {
+  // Initialize with existing questions or default one
+  const [questions, setQuestions] = useState(
+  initialQuestions.length > 0
+    ? initialQuestions
+    : [{ question: "", options: ["", "", "", ""], answer: 0 }]
+);
 
+  // Handle question text change
   const handleQuestionChange = (idx, value) => {
     const updated = [...questions];
     updated[idx].question = value;
     setQuestions(updated);
   };
 
+  // Handle option change
   const handleOptionChange = (qIdx, oIdx, value) => {
     const updated = [...questions];
     updated[qIdx].options[oIdx] = value;
     setQuestions(updated);
   };
 
+  // Handle correct answer change
   const handleAnswerChange = (qIdx, value) => {
     const updated = [...questions];
     updated[qIdx].answer = parseInt(value);
     setQuestions(updated);
   };
 
+  // Add new empty question
   const addQuestion = () => {
-    setQuestions([
-      ...questions,
-      { question: "", options: ["", "", "", ""], answer: 0 }
-    ]);
+    setQuestions([...questions, { question: "", options: ["", "", "", ""], answer: 0 }]);
   };
 
-  const removeQuestion = idx => {
+  // Remove question
+  const removeQuestion = (idx) => {
     setQuestions(questions.filter((_, i) => i !== idx));
   };
 
   const handleSave = () => {
-    onSave(questions);
+    onSave(questions); // return updated questions
   };
 
   return (
     <div className="bg-gradient-to-br from-black via-[#181f2e] to-[#232f4b] rounded-2xl p-8 border border-[#232f4b] shadow-2xl w-full max-w-2xl mx-auto mt-8">
-      <h2 className="text-xl font-bold mb-4">Add Questions</h2>
+      <h2 className="text-xl font-bold mb-4">Add / Edit Questions</h2>
       {questions.map((q, idx) => (
         <div key={idx} className="mb-6 p-4 bg-[#181f2e] rounded-xl border border-[#232f4b]">
           <div className="flex justify-between items-center mb-2">
@@ -53,7 +58,7 @@ export default function AddQuestions({ onSave, onCancel }) {
             className="w-full bg-[#151e2e] border border-[#232f4b] rounded-md px-3 py-2 text-white mb-2"
             placeholder="Enter question text"
             value={q.question}
-            onChange={e => handleQuestionChange(idx, e.target.value)}
+            onChange={(e) => handleQuestionChange(idx, e.target.value)}
           />
           <div className="grid grid-cols-2 gap-2 mb-2">
             {q.options.map((opt, oIdx) => (
@@ -62,7 +67,7 @@ export default function AddQuestions({ onSave, onCancel }) {
                 className="bg-[#151e2e] border border-[#232f4b] rounded-md px-3 py-2 text-white"
                 placeholder={`Option ${oIdx + 1}`}
                 value={opt}
-                onChange={e => handleOptionChange(idx, oIdx, e.target.value)}
+                onChange={(e) => handleOptionChange(idx, oIdx, e.target.value)}
               />
             ))}
           </div>
@@ -71,7 +76,7 @@ export default function AddQuestions({ onSave, onCancel }) {
             <select
               className="bg-[#151e2e] border border-[#232f4b] rounded-md px-2 py-1 text-white"
               value={q.answer}
-              onChange={e => handleAnswerChange(idx, e.target.value)}
+              onChange={(e) => handleAnswerChange(idx, e.target.value)}
             >
               {q.options.map((_, oIdx) => (
                 <option key={oIdx} value={oIdx}>{`Option ${oIdx + 1}`}</option>

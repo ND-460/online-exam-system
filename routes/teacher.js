@@ -41,7 +41,7 @@ router.get("/tests/:profileID", auth, async (req, res) => {
   try {
     const obj = await Test.find(
       { teacherId: profileID },
-      "submitBy className testName"
+      "submitBy testName category className minutes rules outOfMarks questions"
     );
     return res.status(200).json(obj);
   } catch (err) {

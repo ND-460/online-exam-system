@@ -1,54 +1,26 @@
-const moongose = require('mongoose');
+const mongoose = require('mongoose');
 
-const testSchema = new moongose.Schema({
-    teacherId:{
-        type: moongose.Schema.Types.ObjectId,
-        ref: 'teachers',
-        // required: true
-    },
-    testName: {
-        type: String,
-        required: true
-    },
-    category: {
-        type: String,
-        required: true
-    },
-    className: {
-        type: String,
-        required: true
-    },
-    minutes: {
-        type: Number,
-        required: true
-    },
-    rules: {
-        type: String,
-        required: true
-    },
-    outOfMarks: {
-        type: Number,
-        required: true
-    },
-    questions: {
-        type: Array,
-        required: true
-    },
-    assignedTo: {
-        type: Array,
-        // default: []
-    },
-    attempted:{
-        type: Boolean,
-        default: false
-    },
-    answers: {
-        type: Array,
-        default: []
-    },
-    submitBy:{
-        type: Array,
-    }
-})
+const questionSchema = new mongoose.Schema({
+  question: { type: String, required: true },
+  options: { type: [String], required: true }, 
+  answer: { type: Number, required: true }    
+});
 
-module.exports = moongose.model('tests',testSchema)
+const testSchema = new mongoose.Schema({
+  teacherId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'teachers',
+  },
+  testName: { type: String, required: true },
+  category: { type: String, required: true },
+  className: { type: String, required: true },
+  minutes: { type: Number, required: true },
+  rules: { type: [String], required: true, default: [] },
+  outOfMarks: { type: Number, required: true },
+  questions: { type: [questionSchema], required: true }, 
+  assignedTo: { type: Array },
+  attempted: { type: Boolean, default: false },
+  submitBy: { type: Array },
+});
+
+module.exports = mongoose.model('tests', testSchema);

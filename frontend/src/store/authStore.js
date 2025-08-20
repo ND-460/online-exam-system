@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import axios from "axios";
-import jwtDecode from "jwt-decode"; 
+import {jwtDecode} from "jwt-decode"; 
 
 export const useAuthStore = create(
   persist(
