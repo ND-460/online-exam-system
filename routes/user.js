@@ -196,18 +196,18 @@ router.post(
       };
 
       switch (user.role) {
-        case STUDENT:
+        case 'student':
           let studentData = await Student.findOne({
-            profileInfo: user.id,
+            profileInfo: user._id,
           });
 
           const studentProfileID = studentData._id;
           payload.profileID = studentProfileID;
           break;
 
-        case TEACHER:
+        case 'teacher':
           let teacherData = await Teacher.findOne({
-            profileInfo: user.id,
+            profileInfo: user._id,
           });
 
           const teacherProfileID = teacherData._id;
@@ -439,6 +439,7 @@ router.post(
             );
           }
           res.status(200).json({
+            user,
             payload,
             token,
           });

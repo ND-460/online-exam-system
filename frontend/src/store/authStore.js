@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import axios from "axios";
-import {jwtDecode} from "jwt-decode"; 
+import jwtDecode from "jwt-decode"; 
 
 export const useAuthStore = create(
   persist(
@@ -39,7 +39,7 @@ export const useAuthStore = create(
 
           // decode token to extract user id
           const decoded = jwtDecode(token);
-          const userId = decoded.id;
+          const userId = decoded.user.id;
 
           const res = await axios.get(
             `${import.meta.env.VITE_API_URL}/api/user/profile/${userId}`,
