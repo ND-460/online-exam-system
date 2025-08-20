@@ -631,15 +631,12 @@ router.get("/profile/:profileID", auth, async (req, res) => {
   const profileID = req.params.profileID;
 
   try {
-    //  fetching from Student
-    let obj = await Student.findOne({ _id: profileID }).populate("profileInfo");
+    let obj = await Student.findOne({ _id: profileID });
     if (!obj) {
-      //  fetching from Teacher if not Student
-      obj = await Teacher.findOne({ _id: profileID }).populate("profileInfo");
+      obj = await Teacher.findOne({ _id: profileID });
     }
     if (!obj) {
-      //  fallback to generic User
-      obj = await User.findOne({ _id: profileID }).populate("profileInfo");
+      obj = await User.findOne({ _id: profileID });
     }
 
     if (!obj) {
@@ -652,6 +649,7 @@ router.get("/profile/:profileID", auth, async (req, res) => {
     res.status(500).send("Error in fetching Profile Data");
   }
 });
+
 
 /**
  * @method - PUT
