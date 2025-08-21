@@ -1,61 +1,64 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 // import MonacoEditor from "react-monaco-editor"; // Uncomment if Monaco is set up
+import { useParams } from "react-router-dom";
+import { useAuthStore } from "../../store/authStore";
+import axios from "axios";
+// const MOCK_QUESTIONS = [
+//   {
+//     id: 1,
+//     type: "mcq",
+//     question: "What is the capital of France?",
+//     options: ["Berlin", "London", "Paris", "Madrid"],
+//     answer: 2,
+//     marks: 1,
+//   },
+//   {
+//     id: 2,
+//     type: "multi",
+//     question: "Select all prime numbers.",
+//     options: ["2", "3", "4", "5"],
+//     answer: [0, 1, 3],
+//     marks: 2,
+//   },
+//   {
+//     id: 3,
+//     type: "tf",
+//     question: "The sky is green.",
+//     answer: false,
+//     marks: 1,
+//   },
+//   {
+//     id: 4,
+//     type: "fill",
+//     question: "_____ is the largest planet in our solar system.",
+//     answer: "Jupiter",
+//     marks: 1,
+//   },
+//   {
+//     id: 5,
+//     type: "code",
+//     question: "Write a function to reverse a string in Python.",
+//     language: "python",
+//     starter: "def reverse_string(s):\n    # Your code here\n    ",
+//     marks: 5,
+//   },
+// ];
 
-const MOCK_QUESTIONS = [
-  {
-    id: 1,
-    type: "mcq",
-    question: "What is the capital of France?",
-    options: ["Berlin", "London", "Paris", "Madrid"],
-    answer: 2,
-    marks: 1,
-  },
-  {
-    id: 2,
-    type: "multi",
-    question: "Select all prime numbers.",
-    options: ["2", "3", "4", "5"],
-    answer: [0, 1, 3],
-    marks: 2,
-  },
-  {
-    id: 3,
-    type: "tf",
-    question: "The sky is green.",
-    answer: false,
-    marks: 1,
-  },
-  {
-    id: 4,
-    type: "fill",
-    question: "_____ is the largest planet in our solar system.",
-    answer: "Jupiter",
-    marks: 1,
-  },
-  {
-    id: 5,
-    type: "code",
-    question: "Write a function to reverse a string in Python.",
-    language: "python",
-    starter: "def reverse_string(s):\n    # Your code here\n    ",
-    marks: 5,
-  },
-];
-
-const EXAM_INFO = {
-  title: "Sample Exam",
-  subject: "General Knowledge",
-  totalQuestions: MOCK_QUESTIONS.length,
-  totalMarks: MOCK_QUESTIONS.reduce((a, q) => a + q.marks, 0),
-  timeLimit: 30 * 60, // 30 minutes in seconds
-  instructions: [
-    "Do not refresh or close the tab during the exam.",
-    "Each question is mandatory unless marked optional.",
-    "No negative marking.",
-    "Strict anti-cheating measures are enabled.",
-  ],
-};
+// const EXAM_INFO = {
+//   title: "Sample Exam",
+//   subject: "General Knowledge",
+//   totalQuestions: questions.length,
+//   totalMarks: questions.reduce((a, q) => a + q.marks, 0),
+//   timeLimit: 30 * 60, // 30 minutes in seconds
+//   instructions: [
+//     "Do not refresh or close the tab during the exam.",
+//     "Each question is mandatory unless marked optional.",
+//     "No negative marking.",
+//     "Strict anti-cheating measures are enabled.",
+//   ],
+// };
 
 const paletteColors = {
   notVisited: "bg-gray-500",
@@ -75,17 +78,28 @@ function formatTime(secs) {
 export default function Exam() {
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState({});
-  const [palette, setPalette] = useState(
-    MOCK_QUESTIONS.map(() => "notVisited")
-  );
+  const [palette, setPalette] = useState([]);
   const [review, setReview] = useState([]);
   const [showInstructions, setShowInstructions] = useState(false);
-  const [timer, setTimer] = useState(EXAM_INFO.timeLimit);
+  
   const [showSubmit, setShowSubmit] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [tabWarnings, setTabWarnings] = useState(0);
   const timerRef = useRef();
-
+  const { token, user } = useAuthStore();
+  const navigate = useNavigate()
+  const { testId } = useParams();
+  // console.log(testId)
+  const [questions, setQuestions] = useState([]);
+  const [examInfo, setExamInfo] = useState({
+    title: "",
+    subject: "",
+    totalQuestions: 0,
+    totalMarks: 0,
+    timeLimit: 0,
+    instructions: [],
+  });
+const [timer, setTimer] = useState(examInfo.timeLimit);
   // Timer logic
   useEffect(() => {
     if (timer <= 0) {
@@ -123,19 +137,23 @@ export default function Exam() {
 
   // Fullscreen logic
   useEffect(() => {
-    if (fullscreen) {
-      document.documentElement.requestFullscreen();
-    } else {
-      document.exitFullscreen?.();
+  if (fullscreen) {
+    document.documentElement.requestFullscreen();
+  } else {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
     }
-  }, [fullscreen]);
+  }
+}, [fullscreen]);
+
 
   // Palette update
   useEffect(() => {
     setPalette((prev) =>
       prev.map((color, idx) => {
         if (idx === current) {
-          if (answers[idx] !== undefined && !review.includes(idx)) return "answered";
+          if (answers[idx] !== undefined && !review.includes(idx))
+            return "answered";
           if (review.includes(idx)) return "review";
           return color === "notVisited" ? "notAnswered" : color;
         }
@@ -143,6 +161,47 @@ export default function Exam() {
       })
     );
   }, [current, answers, review]);
+  //fetch test from backend
+useEffect(() => {
+  const fetchTest = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_URL}/api/student/test/${testId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const test = res.data; // your backend returns the test directly
+
+      // Format questions so type matches what renderQuestion expects
+      const formattedQuestions = (test.questions || []).map((q) => ({
+        ...q,
+        type: test.category.toLowerCase(), // normalize type
+        marks: q.marks || 1, // default to 1 if not present
+      }));
+
+      setQuestions(formattedQuestions);
+
+      setExamInfo({
+        title: test.testName,
+        subject: test.category,
+        totalQuestions: formattedQuestions.length,
+        totalMarks: formattedQuestions.reduce((sum, q) => sum + q.marks, 0),
+        timeLimit: (test.minutes || 30) * 60,
+        instructions: test.rules || [
+          "Do not refresh or close the tab during the exam.",
+        ],
+      });
+
+      setPalette(formattedQuestions.map(() => "notVisited"));
+      setTimer((test.minutes || 30) * 60);
+    } catch (err) {
+      console.error("Error fetching test:", err);
+    }
+  };
+
+  fetchTest();
+}, [testId, token]);
+
 
   // Question navigation
   const goTo = (idx) => setCurrent(idx);
@@ -161,28 +220,29 @@ export default function Exam() {
   };
 
   // Render question
-  const q = MOCK_QUESTIONS[current];
+  const q = questions[current];
   function renderQuestion() {
     if (!q) return null;
     if (q.type === "mcq") {
       return (
         <div>
-          <div className="mb-4 text-lg font-semibold">{q.question}</div>
-          <div className="flex flex-col gap-2">
-            {q.options.map((opt, i) => (
-              <label key={i} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name={`mcq-${q.id}`}
-                  checked={answers[current] === i}
-                  onChange={() => saveAnswer(i)}
-                  className="accent-blue-500 w-5 h-5"
-                />
-                <span>{opt}</span>
-              </label>
-            ))}
-          </div>
-        </div>
+  <div className="mb-4 text-lg font-semibold text-white">{q.question}</div>
+  <div className="flex flex-col gap-2">
+    {q.options.map((opt, i) => (
+      <label key={i} className="flex items-center gap-2 cursor-pointer text-white">
+        <input
+          type="radio"
+          name={`mcq-${q.id}`}
+          checked={answers[current] === i}
+          onChange={() => saveAnswer(i)}
+          className="accent-blue-500 w-5 h-5"
+        />
+        <span>{opt}</span>
+      </label>
+    ))}
+  </div>
+</div>
+
       );
     }
     if (q.type === "multi") {
@@ -194,9 +254,14 @@ export default function Exam() {
               <label key={i} className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={Array.isArray(answers[current]) && answers[current].includes(i)}
+                  checked={
+                    Array.isArray(answers[current]) &&
+                    answers[current].includes(i)
+                  }
                   onChange={() => {
-                    let arr = Array.isArray(answers[current]) ? [...answers[current]] : [];
+                    let arr = Array.isArray(answers[current])
+                      ? [...answers[current]]
+                      : [];
                     if (arr.includes(i)) arr = arr.filter((x) => x !== i);
                     else arr.push(i);
                     saveAnswer(arr);
@@ -219,7 +284,11 @@ export default function Exam() {
               <button
                 key={val.toString()}
                 onClick={() => saveAnswer(val)}
-                className={`px-6 py-2 rounded-lg font-semibold border-2 transition-all duration-150 ${answers[current] === val ? "bg-blue-500 border-blue-500 text-white" : "bg-[#181f2e] border-blue-700 text-blue-200"}`}
+                className={`px-6 py-2 rounded-lg font-semibold border-2 transition-all duration-150 ${
+                  answers[current] === val
+                    ? "bg-blue-500 border-blue-500 text-white"
+                    : "bg-[#181f2e] border-blue-700 text-blue-200"
+                }`}
               >
                 {val ? "True" : "False"}
               </button>
@@ -246,7 +315,10 @@ export default function Exam() {
       return (
         <div>
           <div className="mb-4 text-lg font-semibold">{q.question}</div>
-          <select className="mb-2 bg-[#181f2e] border border-blue-700 rounded-md px-3 py-2 text-white" defaultValue={q.language}>
+          <select
+            className="mb-2 bg-[#181f2e] border border-blue-700 rounded-md px-3 py-2 text-white"
+            defaultValue={q.language}
+          >
             <option>python</option>
             <option>javascript</option>
             <option>cpp</option>
@@ -255,7 +327,7 @@ export default function Exam() {
           <textarea
             className="w-full bg-[#181f2e] border border-blue-700 rounded-md px-4 py-3 text-white text-lg min-h-[120px]"
             value={answers[current] || q.starter}
-            onChange={e => saveAnswer(e.target.value)}
+            onChange={(e) => saveAnswer(e.target.value)}
           />
         </div>
       );
@@ -272,11 +344,28 @@ export default function Exam() {
   }
 
   // Submit logic
-  function handleSubmit() {
-    setShowSubmit(false);
-    // Save all answers, call API, etc.
-    // Redirect to submitted page (placeholder)
-    alert("Test submitted! (Redirect to summary page)");
+  async function handleSubmit() {
+    try {
+      const payload = {
+        answers: answers, 
+      };
+
+      const res = await axios.post(
+        `${import.meta.env.VITE_API_URL}/api/student/attempt-test/${
+          testId
+        }`, 
+        payload,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      alert(res.data.message || "Test submitted successfully!");
+      // Redirect to results/summary page if needed
+      navigate('/student')
+      
+    } catch (err) {
+      console.error("Error submitting test:", err);
+      alert(err.response?.data?.message || "Failed to submit test");
+    }
   }
 
   return (
@@ -284,16 +373,24 @@ export default function Exam() {
       {/* Exam Info Top Bar */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center px-6 py-4 border-b border-blue-900 bg-[#181f2e] sticky top-0 z-20">
         <div>
-          <div className="text-2xl font-bold text-white mb-1">{EXAM_INFO.title}</div>
-          <div className="text-blue-300 text-sm mb-2">{EXAM_INFO.subject}</div>
+          <div className="text-2xl font-bold text-white mb-1">
+            {examInfo.title}
+          </div>
+          <div className="text-blue-300 text-sm mb-2">{examInfo.subject}</div>
           <div className="flex gap-6 text-blue-200 text-xs">
-            <span>Total Questions: {EXAM_INFO.totalQuestions}</span>
-            <span>Total Marks: {EXAM_INFO.totalMarks}</span>
-            <span>Time Limit: {Math.floor(EXAM_INFO.timeLimit / 60)} min</span>
+            <span>Total Questions: {examInfo.totalQuestions}</span>
+            <span>Total Marks: {examInfo.totalMarks}</span>
+            <span>Time Limit: {Math.floor(examInfo.timeLimit / 60)} min</span>
           </div>
         </div>
         <div className="flex flex-col items-end gap-2 ml-auto">
-          <div className={`text-lg font-bold ${timer < 300 ? "text-red-400 animate-pulse" : "text-blue-400"}`}>{formatTime(timer)}</div>
+          <div
+            className={`text-lg font-bold ${
+              timer < 300 ? "text-red-400 animate-pulse" : "text-blue-400"
+            }`}
+          >
+            {formatTime(timer)}
+          </div>
           <button
             className="text-xs text-blue-300 underline"
             onClick={() => setShowInstructions((v) => !v)}
@@ -312,7 +409,7 @@ export default function Exam() {
             className="overflow-hidden bg-[#232f4b] text-blue-100 px-6 py-4 border-b border-blue-900"
           >
             <ul className="list-disc ml-6">
-              {EXAM_INFO.instructions.map((ins, i) => (
+              {examInfo.instructions.map((ins, i) => (
                 <li key={i}>{ins}</li>
               ))}
             </ul>
@@ -359,8 +456,12 @@ export default function Exam() {
                 </div>
                 <button
                   className="bg-blue-700 hover:bg-blue-800 text-white px-6 py-2 rounded-md font-semibold"
-                  onClick={() => setCurrent((c) => Math.min(MOCK_QUESTIONS.length - 1, c + 1))}
-                  disabled={current === MOCK_QUESTIONS.length - 1}
+                  onClick={() =>
+                    setCurrent((c) =>
+                      Math.min(questions.length - 1, c + 1)
+                    )
+                  }
+                  disabled={current === questions.length - 1}
                 >
                   Next
                 </button>
@@ -372,10 +473,12 @@ export default function Exam() {
         <div className="w-full md:w-64 bg-[#181f2e] border-l border-blue-900 flex flex-col items-center py-8 px-2 md:sticky md:top-0">
           <div className="font-bold text-blue-200 mb-4">Question Palette</div>
           <div className="grid grid-cols-5 md:grid-cols-3 gap-2">
-            {MOCK_QUESTIONS.map((_, idx) => (
+            {questions.map((_, idx) => (
               <button
                 key={idx}
-                className={`w-10 h-10 rounded-full text-white font-bold focus:outline-none focus:ring-2 focus:ring-blue-400 ${getPaletteColor(idx)} transition-all duration-150`}
+                className={`w-10 h-10 rounded-full text-white font-bold focus:outline-none focus:ring-2 focus:ring-blue-400 ${getPaletteColor(
+                  idx
+                )} transition-all duration-150`}
                 onClick={() => goTo(idx)}
               >
                 {idx + 1}
@@ -383,10 +486,22 @@ export default function Exam() {
             ))}
           </div>
           <div className="mt-6 flex flex-col gap-2 text-xs text-blue-300">
-            <div><span className="inline-block w-3 h-3 rounded-full bg-gray-500 mr-2"></span>Not Visited</div>
-            <div><span className="inline-block w-3 h-3 rounded-full bg-green-500 mr-2"></span>Answered</div>
-            <div><span className="inline-block w-3 h-3 rounded-full bg-purple-500 mr-2"></span>Marked for Review</div>
-            <div><span className="inline-block w-3 h-3 rounded-full bg-red-500 mr-2"></span>Not Answered</div>
+            <div>
+              <span className="inline-block w-3 h-3 rounded-full bg-gray-500 mr-2"></span>
+              Not Visited
+            </div>
+            <div>
+              <span className="inline-block w-3 h-3 rounded-full bg-green-500 mr-2"></span>
+              Answered
+            </div>
+            <div>
+              <span className="inline-block w-3 h-3 rounded-full bg-purple-500 mr-2"></span>
+              Marked for Review
+            </div>
+            <div>
+              <span className="inline-block w-3 h-3 rounded-full bg-red-500 mr-2"></span>
+              Not Answered
+            </div>
           </div>
         </div>
       </div>
@@ -394,7 +509,9 @@ export default function Exam() {
       <div className="sticky bottom-0 left-0 w-full bg-[#181f2e] border-t border-blue-900 flex flex-col md:flex-row items-center justify-between px-6 py-4 z-30">
         <button
           className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-md font-bold text-lg mb-2 md:mb-0"
-          onClick={() => setCurrent((c) => Math.min(MOCK_QUESTIONS.length - 1, c + 1))}
+          onClick={() =>
+            setCurrent((c) => Math.min(questions.length - 1, c + 1))
+          }
         >
           Save & Next
         </button>
@@ -415,8 +532,13 @@ export default function Exam() {
             className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
           >
             <div className="bg-[#232f4b] rounded-2xl p-8 max-w-md w-full text-center border-2 border-blue-400">
-              <div className="text-xl font-bold text-white mb-4">Submit Test?</div>
-              <div className="text-blue-200 mb-6">Are you sure you want to submit? You cannot change your answers after this.</div>
+              <div className="text-xl font-bold text-white mb-4">
+                Submit Test?
+              </div>
+              <div className="text-blue-200 mb-6">
+                Are you sure you want to submit? You cannot change your answers
+                after this.
+              </div>
               <div className="flex gap-4 justify-center">
                 <button
                   className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-md font-semibold"

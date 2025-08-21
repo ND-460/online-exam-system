@@ -337,4 +337,71 @@ router.put("/update-test-status/:testID", auth, async (req, res) => {
   }
 });
 
+router.get("/assigned-tests/:userId", auth, async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    
+    const tests = await Test.find({ assignedTo: userId });
+
+    res.status(200).json({ tests });
+  } catch (err) {
+    console.log(err);
+    res.status(500).send("Server error");
+  }
+});
+
+// POST /api/student/attempt-test/:testId
+router.post("/attempt-test/:testId", auth, async (req, res) => {
+  const { testId } = req.params;
+  const studentId = req.user?.id;
+  if (!studentId) return res.status(401).json({ message: "Unauthorized" });
+
+  const { answers } = req.body;
+
+  try {
+    const test = await Test.findById(testId);
+    if (!test) return res.status(404).json({ message: "Test not found" });
+
+    if (!test.assignedTo.includes(studentId))
+      return res.status(403).json({ message: "You are not assigned to this test" });
+
+    if (test.submitBy.includes(studentId))
+      return res.status(400).json({ message: "Test already submitted" });
+
+    const studentAttempt = {
+      testId: test._id,
+      answers,
+      score: null,
+      attemptedAt: new Date(),
+    };
+
+    await Student.findOneAndUpdate(
+  { profileInfo: studentId },
+  { $push: { attemptedTests: studentAttempt } }
+);
+
+
+    test.submitBy.push(studentId);
+    await test.save();
+
+    res.status(200).json({ message: "Test submitted successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error submitting test" });
+  }
+});
+
+router.get('/test/:testId', async (req, res) => {
+  try {
+    const test = await Test.findById(req.params.testId);
+    if (!test) return res.status(404).json({ message: 'Test not found' });
+
+    res.status(200).json(test);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+
 module.exports = router;
