@@ -376,9 +376,11 @@ router.post("/attempt-test/:testId", auth, async (req, res) => {
       attemptedAt: new Date(),
     };
 
-    await Student.findByIdAndUpdate(studentId, {
-      $push: { attemptedTests: studentAttempt },
-    });
+    await Student.findOneAndUpdate(
+  { profileInfo: studentId },
+  { $push: { attemptedTests: studentAttempt } }
+);
+
 
     test.submitBy.push(studentId);
     await test.save();
