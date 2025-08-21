@@ -6,9 +6,18 @@ import axios from "axios";
 import { useAuthStore } from "../../store/authStore";
 
 const RegisterSchema = Yup.object().shape({
-  name: Yup.string().required("Name is required"),
-   email: Yup.string().required('Email is required').matches(/^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-        'Invalid email format (must contain _@_._)'),
+  firstName: Yup.string()
+    .matches(/^[A-Za-z]+$/, "First name must contain only alphabets")
+    .required("First name is required"),
+  lastName: Yup.string()
+    .matches(/^[A-Za-z]+$/, "Last name must contain only alphabets")
+    .required("Last name is required"),
+  email: Yup.string()
+    .required("Email is required")
+    .matches(
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+      "Invalid email format (must contain _@_._)"
+    ),
   password: Yup.string()
     .min(6, "Password must be at least 6 characters")
     .required("Password is required"),
@@ -191,7 +200,7 @@ export default function Register() {
   const [success, setSuccess] = useState("");
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const navigate = useNavigate();
-  const {login} = useAuthStore((state) => state.login)
+  const  login  = useAuthStore((state) => state.login);
 
   useEffect(() => {
     const handleMouseMove = (e) =>
@@ -277,7 +286,8 @@ export default function Register() {
         {/* Email/Password Registration */}
         <Formik
           initialValues={{
-            name: "",
+            firstName: "",
+            lastName: "",
             email: "",
             password: "",
             confirmPassword: "",
@@ -288,20 +298,22 @@ export default function Register() {
             setSuccess("");
             try {
               const res = await axios.post(
-                `${import.meta.env.VITE_API_URL}/api/user/register`,
+                `${import.meta.env.VITE_API_URL}/api/user/signup`,
                 {
-                  name: values.name,
+                  firstName: values.firstName,
+                  lastName: values.lastName,
                   email: values.email,
                   password: values.password,
                   role: selectedRole,
                 }
               );
-              const {token,user} = res.data
-              login(user,token)
+              const { token, user } = res.data;
+              login(user, token);
               setSuccess("Registration successful! Redirecting to login...");
               resetForm();
               setTimeout(() => navigate("/login"), 2000);
             } catch (err) {
+              console.error("Signup error:", err.response?.data);
               setError(err.response?.data?.message || "Registration failed");
             } finally {
               setSubmitting(false);
@@ -312,16 +324,33 @@ export default function Register() {
             <Form className="flex flex-col gap-3 w-full">
               <div>
                 <label className="block mb-1 font-medium text-zinc-400 text-sm">
-                  Full Name
+                  First Name
                 </label>
                 <Field
                   type="text"
-                  name="name"
+                  name="firstName"
                   className="w-full pl-3 py-2 border border-zinc-800/60 rounded-lg bg-zinc-900/60 text-white text-sm"
-                  placeholder="Enter your name"
+                  placeholder="Enter your first name"
                 />
                 <ErrorMessage
-                  name="name"
+                  name="firstName"
+                  component="div"
+                  className="text-red-400 text-xs mt-1"
+                />
+              </div>
+
+              <div>
+                <label className="block mb-1 font-medium text-zinc-400 text-sm">
+                  Last Name
+                </label>
+                <Field
+                  type="text"
+                  name="lastName"
+                  className="w-full pl-3 py-2 border border-zinc-800/60 rounded-lg bg-zinc-900/60 text-white text-sm"
+                  placeholder="Enter your last name"
+                />
+                <ErrorMessage
+                  name="lastName"
                   component="div"
                   className="text-red-400 text-xs mt-1"
                 />
