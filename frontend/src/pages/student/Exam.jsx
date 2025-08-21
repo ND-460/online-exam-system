@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 // import MonacoEditor from "react-monaco-editor"; // Uncomment if Monaco is set up
 import { useParams } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
+import axios from "axios";
 // const MOCK_QUESTIONS = [
 //   {
 //     id: 1,
@@ -134,12 +135,15 @@ const [timer, setTimer] = useState(examInfo.timeLimit);
 
   // Fullscreen logic
   useEffect(() => {
-    if (fullscreen) {
-      document.documentElement.requestFullscreen();
-    } else {
-      document.exitFullscreen?.();
+  if (fullscreen) {
+    document.documentElement.requestFullscreen();
+  } else {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
     }
-  }, [fullscreen]);
+  }
+}, [fullscreen]);
+
 
   // Palette update
   useEffect(() => {
@@ -156,7 +160,7 @@ const [timer, setTimer] = useState(examInfo.timeLimit);
     );
   }, [current, answers, review]);
   //fetch test from backend
-  useEffect(() => {
+useEffect(() => {
   const fetchTest = async () => {
     try {
       const res = await axios.get(
@@ -164,22 +168,29 @@ const [timer, setTimer] = useState(examInfo.timeLimit);
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      const test = res.data.test;
+      const test = res.data; // your backend returns the test directly
 
-      setQuestions(test.questions || []);
+      // Format questions so type matches what renderQuestion expects
+      const formattedQuestions = (test.questions || []).map((q) => ({
+        ...q,
+        type: test.category.toLowerCase(), // normalize type
+        marks: q.marks || 1, // default to 1 if not present
+      }));
+
+      setQuestions(formattedQuestions);
+
       setExamInfo({
         title: test.testName,
         subject: test.category,
-        totalQuestions: test.questions.length,
-        totalMarks: test.questions.reduce((sum, q) => sum + q.marks, 0),
+        totalQuestions: formattedQuestions.length,
+        totalMarks: formattedQuestions.reduce((sum, q) => sum + q.marks, 0),
         timeLimit: (test.minutes || 30) * 60,
-        instructions: test.instructions || [
+        instructions: test.rules || [
           "Do not refresh or close the tab during the exam.",
         ],
       });
 
-
-      setPalette((test.questions || []).map(() => "notVisited"));
+      setPalette(formattedQuestions.map(() => "notVisited"));
       setTimer((test.minutes || 30) * 60);
     } catch (err) {
       console.error("Error fetching test:", err);
@@ -188,7 +199,6 @@ const [timer, setTimer] = useState(examInfo.timeLimit);
 
   fetchTest();
 }, [testId, token]);
-
 
 
   // Question navigation
@@ -214,22 +224,23 @@ const [timer, setTimer] = useState(examInfo.timeLimit);
     if (q.type === "mcq") {
       return (
         <div>
-          <div className="mb-4 text-lg font-semibold">{q.question}</div>
-          <div className="flex flex-col gap-2">
-            {q.options.map((opt, i) => (
-              <label key={i} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name={`mcq-${q.id}`}
-                  checked={answers[current] === i}
-                  onChange={() => saveAnswer(i)}
-                  className="accent-blue-500 w-5 h-5"
-                />
-                <span>{opt}</span>
-              </label>
-            ))}
-          </div>
-        </div>
+  <div className="mb-4 text-lg font-semibold text-white">{q.question}</div>
+  <div className="flex flex-col gap-2">
+    {q.options.map((opt, i) => (
+      <label key={i} className="flex items-center gap-2 cursor-pointer text-white">
+        <input
+          type="radio"
+          name={`mcq-${q.id}`}
+          checked={answers[current] === i}
+          onChange={() => saveAnswer(i)}
+          className="accent-blue-500 w-5 h-5"
+        />
+        <span>{opt}</span>
+      </label>
+    ))}
+  </div>
+</div>
+
       );
     }
     if (q.type === "multi") {
