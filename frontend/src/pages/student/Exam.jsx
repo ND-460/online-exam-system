@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 // import MonacoEditor from "react-monaco-editor"; // Uncomment if Monaco is set up
 import { useParams } from "react-router-dom";
@@ -86,6 +87,7 @@ export default function Exam() {
   const [tabWarnings, setTabWarnings] = useState(0);
   const timerRef = useRef();
   const { token, user } = useAuthStore();
+  const navigate = useNavigate()
   const { testId } = useParams();
   // console.log(testId)
   const [questions, setQuestions] = useState([]);
@@ -358,6 +360,8 @@ useEffect(() => {
 
       alert(res.data.message || "Test submitted successfully!");
       // Redirect to results/summary page if needed
+      navigate('/student')
+      
     } catch (err) {
       console.error("Error submitting test:", err);
       alert(err.response?.data?.message || "Failed to submit test");
