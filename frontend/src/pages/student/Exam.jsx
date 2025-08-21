@@ -345,13 +345,13 @@ useEffect(() => {
   async function handleSubmit() {
     try {
       const payload = {
-        answers: answers, // current answers object
+        answers: answers, 
       };
 
       const res = await axios.post(
         `${import.meta.env.VITE_API_URL}/api/student/attempt-test/${
           testId
-        }`, // replace _id with actual test ID from props or route
+        }`, 
         payload,
         { headers: { Authorization: `Bearer ${token}` } }
       );
