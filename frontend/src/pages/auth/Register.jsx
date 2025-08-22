@@ -4,6 +4,8 @@ import { Formik, Form, Field, ErrorMessage } from "formik";
 import * as Yup from "yup";
 import axios from "axios";
 import { useAuthStore } from "../../store/authStore";
+import {toast} from 'react-toastify'
+import 'react-toastify/ReactToastify.css'
 
 const RegisterSchema = Yup.object().shape({
   firstName: Yup.string()
@@ -309,11 +311,14 @@ export default function Register() {
               );
               const { token, user } = res.data;
               login(user, token);
+              toast.success("Registration Successful, Redirecting to login...");
+
               setSuccess("Registration successful! Redirecting to login...");
               resetForm();
               setTimeout(() => navigate("/login"), 2000);
             } catch (err) {
               console.error("Signup error:", err.response?.data);
+              toast.error("Registration failed ");
               setError(err.response?.data?.message || "Registration failed");
             } finally {
               setSubmitting(false);

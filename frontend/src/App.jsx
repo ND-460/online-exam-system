@@ -19,6 +19,7 @@ import NotFound from './pages/misc/NotFound';
 import Error from './pages/misc/Error';
 import './App.css';
 import ProfilePage from './pages/ProfilePage';
+import { ToastContainer } from 'react-toastify';
 
 function App() {
   return (
@@ -44,6 +45,7 @@ function App() {
         <Route path='/profile' element={<ProfilePage/>}/>
         <Route path="*" element={<NotFound />} />
       </Routes>
+      <ToastContainer position="top-right" autoClose={3000} />
     </Router>
   );
 }

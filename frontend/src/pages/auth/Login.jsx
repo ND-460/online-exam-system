@@ -5,7 +5,8 @@ import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
 import axios from 'axios';
 import {useAuthStore} from '../../store/authStore'
-
+import { toast } from 'react-toastify';
+import 'react-toastify/ReactToastify.css'
 const LoginSchema = Yup.object().shape({
   role: Yup.string().required('Role is required'),
   email: Yup.string().required('Email is required').matches(/^[^\s@]+@[^\s@]+\.[^\s@]+$/,
@@ -174,9 +175,11 @@ export default function Login() {
               localStorage.setItem('token', res.data.token);
               login(res.data.user,res.data.token)
               await fetchProfile()
+              toast.success("Login Successfull")
               navigate(`/${selectedRole}`);
             } catch (err) {
               setError(err.response?.data?.message || 'Login failed');
+              toast.error("Login Failed")
             } finally {
               setSubmitting(false);
             }
