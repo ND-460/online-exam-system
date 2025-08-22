@@ -337,7 +337,7 @@ export default function TeacherDashboard() {
                         <th className="py-3 font-semibold">Title</th>
                         <th className="py-3 font-semibold">Type</th>
                         <th className="py-3 font-semibold">Class</th>
-                        <th className="py-3 font-semibold">Actions</th>
+                        <th className="py-3 font-semibold " colSpan={2}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>

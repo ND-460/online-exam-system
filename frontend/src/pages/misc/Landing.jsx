@@ -650,10 +650,11 @@ function WhyCustomSolution() {
                 </p>
               </div>
             </div>
-
-            <button className="w-full mt-8 px-8 py-4 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300">
+            <Link to='/solutions'>
+            <button className="w-full mt-8 px-8 py-4 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300" >
               Explore ExamVolt Features
             </button>
+            </Link>
           </div>
 
           {/* Right: Stats & Integration */}

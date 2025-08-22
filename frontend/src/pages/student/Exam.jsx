@@ -46,18 +46,22 @@ export default function Exam() {
     timeLimit: 0,
     instructions: [],
   });
-  const [timer, setTimer] = useState(examInfo.timeLimit);
+  const [timer, setTimer] = useState(null);
   // Timer logic
   useEffect(() => {
-    if (timer <= 0) {
-      clearTimeout(timerRef.current);
-      toast.info("Time’s up! Auto-submitting your test...");
-      handleSubmit();
-      return;
-    }
-    timerRef.current = setTimeout(() => setTimer((t) => t - 1), 1000);
-    return () => clearTimeout(timerRef.current);
-  }, [timer]);
+  if (timer === null) return; // do nothing until timer is set
+
+  if (timer <= 0) {
+    clearTimeout(timerRef.current);
+    toast.info("Time’s up! Auto-submitting your test...");
+    handleSubmit();
+    return;
+  }
+
+  timerRef.current = setTimeout(() => setTimer((t) => t - 1), 1000);
+  return () => clearTimeout(timerRef.current);
+}, [timer]);
+
 
   // Strict mode: disable right-click, copy, paste
   useEffect(() => {
@@ -110,44 +114,44 @@ export default function Exam() {
     );
   }, [current, answers, review]);
   //fetch test from backend
-  useEffect(() => {
-    const fetchTest = async () => {
-      try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_API_URL}/api/student/test/${testId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+ useEffect(() => {
+  const fetchTest = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_URL}/api/student/test/${testId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-        const test = res.data; // your backend returns the test directly
+      const test = res.data;
+      const formattedQuestions = (test.questions || []).map((q) => ({
+        ...q,
+        type: test.category.toLowerCase(),
+        marks: q.marks || 1,
+      }));
 
-        const formattedQuestions = (test.questions || []).map((q) => ({
-          ...q,
-          type: test.category.toLowerCase(),
-          marks: q.marks || 1,
-        }));
+      setQuestions(formattedQuestions);
+      setExamInfo({
+        title: test.testName,
+        subject: test.category,
+        totalQuestions: formattedQuestions.length,
+        totalMarks: formattedQuestions.reduce((sum, q) => sum + q.marks, 0),
+        timeLimit: (test.minutes || 30) * 60,
+        instructions: test.rules || ["Do not refresh or close the tab during the exam."],
+      });
 
-        setQuestions(formattedQuestions);
+      setPalette(formattedQuestions.map(() => "notVisited"));
 
-        setExamInfo({
-          title: test.testName,
-          subject: test.category,
-          totalQuestions: formattedQuestions.length,
-          totalMarks: formattedQuestions.reduce((sum, q) => sum + q.marks, 0),
-          timeLimit: (test.minutes || 30) * 60,
-          instructions: test.rules || [
-            "Do not refresh or close the tab during the exam.",
-          ],
-        });
+     
+      setTimer((test.minutes || 30) * 60);
 
-        setPalette(formattedQuestions.map(() => "notVisited"));
-        setTimer((test.minutes || 30) * 60);
-      } catch (err) {
-        console.error("Error fetching test:", err);
-      }
-    };
+    } catch (err) {
+      console.error("Error fetching test:", err);
+    }
+  };
 
-    fetchTest();
-  }, [testId, token]);
+  fetchTest();
+}, [testId, token]);
+
 
   // Question navigation
   const goTo = (idx) => setCurrent(idx);
