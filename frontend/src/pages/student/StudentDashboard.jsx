@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import axios from "axios";
+import { toast } from "react-toastify";
 
 export default function StudentDashboard() {
   const [language, setLanguage] = useState("JavaScript");
@@ -22,7 +23,18 @@ export default function StudentDashboard() {
     logout();
     navigate("/");
   };
-
+  useEffect(() => {
+    if (!user) {
+      navigate("/login");
+    } else if (user.role !== "student") {
+      if(user.role === 'teacher'){
+        navigate('/teacher')
+      }else if(user.role === 'admin'){
+        navigate('/admin')
+      }
+      toast.error('Unauthorised access')
+    }
+  }, [user, navigate]);
   // Fetch test counts and next active test
   useEffect(() => {
     const fetchTests = async () => {

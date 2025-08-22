@@ -21,6 +21,19 @@ export default function TeacherDashboard() {
   const { logout, token, user } = useAuthStore();
   const navigate = useNavigate();
   useEffect(() => {
+  if (!user) {
+    navigate("/login");
+  } else if (user.role !== "teacher") {
+    if(user.role === 'student'){
+      navigate('/student')
+    }else if(user.role === 'admin'){
+      navigate('/admin')
+    }
+    toast.error('Unauthorised access')
+  }
+}, [user, navigate]);
+
+  useEffect(() => {
     const fetchTests = async () => {
       try {
         const res = await axios.get(
