@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import {useNavigate,Link} from "react-router-dom"
 import { useAuthStore } from "../../store/authStore";
+import { toast } from "react-toastify";
 const notifications = [
   { id: 1, message: "New user registered: Alice" },
   { id: 2, message: "Test submitted by John" },
@@ -49,6 +50,18 @@ export default function AdminDashboard() {
     logout(); 
     navigate("/");
   };
+  useEffect(() => {
+    if (!user) {
+      navigate("/login");
+    } else if (user.role !== "admin") {
+      if(user.role === 'student'){
+        navigate('/student')
+      }else if(user.role === 'teacher'){
+        navigate('/teacher')
+      }
+      toast.error("Unauthorised access")
+    }
+  }, [user, navigate]);
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#151e2e] to-[#1a2236] relative overflow-x-hidden">
       {/* Top Nav */}
