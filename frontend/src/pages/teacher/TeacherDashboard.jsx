@@ -4,7 +4,7 @@ import AddQuestions from "./AddQuestions";
 import { useAuthStore } from "../../store/authStore";
 import axios from "axios";
 import { toast } from "react-toastify";
-import 'react-toastify/ReactToastify.css'
+import "react-toastify/ReactToastify.css";
 export default function TeacherDashboard() {
   const [tests, setTests] = useState([]);
   const [testTitle, setTestTitle] = useState("");
@@ -87,12 +87,12 @@ export default function TeacherDashboard() {
         }
       );
       // alert("Test deleted successfully!");
-      toast.success("Test deleted successfully!")
+      toast.success("Test deleted successfully!");
       await refreshTests();
     } catch (err) {
       console.error(err);
       // alert("Error deleting test");
-      toast.error("Error deleting test")
+      toast.error("Error deleting test");
     }
   };
 
@@ -116,7 +116,7 @@ export default function TeacherDashboard() {
           }
         );
         // alert("Test updated successfully!");
-        toast.success("Test updated successfully!")
+        toast.success("Test updated successfully!");
         setEditingTest(null);
       } else {
         const payload = {
@@ -138,14 +138,14 @@ export default function TeacherDashboard() {
           }
         );
         // alert("Test created successfully!");
-        toast.success("Test created successfully!")
+        toast.success("Test created successfully!");
       }
 
       await refreshTests();
     } catch (err) {
       console.error(err);
       // alert("Error saving test");
-      toast.error("Error saving test")
+      toast.error("Error saving test");
     }
   };
 
@@ -256,13 +256,19 @@ export default function TeacherDashboard() {
                   />
 
                   {/* Test Duration */}
-                  <input
-                    type="number"
-                    className="w-32 bg-[#151e2e] border border-[#232f4b] rounded-md px-4 py-3 text-white text-lg"
-                    placeholder="Duration (minutes)"
-                    value={minutes}
-                    onChange={(e) => setMinutes(Number(e.target.value))}
-                  />
+                  <div className="flex flex-col">
+                    <label className="text-blue-200 text-sm mb-1">
+                      Duration (minutes)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      className="w-32 bg-[#151e2e] border border-[#232f4b] rounded-md px-4 py-2 text-white text-lg"
+                      placeholder="30"
+                      value={minutes}
+                      onChange={(e) => setMinutes(Number(e.target.value))}
+                    />
+                  </div>
                 </div>
 
                 {/* Rules Section */}
@@ -330,7 +336,7 @@ export default function TeacherDashboard() {
                       <tr className="border-b border-[#232f4b]">
                         <th className="py-3 font-semibold">Title</th>
                         <th className="py-3 font-semibold">Type</th>
-                        <th className="py-3 font-semibold">Visibility</th>
+                        <th className="py-3 font-semibold">Class</th>
                         <th className="py-3 font-semibold">Actions</th>
                       </tr>
                     </thead>
