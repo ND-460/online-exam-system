@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { useAuthStore } from "../store/authStore";
+import { Edit, Save, X } from "lucide-react";
+
 
 // Reuse Crystal Animation
 const CrystalElement = ({
@@ -32,17 +34,18 @@ const CrystalElement = ({
           animation: `float ${duration}s ease-in-out infinite`,
           animationDelay: `${delay}s`,
         };
+
     }
   };
   return (
     <div
-      className={`${className} ${size} bg-gradient-to-br from-black/80 to-zinc-900/70 rounded-lg backdrop-blur-sm border border-zinc-700/60 shadow-xl`}
+      className={`${className} ${size} bg-gradient-to-br from-zinc-700/70 to-zinc-900/50 rounded-lg backdrop-blur-sm border border-zinc-700/60 shadow-xl`}
       style={getMovementStyle()}
     />
   );
 };
 
-// Floating Crystals
+// Floating Background
 const FloatingCrystals = () => (
   <>
     <CrystalElement
@@ -91,19 +94,16 @@ const ProfilePage = () => {
         );
         updateUser(res.data.obj);
         setForm(res.data.obj);
-        setLoading(false);
       } catch (err) {
         console.error("Error fetching profile:", err);
+      } finally {
         setLoading(false);
       }
     };
     if (user?._id) fetchProfile();
   }, [user?._id, token, updateUser]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm({ ...form, [name]: value });
-  };
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSave = async () => {
     try {
@@ -119,12 +119,20 @@ const ProfilePage = () => {
     }
   };
 
-  if (loading) return <p className="text-center mt-6 text-white">Loading...</p>;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black">
+        <div className="w-80 h-60 bg-zinc-900/70 rounded-2xl animate-pulse" />
+      </div>
+    );
+  }
+
+  const initials = `${form.firstName?.[0] || ""}${form.lastName?.[0] || ""}`;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-zinc-900 to-black relative overflow-hidden flex items-center justify-center p-6">
-      {/* Background animations */}
       <FloatingCrystals />
+
 
       {/* Profile Card */}
       <div className="w-full max-w-lg p-6 rounded-2xl shadow-2xl bg-zinc-900/80 backdrop-blur-xl border border-zinc-800/60 relative z-20">
@@ -193,22 +201,20 @@ const ProfilePage = () => {
               />
             </div>
 
-            <div className="flex gap-2 mt-3">
-              <button
-                onClick={handleSave}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold"
-              >
-                Save
+
+            <div className="col-span-2 flex gap-3 mt-4">
+              <button onClick={handleSave}
+                className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-90 text-white px-4 py-2 rounded-lg font-semibold shadow-md">
+                <Save size={18}/> Save
               </button>
-              <button
-                onClick={() => setEditing(false)}
-                className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-semibold"
-              >
-                Cancel
+              <button onClick={() => setEditing(false)}
+                className="flex-1 flex items-center justify-center gap-2 bg-zinc-700 hover:bg-zinc-600 text-white px-4 py-2 rounded-lg font-semibold">
+                <X size={18}/> Cancel
               </button>
             </div>
           </div>
         ) : (
+
           <div className="flex flex-col gap-2 text-zinc-300">
             <p>
               <b>Name:</b> {form.firstName} {form.lastName}
@@ -229,19 +235,20 @@ const ProfilePage = () => {
               <b>Role:</b> {form.role}
             </p>
 
-            <button
-              onClick={() => setEditing(true)}
-              className="px-6 py-2 rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 
-             text-white font-semibold shadow-lg hover:scale-105 hover:shadow-xl 
-             transition-all duration-300 ease-in-out"
-            >
-              Edit Profile
+
+            <button onClick={() => setEditing(true)}
+              className="mt-4 w-full flex items-center justify-center gap-2 px-6 py-2 rounded-lg 
+                         bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 
+                         text-white font-semibold shadow-lg hover:scale-105 hover:shadow-xl 
+                         transition-all duration-300 ease-in-out">
+              <Edit size={18}/> Edit Profile
             </button>
           </div>
         )}
       </div>
 
       <style jsx>{`
+
         @keyframes float {
           0%,
           100% {
@@ -269,6 +276,7 @@ const ProfilePage = () => {
             transform: translateX(-20px);
           }
         }
+
       `}</style>
     </div>
   );
