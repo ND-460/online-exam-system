@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState ,useEffect} from "react";
 import { motion } from "framer-motion";
 import {
   Bell, Sun, Moon, User, Users, FileText, TrendingUp, Clock, CheckCircle, XCircle, Trash2, BarChart3, Mail, CreditCard, Plus, MessageCircle, Activity,
@@ -44,7 +44,7 @@ export default function AdminDashboard() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [showAnnounceModal, setShowAnnounceModal] = useState(false);
   const [announceText, setAnnounceText] = useState("");
-  const {logout} = useAuthStore()
+  const {logout,user,token} = useAuthStore()
   const navigate = useNavigate()
   const handleLogout = () => {
     logout(); 
