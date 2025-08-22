@@ -54,7 +54,7 @@ export default function StudentDashboard() {
   // Fetch test counts and next active test
 
 
-  // Mock performance data (replace with API later)
+  
   const performanceData = [
     { week: "Week 1", score: 65 },
     { week: "Week 2", score: 72 },
