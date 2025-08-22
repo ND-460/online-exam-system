@@ -3,7 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import AddQuestions from "./AddQuestions";
 import { useAuthStore } from "../../store/authStore";
 import axios from "axios";
-
+import { toast } from "react-toastify";
+import 'react-toastify/ReactToastify.css'
 export default function TeacherDashboard() {
   const [tests, setTests] = useState([]);
   const [testTitle, setTestTitle] = useState("");
@@ -85,11 +86,13 @@ export default function TeacherDashboard() {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      alert("Test deleted successfully!");
+      // alert("Test deleted successfully!");
+      toast.success("Test deleted successfully!")
       await refreshTests();
     } catch (err) {
       console.error(err);
-      alert("Error deleting test");
+      // alert("Error deleting test");
+      toast.error("Error deleting test")
     }
   };
 
@@ -112,7 +115,8 @@ export default function TeacherDashboard() {
             headers: { Authorization: `Bearer ${token}` },
           }
         );
-        alert("Test updated successfully!");
+        // alert("Test updated successfully!");
+        toast.success("Test updated successfully!")
         setEditingTest(null);
       } else {
         const payload = {
@@ -133,13 +137,15 @@ export default function TeacherDashboard() {
             headers: { Authorization: `Bearer ${token}` },
           }
         );
-        alert("Test created successfully!");
+        // alert("Test created successfully!");
+        toast.success("Test created successfully!")
       }
 
       await refreshTests();
     } catch (err) {
       console.error(err);
-      alert("Error saving test");
+      // alert("Error saving test");
+      toast.error("Error saving test")
     }
   };
 

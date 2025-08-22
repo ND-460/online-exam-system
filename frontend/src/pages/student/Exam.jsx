@@ -1,65 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-// import MonacoEditor from "react-monaco-editor"; // Uncomment if Monaco is set up
+// import MonacoEditor from "react-monaco-editor"; 
 import { useParams } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import axios from "axios";
-// const MOCK_QUESTIONS = [
-//   {
-//     id: 1,
-//     type: "mcq",
-//     question: "What is the capital of France?",
-//     options: ["Berlin", "London", "Paris", "Madrid"],
-//     answer: 2,
-//     marks: 1,
-//   },
-//   {
-//     id: 2,
-//     type: "multi",
-//     question: "Select all prime numbers.",
-//     options: ["2", "3", "4", "5"],
-//     answer: [0, 1, 3],
-//     marks: 2,
-//   },
-//   {
-//     id: 3,
-//     type: "tf",
-//     question: "The sky is green.",
-//     answer: false,
-//     marks: 1,
-//   },
-//   {
-//     id: 4,
-//     type: "fill",
-//     question: "_____ is the largest planet in our solar system.",
-//     answer: "Jupiter",
-//     marks: 1,
-//   },
-//   {
-//     id: 5,
-//     type: "code",
-//     question: "Write a function to reverse a string in Python.",
-//     language: "python",
-//     starter: "def reverse_string(s):\n    # Your code here\n    ",
-//     marks: 5,
-//   },
-// ];
-
-// const EXAM_INFO = {
-//   title: "Sample Exam",
-//   subject: "General Knowledge",
-//   totalQuestions: questions.length,
-//   totalMarks: questions.reduce((a, q) => a + q.marks, 0),
-//   timeLimit: 30 * 60, // 30 minutes in seconds
-//   instructions: [
-//     "Do not refresh or close the tab during the exam.",
-//     "Each question is mandatory unless marked optional.",
-//     "No negative marking.",
-//     "Strict anti-cheating measures are enabled.",
-//   ],
-// };
-
+import { toast } from "react-toastify";
+import 'react-toastify/ReactToastify.css'
 const paletteColors = {
   notVisited: "bg-gray-500",
   answered: "bg-green-500",
@@ -358,13 +305,15 @@ useEffect(() => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      alert(res.data.message || "Test submitted successfully!");
-      // Redirect to results/summary page if needed
+      // alert(res.data.message || "Test submitted successfully!");
+      toast.success("Test submitted successfully!")
+      
       navigate('/student')
       
     } catch (err) {
       console.error("Error submitting test:", err);
-      alert(err.response?.data?.message || "Failed to submit test");
+      // alert(err.response?.data?.message || "Failed to submit test");
+      toast.error("Failed to submit test!")
     }
   }
 
