@@ -51,7 +51,6 @@ export default function TeacherDashboard() {
   useEffect(() => {
     if (user?._id) refreshTests();
   }, [user]);
-  
 
   // const handleUpdateTest = async () => {
   //   try {
@@ -108,7 +107,7 @@ export default function TeacherDashboard() {
           `${import.meta.env.VITE_API_URL}/api/teacher/update-test/${
             editingTest._id
           }`,
-          { questions: qs }, // <- send only questions
+          { questions: qs },
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -116,7 +115,6 @@ export default function TeacherDashboard() {
         alert("Test updated successfully!");
         setEditingTest(null);
       } else {
-        // Full payload for creating a new test
         const payload = {
           teacherId: user._id,
           testName: testTitle,
@@ -164,7 +162,6 @@ export default function TeacherDashboard() {
     logout();
     navigate("/login");
   };
-  
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#151e2e] to-[#1a2236] p-6 text-white">
@@ -205,9 +202,26 @@ export default function TeacherDashboard() {
                   <h3 className="text-2xl font-bold tracking-tight text-white">
                     Create New Test
                   </h3>
-                  <span className="text-sm text-blue-200">
+                  {/* <span className="text-sm text-blue-200">
                     Drafts auto-save
-                  </span>
+                  </span> */}
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() =>
+                        alert("Import from CSV/Excel coming soon!")
+                      }
+                      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-medium text-sm"
+                    >
+                      Import CSV/Excel
+                    </button>
+
+                    <button
+                      onClick={() => alert("Upload to AI coming soon!")}
+                      className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md font-medium text-sm"
+                    >
+                      Upload to AI
+                    </button>
+                  </div>
                 </div>
                 <div className="flex gap-4 mb-4">
                   <input
@@ -295,9 +309,9 @@ export default function TeacherDashboard() {
                   >
                     Next: Questions
                   </button>
-                  <button className="bg-transparent border border-blue-200 text-blue-200 px-6 py-3 rounded-md font-semibold text-lg">
+                  {/* <button className="bg-transparent border border-blue-200 text-blue-200 px-6 py-3 rounded-md font-semibold text-lg">
                     Save Draft
-                  </button>
+                  </button> */}
                 </div>
               </div>
 
