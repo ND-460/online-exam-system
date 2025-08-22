@@ -40,7 +40,7 @@ export default function AddQuestions({ initialQuestions = [], onSave, onCancel }
   };
 
   const handleSave = () => {
-    onSave(questions); // return updated questions
+    onSave(questions);
   };
 
   return (
