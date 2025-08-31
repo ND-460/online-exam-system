@@ -4,6 +4,7 @@ import AddQuestions from "./AddQuestions";
 import { useAuthStore } from "../../store/authStore";
 import axios from "axios";
 import { toast } from "react-toastify";
+import DatePicker from "react-datepicker";
 import "react-toastify/ReactToastify.css";
 export default function TeacherDashboard() {
   const [tests, setTests] = useState([]);
@@ -19,19 +20,20 @@ export default function TeacherDashboard() {
   const [teacherTests, setTeacherTests] = useState([]);
   const [outOfMarks, setOutOfMarks] = useState(0);
   const { logout, token, user } = useAuthStore();
+  const [scheduledAt, setScheduledAt] = useState(null);
   const navigate = useNavigate();
   useEffect(() => {
-  if (!user) {
-    navigate("/login");
-  } else if (user.role !== "teacher") {
-    if(user.role === 'student'){
-      navigate('/student')
-    }else if(user.role === 'admin'){
-      navigate('/admin')
+    if (!user) {
+      navigate("/login");
+    } else if (user.role !== "teacher") {
+      if (user.role === "student") {
+        navigate("/student");
+      } else if (user.role === "admin") {
+        navigate("/admin");
+      }
+      toast.error("Unauthorised access");
     }
-    toast.error('Unauthorised access')
-  }
-}, [user, navigate]);
+  }, [user, navigate]);
 
   useEffect(() => {
     const fetchTests = async () => {
@@ -140,6 +142,8 @@ export default function TeacherDashboard() {
           minutes,
           rules,
           outOfMarks,
+          description: testDesc,
+          scheduledAt,
           questions: qs,
         };
 
@@ -259,6 +263,20 @@ export default function TeacherDashboard() {
                     <option>Essay</option>
                   </select>
                 </div>
+                <div className="flex flex-col mb-4">
+                  <label className="text-blue-200 text-sm mb-1">
+                    Schedule Test:
+                  </label>
+                  <DatePicker
+                    selected={scheduledAt}
+                    onChange={(date) => setScheduledAt(date)}
+                    showTimeSelect
+                    timeIntervals={15} 
+                    dateFormat="MMMM d, yyyy h:mm aa"
+                    className="bg-[#151e2e] border border-[#232f4b] rounded-md px-4 py-2 text-white"
+                    calendarClassName="bg-[#151e2e] text-white rounded-md shadow-lg"
+                  />
+                </div>
                 <div className="flex gap-4 mb-4">
                   {/* Class Selection */}
                   <input
@@ -350,7 +368,9 @@ export default function TeacherDashboard() {
                         <th className="py-3 font-semibold">Title</th>
                         <th className="py-3 font-semibold">Type</th>
                         <th className="py-3 font-semibold">Class</th>
-                        <th className="py-3 font-semibold " colSpan={2}>Actions</th>
+                        <th className="py-3 font-semibold " colSpan={2}>
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody>

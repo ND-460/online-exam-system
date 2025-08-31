@@ -4,6 +4,7 @@ const auth = require("../middleware/auth");
 const Student = require("../model/Student");
 const Test = require("../model/Test");
 const User = require("../model/User");
+const Result = require("../model/Result");
 require("dotenv").config();
 
 // Get test counts for a student
@@ -11,9 +12,18 @@ router.get("/tests/student/:studentId", auth, async (req, res) => {
   const studentId = req.params.studentId;
 
   try {
-    const upcoming = await Test.countDocuments({ assignedTo: studentId, attempted: false });
-    const ongoing = await Test.countDocuments({ assignedTo: studentId, attempted: false, /* add extra filter if you track time */ });
-    const completed = await Test.countDocuments({ assignedTo: studentId, attempted: true });
+    const upcoming = await Test.countDocuments({
+      assignedTo: studentId,
+      attempted: false,
+    });
+    const ongoing = await Test.countDocuments({
+      assignedTo: studentId,
+      attempted: false /* add extra filter if you track time */,
+    });
+    const completed = await Test.countDocuments({
+      assignedTo: studentId,
+      attempted: true,
+    });
 
     res.status(200).json({ upcoming, ongoing, completed });
   } catch (err) {
@@ -56,7 +66,9 @@ router.get("/profile/:profileID", auth, async (req, res) => {
   try {
     const obj = await Student.findOne({
       _id: profileID,
-    }).populate("profileInfo").exec();
+    })
+      .populate("profileInfo")
+      .exec();
 
     if (!obj) {
       return res.status(404).json({ message: "Student not found" });
@@ -134,33 +146,18 @@ router.get("/attempt-tests/:studentID", auth, async (req, res) => {
  * @description - Fetch student results using studentID
  */
 
-router.post("/results/:studentID", auth, async (req, res) => {
+router.get("/results/:studentID", auth, async (req, res) => {
   const studentID = req.params.studentID;
-  const { testID } = req.body;
 
   try {
-    await Test.find(
-      {
-        _id: testID,
-      },
-      "submitBy -_id",
-      function (err, obj) {
-        if (err) {
-          return res.status(400).json({ err });
-        } else {
-          const result = obj[0].submitBy.filter((student, index) => {
-            return student.id === studentID;
-          });
-
-          return res.status(200).json({
-            result,
-          });
-        }
-      }
+    const results = await Result.find({ studentID }).populate(
+      "testID",
+      "title duration"
     );
+    res.status(200).json({ results });
   } catch (err) {
     console.log(err.message);
-    res.status(500).send("Error in fetching Test Data");
+    res.status(500).send("Error in fetching results");
   }
 });
 
@@ -204,15 +201,8 @@ router.post("/results/:studentID", auth, async (req, res) => {
 
 router.put("/update-profile/:profileID", auth, async (req, res) => {
   const profileID = req.params.profileID;
-  const {
-    firstName,
-    lastName,
-    email,
-    password,
-    phone,
-    className,
-    section,
-  } = req.body;
+  const { firstName, lastName, email, password, phone, className, section } =
+    req.body;
 
   try {
     const updatedData = await User.findOneAndUpdate(
@@ -235,7 +225,6 @@ router.put("/update-profile/:profileID", auth, async (req, res) => {
   }
 });
 
-
 /**
  * @method - PUT
  * @param - /submit-test/:testID
@@ -243,36 +232,71 @@ router.put("/update-profile/:profileID", auth, async (req, res) => {
  */
 
 router.put("/submit-test/:testID", auth, async (req, res) => {
-  const testID = req.params.testID;
-  const submittedData = req.body.submitBy;
-  const testName = req.body.testName;
+  const { testID } = req.params;
+  const { answers } = req.body;
+  const studentId = req.user.id;
   const date = Date.now();
 
   try {
+    const test = await Test.findById(testID);
+    if (!test) return res.status(404).json({ message: "Test not found" });
+
+    let score = 0;
+    const evaluatedAnswers = [];
+
+    test.questions.forEach((q, i) => {
+      const submitted = answers[i];
+      const isCorrect = submitted === q.correctAnswer;
+      if (isCorrect) score++;
+      evaluatedAnswers.push({
+        question: q._id,
+        submitted,
+        correctAnswer: q.correctAnswer,
+        isCorrect,
+      });
+    });
+
     await Test.updateOne(
       { _id: testID },
+      { $addToSet: { submitBy: studentId }, attempted: true }
+    );
+
+    await Student.updateOne(
+      { _id: studentId },
       {
-        $addToSet: { submitBy: [...submittedData] },
-        attempted: true,
+        $push: {
+          attemptedTests: {
+            testId: test._id,
+            testName: test.title,
+            score,
+            outOfMarks: test.questions.length,
+            attemptedAt: date,
+          },
+        },
+        $set: {
+          "testStatus.$[elem].status": "submitted",
+          "testStatus.$[elem].endedAt": date,
+        },
       },
-      async function (err, updatedData) {
-        if (err) {
-          return res.status(400).json({ message: "failed to submit test" });
-        } else {
-          await Student.updateOne(
-            { _id: submittedData[0].profileID },
-            {
-              $addToSet: {
-                attemptedTest: [{ testName, date, ...submittedData }],
-              },
-            }
-          );
-          return res.status(200).json({
-            message: "test submitted succesfully",
-          });
-        }
+      {
+        arrayFilters: [{ "elem.testId": test._id }],
       }
     );
+
+    await Result.create({
+      studentID: studentId,
+      testID,
+      testName: test.title,
+      score,
+      answers: evaluatedAnswers,
+      submittedAt: date,
+    });
+
+    return res.status(200).json({
+      message: "Test submitted successfully",
+      score,
+      total: test.questions.length,
+    });
   } catch (err) {
     console.log(err.message);
     res.status(500).send("Error in submitting test data");
@@ -340,16 +364,30 @@ router.put("/update-test-status/:testID", auth, async (req, res) => {
 router.get("/assigned-tests/:userId", auth, async (req, res) => {
   try {
     const userId = req.params.userId;
+    const now = new Date();
 
     
     const tests = await Test.find({ assignedTo: userId });
 
-    res.status(200).json({ tests });
+    
+    const validTests = tests.filter(test => {
+      if (!test.scheduledAt || !test.minutes) return false; 
+
+      const startTime = new Date(test.scheduledAt);
+      const endTime = new Date(test.scheduledAt);
+      endTime.setMinutes(endTime.getMinutes() + test.minutes);
+
+      return now >= startTime && now <= endTime;
+    });
+
+    res.status(200).json({ tests: validTests });
   } catch (err) {
-    console.log(err);
+    console.error("Error fetching assigned tests:", err);
     res.status(500).send("Server error");
   }
 });
+
+
 
 // POST /api/student/attempt-test/:testId
 router.post("/attempt-test/:testId", auth, async (req, res) => {
@@ -364,7 +402,9 @@ router.post("/attempt-test/:testId", auth, async (req, res) => {
     if (!test) return res.status(404).json({ message: "Test not found" });
 
     if (!test.assignedTo.includes(studentId))
-      return res.status(403).json({ message: "You are not assigned to this test" });
+      return res
+        .status(403)
+        .json({ message: "You are not assigned to this test" });
 
     if (test.submitBy.includes(studentId))
       return res.status(400).json({ message: "Test already submitted" });
@@ -377,10 +417,9 @@ router.post("/attempt-test/:testId", auth, async (req, res) => {
     };
 
     await Student.findOneAndUpdate(
-  { profileInfo: studentId },
-  { $push: { attemptedTests: studentAttempt } }
-);
-
+      { profileInfo: studentId },
+      { $push: { attemptedTests: studentAttempt } }
+    );
 
     test.submitBy.push(studentId);
     await test.save();
@@ -392,16 +431,15 @@ router.post("/attempt-test/:testId", auth, async (req, res) => {
   }
 });
 
-router.get('/test/:testId', async (req, res) => {
+router.get("/test/:testId", async (req, res) => {
   try {
     const test = await Test.findById(req.params.testId);
-    if (!test) return res.status(404).json({ message: 'Test not found' });
+    if (!test) return res.status(404).json({ message: "Test not found" });
 
     res.status(200).json(test);
   } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 });
-
 
 module.exports = router;

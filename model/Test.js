@@ -21,6 +21,8 @@ const testSchema = new mongoose.Schema({
   assignedTo: { type: Array },
   attempted: { type: Boolean, default: false },
   submitBy: { type: Array },
+  scheduledAt: { type: Date, required: false }, 
+  description: {type: String},
 });
 
 module.exports = mongoose.model('tests', testSchema);

@@ -1,20 +1,45 @@
 const mongoose = require('mongoose');
 
-const studentSchema  = new mongoose.Schema({
-    profileInfo:{
+const studentSchema = new mongoose.Schema({
+  profileInfo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'users',
+    required: true,
+  },
+  attemptedTests: [
+    {
+      testId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'users'
-    },
-    attemptedTests:{
-        type: Array,
-    },
-    testStatus: {
-        type: Array, 
-    },
-    createdAt: {
+        ref: 'Test',
+      },
+      testName: String,
+      score: Number,
+      outOfMarks: Number,
+      attemptedAt: {
         type: Date,
-        default: Date.now()
+        default: Date.now,
+      },
     },
-})
+  ],
+  testStatus: [
+    {
+      testId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Test',
+      },
+      status: {
+        type: String,
+        enum: ['not_started', 'in_progress', 'submitted'],
+        default: 'not_started',
+      },
+      startedAt: Date,
+      endedAt: Date,
+    },
+  ],
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
 
-module.exports = mongoose.model('students', studentSchema);
+module.exports = mongoose.model('Student', studentSchema);
