@@ -23,6 +23,7 @@ function formatTime(secs) {
 }
 
 export default function Exam() {
+  const [started, setStarted] = useState(false);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState({});
   const [palette, setPalette] = useState([]);
@@ -49,19 +50,16 @@ export default function Exam() {
   const [timer, setTimer] = useState(null);
   // Timer logic
   useEffect(() => {
-  if (timer === null) return; // do nothing until timer is set
-
-  if (timer <= 0) {
-    clearTimeout(timerRef.current);
-    toast.info("Time’s up! Auto-submitting your test...");
-    handleSubmit();
-    return;
-  }
-
-  timerRef.current = setTimeout(() => setTimer((t) => t - 1), 1000);
-  return () => clearTimeout(timerRef.current);
-}, [timer]);
-
+    if (!started || timer === null) return;
+    if (timer <= 0) {
+      clearTimeout(timerRef.current);
+      toast.info("Time’s up! Auto-submitting your test...");
+      handleSubmit();
+      return;
+    }
+    timerRef.current = setTimeout(() => setTimer((t) => t - 1), 1000);
+    return () => clearTimeout(timerRef.current);
+  }, [timer, started]);
 
   // Strict mode: disable right-click, copy, paste
   useEffect(() => {
@@ -114,15 +112,14 @@ export default function Exam() {
     );
   }, [current, answers, review]);
   //fetch test from backend
- useEffect(() => {
-  const fetchTest = async () => {
-    try {
+  useEffect(() => {
+    const fetchTest = async () => {
       const res = await axios.get(
         `${import.meta.env.VITE_API_URL}/api/student/test/${testId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
       const test = res.data;
+
       const formattedQuestions = (test.questions || []).map((q) => ({
         ...q,
         type: test.category.toLowerCase(),
@@ -136,22 +133,15 @@ export default function Exam() {
         totalQuestions: formattedQuestions.length,
         totalMarks: formattedQuestions.reduce((sum, q) => sum + q.marks, 0),
         timeLimit: (test.minutes || 30) * 60,
-        instructions: test.rules || ["Do not refresh or close the tab during the exam."],
+        instructions: test.rules || [
+          "Do not refresh or close the tab during the exam.",
+        ],
       });
-
       setPalette(formattedQuestions.map(() => "notVisited"));
-
-     
       setTimer((test.minutes || 30) * 60);
-
-    } catch (err) {
-      console.error("Error fetching test:", err);
-    }
-  };
-
-  fetchTest();
-}, [testId, token]);
-
+    };
+    fetchTest();
+  }, [testId, token]);
 
   // Question navigation
   const goTo = (idx) => setCurrent(idx);
@@ -319,6 +309,30 @@ export default function Exam() {
       // alert(err.response?.data?.message || "Failed to submit test");
       toast.error("Failed to submit test!");
     }
+  }
+  if (!started) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#151e2e]">
+        <div className="p-8 bg-[#232f4b] rounded-2xl text-center text-white max-w-lg">
+          <h1 className="text-2xl font-bold mb-4">{examInfo.title}</h1>
+          <p className="mb-4 text-blue-200">
+            You have {Math.floor(examInfo.timeLimit / 60)} minutes. Once
+            started, the timer cannot be paused.
+          </p>
+          <ul className="list-disc text-left text-sm text-blue-300 mb-6 ml-6">
+            {examInfo.instructions.map((ins, i) => (
+              <li key={i}>{ins}</li>
+            ))}
+          </ul>
+          <button
+            className="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-md font-semibold"
+            onClick={() => setStarted(true)}
+          >
+            Start Test
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
