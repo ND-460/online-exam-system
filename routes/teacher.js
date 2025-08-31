@@ -4,6 +4,7 @@ const auth = require("../middleware/auth");
 const Test = require("../model/Test");
 const Teacher = require("../model/Teacher");
 const User = require("../model/User");
+const Result = require("../model/Result")
 require("dotenv").config();
 const Student = require("../model/Student");
 
@@ -154,6 +155,7 @@ router.post("/create-test", auth, async (req, res) => {
     outOfMarks,
     answers,
     questions,
+    scheduledAt,
   } = req.body;
 
   try {
@@ -187,6 +189,7 @@ router.post("/create-test", auth, async (req, res) => {
       outOfMarks,
       questions,
       assignedTo: studentIds,
+      scheduledAt: scheduledAt?new Date(scheduledAt): null,
     });
 
     const data = await createTest.save();
@@ -426,5 +429,46 @@ router.delete("/delete-test/:testid", auth, async (req, res) => {
     res.status(500).send("Error in Deleting");
   }
 });
+
+router.get("/results/test/:testID", auth, async (req, res) => {
+  const { testID } = req.params;
+  const { sortBy = "score", order = "desc", minScore, maxScore, page = 1, limit = 10 } = req.query;
+
+  try {
+    let filter = { testID };
+
+    if (minScore !== undefined || maxScore !== undefined) {
+      filter.score = {};
+      if (minScore !== undefined) filter.score.$gte = Number(minScore);
+      if (maxScore !== undefined) filter.score.$lte = Number(maxScore);
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const results = await Result.find(filter)
+      .populate("studentID", "name email rollNo")
+      .populate("testID", "title duration")
+      .sort({ [sortBy]: order === "asc" ? 1 : -1 })
+      .skip(skip)
+      .limit(Number(limit));
+
+    const total = await Result.countDocuments(filter);
+
+    res.status(200).json({
+      results,
+      pagination: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (err) {
+    console.log(err.message);
+    res.status(500).send("Error in fetching test results");
+  }
+});
+
+
 
 module.exports = router;

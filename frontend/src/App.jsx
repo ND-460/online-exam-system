@@ -20,6 +20,8 @@ import Error from './pages/misc/Error';
 import './App.css';
 import ProfilePage from './pages/ProfilePage';
 import { ToastContainer } from 'react-toastify';
+import "react-datepicker/dist/react-datepicker.css";
+
 
 function App() {
   return (
