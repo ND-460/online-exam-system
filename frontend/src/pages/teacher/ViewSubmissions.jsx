@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 
-const ViewSubmissions = ({ testId ,token}) => {
+const ViewSubmissions = ({ testId, token }) => {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -19,18 +19,18 @@ const ViewSubmissions = ({ testId ,token}) => {
             },
           }
         );
-        
+
         setSubmissions(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
         console.error("Error fetching submissions", err);
-        setSubmissions([]); 
+        setSubmissions([]);
       } finally {
         setLoading(false);
       }
     };
 
     fetchSubmissions();
-  }, [testId,token]);
+  }, [testId, token]);
 
   if (loading) {
     return (
@@ -61,11 +61,16 @@ const ViewSubmissions = ({ testId ,token}) => {
         <tbody>
           {submissions.map((sub, idx) => (
             <tr key={idx} className="border-b border-[#232f4b]">
-              <td className="p-2">{sub.studentName || "Unknown"}</td>
+              <td className="p-2">
+                {sub.studentId?.profileInfo
+                  ? `${sub.studentId.profileInfo.firstName} ${sub.studentId.profileInfo.lastName}`
+                  : "Unknown"}
+              </td>
+
               <td className="p-2">{sub.score ?? "-"}</td>
               <td className="p-2">
-                {sub.submittedAt
-                  ? new Date(sub.submittedAt).toLocaleString()
+                {sub.attemptedAt
+                  ? new Date(sub.attemptedAt).toLocaleString()
                   : "-"}
               </td>
             </tr>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 
-const Analytics = ({ testId,token }) => {
+const Analytics = ({ testId, token }) => {
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -15,7 +15,7 @@ const Analytics = ({ testId,token }) => {
           `${import.meta.env.VITE_API_URL}/api/teacher/analytics/${testId}`,
           {
             headers: {
-              Authorization: `Bearer ${token}`, 
+              Authorization: `Bearer ${token}`,
             },
           }
         );
@@ -29,7 +29,7 @@ const Analytics = ({ testId,token }) => {
     };
 
     fetchAnalytics();
-  }, [testId,token]);
+  }, [testId, token]);
 
   if (loading) {
     return (
@@ -48,8 +48,18 @@ const Analytics = ({ testId,token }) => {
   }
 
   const avgScore = Number(analytics.avgScore ?? 0);
-  const highestScore = Number(analytics.highestScore ?? 0);
-  const lowestScore = Number(analytics.lowestScore ?? 0);
+  const totalStudents = analytics.totalStudents ?? 0;
+  const scoreDistribution = analytics.scoreDistribution ?? [];
+
+  const highestScore =
+    scoreDistribution.length > 0
+      ? Math.max(...scoreDistribution.map((s) => s.score))
+      : 0;
+
+  const lowestScore =
+    scoreDistribution.length > 0
+      ? Math.min(...scoreDistribution.map((s) => s.score))
+      : 0;
 
   return (
     <div className="p-4 bg-[#1e293b] rounded-lg shadow-md text-blue-100">
@@ -58,7 +68,8 @@ const Analytics = ({ testId,token }) => {
         <li>Average Score: {avgScore.toFixed(2)}</li>
         <li>Highest Score: {highestScore.toFixed(2)}</li>
         <li>Lowest Score: {lowestScore.toFixed(2)}</li>
-        <li>Total Submissions: {analytics.totalSubmissions ?? 0}</li>
+        <li>Total Students: {totalStudents}</li>
+        <li>Total Submissions: {scoreDistribution.length}</li>
       </ul>
     </div>
   );

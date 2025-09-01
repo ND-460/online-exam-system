@@ -470,7 +470,14 @@ router.get("/submissions/:testId", auth, async (req, res) => {
     const { testId } = req.params;
 
     const submissions = await Result.find({ testId })
-      .populate("studentId", "name email")
+      // .populate("studentId", "name email")
+      .populate({
+        path:"studentId",
+        populate:{
+          path:"profileInfo",
+          select:"firstName lastName email"
+        }
+      })
       .sort({ submittedAt: -1 });
 
     res.status(200).json(submissions);
