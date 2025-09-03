@@ -6,6 +6,8 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import DatePicker from "react-datepicker";
 import "react-toastify/ReactToastify.css";
+import ViewSubmissions from "./ViewSubmissions";
+import Analytics from "./Analytics";
 export default function TeacherDashboard() {
   const [tests, setTests] = useState([]);
   const [testTitle, setTestTitle] = useState("");
@@ -21,6 +23,8 @@ export default function TeacherDashboard() {
   const [outOfMarks, setOutOfMarks] = useState(0);
   const { logout, token, user } = useAuthStore();
   const [scheduledAt, setScheduledAt] = useState(null);
+  const [selectedTest, setSelectedTest] = useState(null);
+
   const navigate = useNavigate();
   useEffect(() => {
     if (!user) {
@@ -271,7 +275,7 @@ export default function TeacherDashboard() {
                     selected={scheduledAt}
                     onChange={(date) => setScheduledAt(date)}
                     showTimeSelect
-                    timeIntervals={15} 
+                    timeIntervals={15}
                     dateFormat="MMMM d, yyyy h:mm aa"
                     className="bg-[#151e2e] border border-[#232f4b] rounded-md px-4 py-2 text-white"
                     calendarClassName="bg-[#151e2e] text-white rounded-md shadow-lg"
@@ -390,6 +394,14 @@ export default function TeacherDashboard() {
                                 Delete
                               </button>
                             </td>
+                            <td>
+                              <button
+                                onClick={() => setSelectedTest(t._id)}
+                                className="text-blue-400 underline"
+                              >
+                                View
+                              </button>
+                            </td>
                           </tr>
                         ))
                       ) : (
@@ -408,9 +420,13 @@ export default function TeacherDashboard() {
                 <p className="text-blue-200 text-xs mb-2">
                   Filter by test or student, see code output and score.
                 </p>
-                <div className="h-24 flex items-center justify-center text-blue-300 text-xs">
-                  [Submissions Table Placeholder]
-                </div>
+                {selectedTest ? (
+                  <ViewSubmissions testId={selectedTest} token = {token}/>
+                ) : (
+                  <div className="h-24 flex items-center justify-center text-blue-300 text-xs">
+                    Select a test from "Manage Tests" to view submissions.
+                  </div>
+                )}
               </div>
             </div>
 
@@ -419,9 +435,13 @@ export default function TeacherDashboard() {
               {/* Analytics (Snapshot) */}
               <div className="bg-gradient-to-br from-black via-[#181f2e] to-[#232f4b] rounded-2xl p-6 border border-[#232f4b] shadow-xl w-full">
                 <h3 className="font-bold mb-2">Analytics (Snapshot)</h3>
-                <div className="h-32 flex items-center justify-center text-blue-300 text-xs">
-                  [Charts Placeholder]
-                </div>
+                {selectedTest ? (
+                  <Analytics testId={selectedTest} token = {token} />
+                ) : (
+                  <div className="h-32 flex items-center justify-center text-blue-300 text-xs">
+                    Select a test to view analytics.
+                  </div>
+                )}
               </div>
 
               {/* Invite Students */}

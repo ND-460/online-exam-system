@@ -4,7 +4,7 @@ const auth = require("../middleware/auth");
 const Test = require("../model/Test");
 const Teacher = require("../model/Teacher");
 const User = require("../model/User");
-const Result = require("../model/Result")
+const Result = require("../model/Result");
 require("dotenv").config();
 const Student = require("../model/Student");
 
@@ -52,7 +52,6 @@ router.get("/tests/:profileID", auth, async (req, res) => {
   }
 });
 
-
 /**
  * @method - GET
  * @param - /classes
@@ -86,7 +85,6 @@ router.get("/classes", auth, async (req, res) => {
     res.status(500).send("Error in fetching classes");
   }
 });
-
 
 /**
  * @method - GET
@@ -123,7 +121,9 @@ router.get("/profile/:profileID", auth, async (req, res) => {
   try {
     const obj = await Teacher.findOne({
       _id: profileID,
-    }).populate("profileInfo").exec();
+    })
+      .populate("profileInfo")
+      .exec();
 
     if (!obj) {
       return res.status(404).json({ message: "Student not found" });
@@ -166,16 +166,15 @@ router.post("/create-test", auth, async (req, res) => {
     }
 
     // Get all students of the class via populate
-    const students = await Student.find()
-      .populate({
-        path: 'profileInfo',
-        match: { className },
-        select: '_id className'
-      });
+    const students = await Student.find().populate({
+      path: "profileInfo",
+      match: { className },
+      select: "_id className",
+    });
 
     const studentIds = students
-      .filter(s => s.profileInfo)
-      .map(s => s.profileInfo._id.toString());
+      .filter((s) => s.profileInfo)
+      .map((s) => s.profileInfo._id.toString());
 
     // Create test
     const createTest = new Test({
@@ -189,7 +188,7 @@ router.post("/create-test", auth, async (req, res) => {
       outOfMarks,
       questions,
       assignedTo: studentIds,
-      scheduledAt: scheduledAt?new Date(scheduledAt): null,
+      scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
     });
 
     const data = await createTest.save();
@@ -199,8 +198,6 @@ router.post("/create-test", auth, async (req, res) => {
     res.status(500).send("Error in Saving");
   }
 });
-
-
 
 /**
  * @method - PUT
@@ -242,26 +239,23 @@ router.put("/update-test/:testid", auth, async (req, res) => {
     // If className is provided or changed, update assignedTo
     if (className) {
       // Fetch all students of this class
-      const students = await Student.find()
-        .populate({
-          path: 'profileInfo',
-          match: { className },
-          select: '_id className'
-        });
+      const students = await Student.find().populate({
+        path: "profileInfo",
+        match: { className },
+        select: "_id className",
+      });
 
       const studentIds = students
-        .filter(s => s.profileInfo) // remove unmatched
-        .map(s => s.profileInfo._id.toString());
+        .filter((s) => s.profileInfo) // remove unmatched
+        .map((s) => s.profileInfo._id.toString());
 
       updateData.className = className;
       updateData.assignedTo = studentIds;
     }
 
-    const updatedTest = await Test.findByIdAndUpdate(
-      testID,
-      updateData,
-      { new: true }
-    );
+    const updatedTest = await Test.findByIdAndUpdate(testID, updateData, {
+      new: true,
+    });
 
     if (!updatedTest) {
       return res.status(404).json({ message: "Test not found" });
@@ -273,9 +267,6 @@ router.put("/update-test/:testid", auth, async (req, res) => {
     res.status(500).send("Error in Updating");
   }
 });
-
-
-
 
 /**
  * @method - PUT
@@ -332,7 +323,6 @@ router.put("/update-profile/:profileID", auth, async (req, res) => {
   }
 });
 
-
 /**
  * @method - PUT
  * @param - /assigend-to/:testID
@@ -373,19 +363,18 @@ router.put("/assigend-to/:testID", auth, async (req, res) => {
     const updatedData = await Test.updateOne(
       { _id: testID },
       {
-        $addToSet: { assignedTo: { $each: className } }
+        $addToSet: { assignedTo: { $each: className } },
       }
     );
 
     return res.status(200).json({
-      updatedData
+      updatedData,
     });
   } catch (err) {
     console.log(err.message);
     res.status(500).send("Error in Updating");
   }
 });
-
 
 /**
  * @method - DELETE
@@ -415,10 +404,10 @@ router.put("/assigend-to/:testID", auth, async (req, res) => {
 router.delete("/delete-test/:testid", auth, async (req, res) => {
   const testID = req.params.testid;
   console.log(testID);
-  
+
   try {
     const deletedTest = await Test.findByIdAndDelete(testID);
-    
+
     if (!deletedTest) {
       return res.status(404).json({ message: "Test not found" });
     }
@@ -432,7 +421,14 @@ router.delete("/delete-test/:testid", auth, async (req, res) => {
 
 router.get("/results/test/:testID", auth, async (req, res) => {
   const { testID } = req.params;
-  const { sortBy = "score", order = "desc", minScore, maxScore, page = 1, limit = 10 } = req.query;
+  const {
+    sortBy = "score",
+    order = "desc",
+    minScore,
+    maxScore,
+    page = 1,
+    limit = 10,
+  } = req.query;
 
   try {
     let filter = { testID };
@@ -469,6 +465,69 @@ router.get("/results/test/:testID", auth, async (req, res) => {
   }
 });
 
+router.get("/submissions/:testId", auth, async (req, res) => {
+  try {
+    const { testId } = req.params;
 
+    const submissions = await Result.find({ testId })
+      // .populate("studentId", "name email")
+      .populate({
+        path:"studentId",
+        populate:{
+          path:"profileInfo",
+          select:"firstName lastName email"
+        }
+      })
+      .sort({ submittedAt: -1 });
+
+    res.status(200).json(submissions);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error fetching submissions" });
+  }
+});
+
+router.post("/feedback/:resultId", auth, async (req, res) => {
+  try {
+    const { resultId } = req.params;
+    const { feedback } = req.body;
+
+    const updated = await Result.findByIdAndUpdate(
+      resultId,
+      { feedback },
+      { new: true }
+    );
+
+    res.status(200).json({ message: "Feedback added", updated });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error saving feedback" });
+  }
+});
+
+router.get("/analytics/:testId", auth, async (req, res) => {
+  try {
+    const { testId } = req.params;
+    const results = await Result.find({ testId });
+
+    const totalStudents = results.length;
+    const avgScore =
+      results.reduce((acc, r) => acc + r.score, 0) / (totalStudents || 1);
+
+    const scoreDistribution = results.map(r => ({
+      student: r.studentId,
+      score: r.score,
+    }));
+
+    res.status(200).json({
+      totalStudents,
+      avgScore,
+      scoreDistribution,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error fetching analytics" });
+  }
+});
 
 module.exports = router;

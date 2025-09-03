@@ -313,6 +313,8 @@ router.post("/attempt-test/:testId", auth, async (req, res) => {
   try {
     const test = await Test.findById(testId);
     if (!test) return res.status(404).json({ message: "Test not found" });
+    const student = await Student.findOne({ profileInfo: studentId });
+    if (!student) return res.status(404).json({ message: "Student profile not found" });
 
     if (!test.assignedTo.includes(studentId))
       return res
@@ -363,7 +365,7 @@ router.post("/attempt-test/:testId", auth, async (req, res) => {
     );
 
     await Result.create({
-      studentId: studentId,
+      studentId: student._id,
       testId: test._id,
       teacherId: test.teacherId,
       testName: test.testName,
