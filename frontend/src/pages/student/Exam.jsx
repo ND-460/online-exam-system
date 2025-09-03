@@ -62,27 +62,26 @@ export default function Exam() {
   }, [timer, started]);
 
   // Strict mode: disable right-click, copy, paste
- useEffect(() => {
-  const prevent = (e, contxt) => {
-    e.preventDefault();
-    toast.warning(`Warning: ${contxt} occurred`);
-  };
+  useEffect(() => {
+    const prevent = (e, contxt) => {
+      e.preventDefault();
+      toast.warning(`Warning: ${contxt} occurred`);
+    };
 
-  const handleContextMenu = (e) => prevent(e, "context menu");
-  const handleCopy = (e) => prevent(e, "copy");
-  const handlePaste = (e) => prevent(e, "paste");
+    const handleContextMenu = (e) => prevent(e, "context menu");
+    const handleCopy = (e) => prevent(e, "copy");
+    const handlePaste = (e) => prevent(e, "paste");
 
-  document.addEventListener("contextmenu", handleContextMenu);
-  document.addEventListener("copy", handleCopy);
-  document.addEventListener("paste", handlePaste);
+    document.addEventListener("contextmenu", handleContextMenu);
+    document.addEventListener("copy", handleCopy);
+    document.addEventListener("paste", handlePaste);
 
-  return () => {
-    document.removeEventListener("contextmenu", handleContextMenu);
-    document.removeEventListener("copy", handleCopy);
-    document.removeEventListener("paste", handlePaste);
-  };
-}, []);
-
+    return () => {
+      document.removeEventListener("contextmenu", handleContextMenu);
+      document.removeEventListener("copy", handleCopy);
+      document.removeEventListener("paste", handlePaste);
+    };
+  }, []);
 
   // Strict mode: tab switch warning
   useEffect(() => {
@@ -98,14 +97,34 @@ export default function Exam() {
 
   // Fullscreen logic
   useEffect(() => {
-    if (fullscreen) {
-      document.documentElement.requestFullscreen();
-    } else {
-      if (document.fullscreenElement) {
-        document.exitFullscreen();
+    const enterFullscreen = async () => {
+      try {
+        if (fullscreen && !document.fullscreenElement) {
+          await document.documentElement.requestFullscreen();
+        } else if (!fullscreen && document.fullscreenElement) {
+          await document.exitFullscreen();
+        }
+      } catch (err) {
+        console.error("Fullscreen error:", err);
       }
-    }
+    };
+    enterFullscreen();
   }, [fullscreen]);
+  // Prevent exit fullscreen
+useEffect(() => {
+  const handleExit = () => {
+    if (!document.fullscreenElement && fullscreen) {
+      // re-enter fullscreen if user pressed Esc or tried to exit
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.error("Re-enter fullscreen failed:", err);
+        toast.warning("Warning: FullScreen Exited")
+      });
+    }
+  };
+
+  document.addEventListener("fullscreenchange", handleExit);
+  return () => document.removeEventListener("fullscreenchange", handleExit);
+}, [fullscreen]);
 
   // Palette update
   useEffect(() => {
@@ -336,7 +355,10 @@ export default function Exam() {
           </ul>
           <button
             className="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-md font-semibold"
-            onClick={() => setStarted(true)}
+            onClick={() => {
+              setStarted(true);
+              setFullscreen(true);
+            }}
           >
             Start Test
           </button>
