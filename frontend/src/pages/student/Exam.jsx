@@ -62,17 +62,27 @@ export default function Exam() {
   }, [timer, started]);
 
   // Strict mode: disable right-click, copy, paste
-  useEffect(() => {
-    const prevent = (e) => e.preventDefault();
-    document.addEventListener("contextmenu", prevent);
-    document.addEventListener("copy", prevent);
-    document.addEventListener("paste", prevent);
-    return () => {
-      document.removeEventListener("contextmenu", prevent);
-      document.removeEventListener("copy", prevent);
-      document.removeEventListener("paste", prevent);
-    };
-  }, []);
+ useEffect(() => {
+  const prevent = (e, contxt) => {
+    e.preventDefault();
+    toast.warning(`Warning: ${contxt} occurred`);
+  };
+
+  const handleContextMenu = (e) => prevent(e, "context menu");
+  const handleCopy = (e) => prevent(e, "copy");
+  const handlePaste = (e) => prevent(e, "paste");
+
+  document.addEventListener("contextmenu", handleContextMenu);
+  document.addEventListener("copy", handleCopy);
+  document.addEventListener("paste", handlePaste);
+
+  return () => {
+    document.removeEventListener("contextmenu", handleContextMenu);
+    document.removeEventListener("copy", handleCopy);
+    document.removeEventListener("paste", handlePaste);
+  };
+}, []);
+
 
   // Strict mode: tab switch warning
   useEffect(() => {
