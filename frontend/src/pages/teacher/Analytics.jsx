@@ -8,6 +8,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Label,
 } from "recharts";
 
 const Analytics = ({ testId, token }) => {
@@ -70,14 +71,16 @@ const Analytics = ({ testId, token }) => {
       ? Math.min(...scoreDistribution.map((s) => s.score))
       : 0;
 
-  
   const bins = Array.from({ length: 10 }, (_, i) => ({
-    range: `${i * 10}-${i * 10 + 9}`,
+    range: i === 9 ? "90-100%" : `${i * 10}-${i * 10 + 9}%`,
     count: 0,
   }));
 
   scoreDistribution.forEach((s) => {
-    const binIndex = Math.min(Math.floor(s.score / 10), 9); 
+    const percent =
+      Number(s.percentage) || (s.score / (s.outOfMarks || 1)) * 100;
+
+    const binIndex = Math.min(Math.floor(percent / 10), 9);
     bins[binIndex].count += 1;
   });
 
@@ -86,19 +89,38 @@ const Analytics = ({ testId, token }) => {
       <h2 className="text-lg font-semibold mb-4">Test Analytics</h2>
       <ul className="space-y-2 text-sm mb-6">
         <li>Average Score: {avgScore.toFixed(2)}</li>
+        <li>Average %: {Number(analytics.avgPercentage ?? 0).toFixed(2)}%</li>
+
         <li>Highest Score: {highestScore.toFixed(2)}</li>
         <li>Lowest Score: {lowestScore.toFixed(2)}</li>
         <li>Total Students: {totalStudents}</li>
         <li>Total Submissions: {scoreDistribution.length}</li>
       </ul>
 
-      
       <div className="h-72 flex items-center justify-center">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={bins}>
+          <BarChart
+            data={bins}
+            margin={{ top: 20, right: 20, left: 20, bottom: 40 }}
+          >
             <CartesianGrid strokeDasharray="3 3" stroke="#232f4b" />
-            <XAxis dataKey="range" stroke="#b3c2e6" />
-            <YAxis allowDecimals={false} stroke="#b3c2e6" />
+            <XAxis dataKey="range" stroke="#b3c2e6">
+              <Label
+                value="Score Range (%)"
+                offset={-5}
+                position="insideBottom"
+                fill="#b3c2e6"
+              />
+            </XAxis>
+            <YAxis allowDecimals={false} stroke="#b3c2e6">
+              <Label
+                value="Number of Students"
+                angle={-90}
+                position="insideLeft"
+                fill="#b3c2e6"
+                style={{ textAnchor: "middle" }}
+              />
+            </YAxis>
             <Tooltip
               contentStyle={{
                 background: "#232f4b",
