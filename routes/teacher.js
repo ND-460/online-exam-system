@@ -511,17 +511,27 @@ router.get("/analytics/:testId", auth, async (req, res) => {
     const results = await Result.find({ testId });
 
     const totalStudents = results.length;
+
+    // Average raw score
     const avgScore =
       results.reduce((acc, r) => acc + r.score, 0) / (totalStudents || 1);
 
-    const scoreDistribution = results.map(r => ({
+    // Average percentage
+    const avgPercentage =
+      results.reduce((acc, r) => acc + (r.score / r.outOfMarks) * 100, 0) /
+      (totalStudents || 1);
+
+    const scoreDistribution = results.map((r) => ({
       student: r.studentId,
       score: r.score,
+      outOfMarks: r.outOfMarks,
+      percentage: ((r.score / r.outOfMarks) * 100).toFixed(2),
     }));
 
     res.status(200).json({
       totalStudents,
-      avgScore,
+      avgScore: avgScore.toFixed(2),
+      avgPercentage: avgPercentage.toFixed(2),
       scoreDistribution,
     });
   } catch (err) {
@@ -529,5 +539,6 @@ router.get("/analytics/:testId", auth, async (req, res) => {
     res.status(500).json({ message: "Error fetching analytics" });
   }
 });
+
 
 module.exports = router;

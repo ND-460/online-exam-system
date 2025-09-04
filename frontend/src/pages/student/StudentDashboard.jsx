@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
+import PerformanceReports from "./PerformanceReports";
 import axios from "axios";
 
 import { toast } from "react-toastify";
@@ -16,7 +17,6 @@ import {
   Legend,
 } from "recharts";
 import Editor from "@monaco-editor/react";
-
 
 export default function StudentDashboard() {
   const [language, setLanguage] = useState("JavaScript");
@@ -43,18 +43,16 @@ export default function StudentDashboard() {
     if (!user) {
       navigate("/login");
     } else if (user.role !== "student") {
-      if(user.role === 'teacher'){
-        navigate('/teacher')
-      }else if(user.role === 'admin'){
-        navigate('/admin')
+      if (user.role === "teacher") {
+        navigate("/teacher");
+      } else if (user.role === "admin") {
+        navigate("/admin");
       }
-      toast.error('Unauthorised access')
+      toast.error("Unauthorised access");
     }
   }, [user, navigate]);
   // Fetch test counts and next active test
 
-
-  
   const performanceData = [
     { week: "Week 1", score: 65 },
     { week: "Week 2", score: 72 },
@@ -69,7 +67,9 @@ export default function StudentDashboard() {
     const fetchTests = async () => {
       try {
         const countsRes = await axios.get(
-          `${import.meta.env.VITE_API_URL}/api/student/tests/student/${user._id}`,
+          `${import.meta.env.VITE_API_URL}/api/student/tests/student/${
+            user._id
+          }`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setTestCounts(countsRes.data.payload || countsRes.data);
@@ -118,7 +118,9 @@ export default function StudentDashboard() {
   const fetchMyTests = async () => {
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_API_URL}/api/student/assigned-tests/${user._id}`,
+        `${import.meta.env.VITE_API_URL}/api/student/assigned-tests/${
+          user._id
+        }`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -178,9 +180,21 @@ export default function StudentDashboard() {
               </div>
               <div className="flex flex-row gap-6">
                 {[
-                  { label: "Upcoming", count: testCounts.upcoming, color: "blue" },
-                  { label: "Ongoing", count: testCounts.ongoing, color: "green" },
-                  { label: "Completed", count: testCounts.completed, color: "purple" },
+                  {
+                    label: "Upcoming",
+                    count: testCounts.upcoming,
+                    color: "blue",
+                  },
+                  {
+                    label: "Ongoing",
+                    count: testCounts.ongoing,
+                    color: "green",
+                  },
+                  {
+                    label: "Completed",
+                    count: testCounts.completed,
+                    color: "purple",
+                  },
                 ].map((card) => (
                   <div
                     key={card.label}
@@ -231,95 +245,77 @@ export default function StudentDashboard() {
           </div>
 
           {/* Code Practice Arena */}
-           <div className="bg-gradient-to-br from-black via-[#181f2e] to-[#232f4b] rounded-3xl p-12 border border-[#232f4b] shadow-2xl w-full flex flex-col md:flex-row gap-12 transition duration-300 hover:scale-[1.01]">
-      {/* Left Section */}
-      <div className="flex-1 flex flex-col justify-center">
-        <h3 className="font-semibold text-2xl mb-3">Code Practice Arena</h3>
-        <p className="text-blue-200 text-base mb-6">
-          Open practice problems, choose language, and sharpen your skills.
-        </p>
+          <div className="bg-gradient-to-br from-black via-[#181f2e] to-[#232f4b] rounded-3xl p-12 border border-[#232f4b] shadow-2xl w-full flex flex-col md:flex-row gap-12 transition duration-300 hover:scale-[1.01]">
+            {/* Left Section */}
+            <div className="flex-1 flex flex-col justify-center">
+              <h3 className="font-semibold text-2xl mb-3">
+                Code Practice Arena
+              </h3>
+              <p className="text-blue-200 text-base mb-6">
+                Open practice problems, choose language, and sharpen your
+                skills.
+              </p>
 
-        {/* Language Selector */}
-        <label className="block text-lg mb-2" htmlFor="language">
-          Language
-        </label>
-        <select
-          id="language"
-          className="w-full bg-[#151e2e] border border-[#232f4b] rounded-lg px-4 py-3 text-white mb-4 text-lg focus:ring-2 focus:ring-violet-500 outline-none transition"
-          value={language}
-          onChange={(e) => setLanguage(e.target.value)}
-        >
-          <option>JavaScript</option>
-          <option>Python</option>
-          <option>C++</option>
-          <option>Java</option>
-        </select>
+              {/* Language Selector */}
+              <label className="block text-lg mb-2" htmlFor="language">
+                Language
+              </label>
+              <select
+                id="language"
+                className="w-full bg-[#151e2e] border border-[#232f4b] rounded-lg px-4 py-3 text-white mb-4 text-lg focus:ring-2 focus:ring-violet-500 outline-none transition"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+              >
+                <option>JavaScript</option>
+                <option>Python</option>
+                <option>C++</option>
+                <option>Java</option>
+              </select>
 
-        {/* Buttons */}
-        <div className="flex gap-4 mt-4">
-          <button
-            className="flex-1 bg-violet-600 hover:bg-violet-700 text-white px-6 py-3 rounded-lg font-semibold text-lg shadow-md hover:shadow-lg transition"
-            onClick={() => setOpenEditor(true)}
-          >
-            Open Editor
-          </button>
-          <button className="flex-1 bg-[#232f4b] hover:bg-[#2a3957] text-white px-6 py-3 rounded-lg font-semibold border border-[#2a3957] text-lg transition">
-            Join Test (Code)
-          </button>
-        </div>
-      </div>
+              {/* Buttons */}
+              <div className="flex gap-4 mt-4">
+                <button
+                  className="flex-1 bg-violet-600 hover:bg-violet-700 text-white px-6 py-3 rounded-lg font-semibold text-lg shadow-md hover:shadow-lg transition"
+                  onClick={() => setOpenEditor(true)}
+                >
+                  Open Editor
+                </button>
+                <button className="flex-1 bg-[#232f4b] hover:bg-[#2a3957] text-white px-6 py-3 rounded-lg font-semibold border border-[#2a3957] text-lg transition">
+                  Join Test (Code)
+                </button>
+              </div>
+            </div>
 
-      {/* Right Section */}
-      <div className="flex-1 mt-8 md:mt-0 flex flex-col justify-center">
-        {!openEditor ? (
-          <>
-            <div className="text-lg font-semibold mb-4">Sample Problems</div>
-            <ul className="text-blue-100 text-base list-disc ml-6 space-y-2">
-              <li>Two sum — Easy</li>
-              <li>Balanced Brackets — Medium</li>
-              <li>LRU Cache — Hard</li>
-            </ul>
-          </>
-        ) : (
-          <div className="h-[400px] rounded-xl overflow-hidden border border-[#2a3957]">
-            <Editor
-              height="100%"
-              defaultLanguage="javascript"
-              language={languageMap[language]}
-              value={code}
-              theme="vs-dark"
-              onChange={(value) => setCode(value || "")}
-            />
-          </div>
-        )}
-      </div>
-    </div>
-
-          {/* Performance Reports */}
-          <div className="bg-gradient-to-br from-black via-[#181f2e] to-[#232f4b] rounded-3xl p-10 border border-[#232f4b] shadow-2xl w-full transition duration-300 hover:scale-[1.01]">
-            <h3 className="font-bold text-xl mb-2">Performance Reports</h3>
-            <p className="text-blue-200 text-sm mb-5">
-              Weekly progress, strengths and weaknesses.
-            </p>
-            <div className="h-72 flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={performanceData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#232f4b" />
-                  <XAxis dataKey="week" stroke="#b3c2e6" />
-                  <YAxis stroke="#b3c2e6" />
-                  <Tooltip
-                    contentStyle={{
-                      background: "#232f4b",
-                      border: "none",
-                      color: "#fff",
-                    }}
+            {/* Right Section */}
+            <div className="flex-1 mt-8 md:mt-0 flex flex-col justify-center">
+              {!openEditor ? (
+                <>
+                  <div className="text-lg font-semibold mb-4">
+                    Sample Problems
+                  </div>
+                  <ul className="text-blue-100 text-base list-disc ml-6 space-y-2">
+                    <li>Two sum — Easy</li>
+                    <li>Balanced Brackets — Medium</li>
+                    <li>LRU Cache — Hard</li>
+                  </ul>
+                </>
+              ) : (
+                <div className="h-[400px] rounded-xl overflow-hidden border border-[#2a3957]">
+                  <Editor
+                    height="100%"
+                    defaultLanguage="javascript"
+                    language={languageMap[language]}
+                    value={code}
+                    theme="vs-dark"
+                    onChange={(value) => setCode(value || "")}
                   />
-                  <Legend />
-                  <Bar dataKey="score" fill="#7c3aed" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Performance Reports */}
+          <PerformanceReports userId={user._id} token={token} />
         </div>
 
         {/* Right Sidebar */}
