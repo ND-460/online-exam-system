@@ -480,9 +480,9 @@ router.get("/test/:testId", async (req, res) => {
   }
 });
 
-router.get("/performance/:userId", async (req, res) => {
+router.get("/performance", auth, async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = req.user?.id; // from JWT
 
     const student = await Student.findOne({ profileInfo: userId });
     if (!student) {
@@ -494,17 +494,16 @@ router.get("/performance/:userId", async (req, res) => {
       .sort({ attemptedAt: -1 })
       .limit(5);
 
-    if (!results || results.length === 0) {
+    if (!results.length) {
       return res.status(404).json({ message: "No performance records found" });
     }
 
     const performanceData = results.map((result) => {
       const totalMarks = result.testId?.outOfMarks || result.outOfMarks || 1;
-
       const percentage = ((result.score / totalMarks) * 100).toFixed(2);
 
       return {
-        testName: result.testId?.testName || result.testName || "Unknown Test",
+        testName: result.testId?.testName || "Unknown Test",
         score: result.score,
         outOfMarks: totalMarks,
         percentage: Number(percentage),
