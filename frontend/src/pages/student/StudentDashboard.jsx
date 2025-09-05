@@ -336,7 +336,7 @@ export default function StudentDashboard() {
             <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-[#2a3957] scrollbar-track-[#151e2e]">
               <ul className="divide-y divide-gray-700">
                 {myTests.length > 0 ? (
-                  myTests.map((test) => (
+                  myTests.map((test) => ( 
                     <li
                       key={test._id}
                       className="py-4 flex justify-between items-center hover:bg-[#232f4b] px-3 rounded-md transition"

@@ -12,58 +12,55 @@ import {
   Label,
 } from "recharts";
 
-export default function PerformanceReports({ userId, token }) {
+export default function PerformanceReports({ token }) {
   const [performanceData, setPerformanceData] = useState([]);
   const [status, setStatus] = useState(null); // "good" | "bad" | "neutral"
 
   useEffect(() => {
-  const fetchPerformance = async () => {
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_URL}/api/student/performance/${userId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+    const fetchPerformance = async () => {
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_API_URL}/api/student/performance`, // 👈 no userId here
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
 
-      // ✅ backend returns { performanceData }
-      let tests = res.data.performanceData || [];
+        let tests = res.data.performanceData || [];
 
-      // sort ascending by date
-      tests = tests.sort((a, b) => new Date(a.date) - new Date(b.date));
+        // sort by date ascending
+        tests = tests.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-      // Ensure only last 5 tests (oldest to newest)
-      tests = tests.slice(-5);
+        // keep only last 5
+        tests = tests.slice(-5);
 
-      // Map into chart-friendly format
-      const formatted = tests.map((t, idx) => ({
-        test: t.testName || `Test ${idx + 1}`,
-        score: parseFloat(t.percentage) || 0,
-      }));
+        const formatted = tests.map((t, idx) => ({
+          test: t.testName || `Test ${idx + 1}`,
+          score: parseFloat(t.percentage) || 0,
+        }));
 
-      setPerformanceData(formatted);
+        setPerformanceData(formatted);
 
-      // Performance trend analysis
-      if (formatted.length > 1) {
-        const latest = formatted[formatted.length - 1].score;
-        const prevAvg =
-          formatted.slice(0, -1).reduce((sum, t) => sum + t.score, 0) /
-          (formatted.length - 1);
+        // performance trend
+        if (formatted.length > 1) {
+          const latest = formatted[formatted.length - 1].score;
+          const prevAvg =
+            formatted.slice(0, -1).reduce((sum, t) => sum + t.score, 0) /
+            (formatted.length - 1);
 
-        if (latest > prevAvg + 5) {
-          setStatus("good");
-        } else if (latest < prevAvg - 5) {
-          setStatus("bad");
-        } else {
-          setStatus("neutral");
+          if (latest > prevAvg + 5) {
+            setStatus("good");
+          } else if (latest < prevAvg - 5) {
+            setStatus("bad");
+          } else {
+            setStatus("neutral");
+          }
         }
+      } catch (err) {
+        console.error("Error fetching performance:", err);
       }
-    } catch (err) {
-      console.error("Error fetching performance:", err);
-    }
-  };
+    };
 
-  fetchPerformance();
-}, [userId, token]);
-
+    fetchPerformance();
+  }, [token]);
 
   return (
     <div className="bg-gradient-to-br from-black via-[#181f2e] to-[#232f4b] rounded-3xl p-10 border border-[#232f4b] shadow-2xl w-full transition duration-300 hover:scale-[1.01]">
@@ -92,7 +89,12 @@ export default function PerformanceReports({ userId, token }) {
           <BarChart data={performanceData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#232f4b" />
             <XAxis dataKey="test" stroke="#b3c2e6">
-              <Label value="Tests" offset={-5} position="insideBottom" fill="#b3c2e6" />
+              <Label
+                value="Tests"
+                offset={-5}
+                position="insideBottom"
+                fill="#b3c2e6"
+              />
             </XAxis>
             <YAxis stroke="#b3c2e6" domain={[0, 100]}>
               <Label
@@ -104,6 +106,7 @@ export default function PerformanceReports({ userId, token }) {
               />
             </YAxis>
             <Tooltip
+              formatter={(value) => [`${value}%`, "Percentage"]}
               contentStyle={{
                 background: "#232f4b",
                 border: "none",
