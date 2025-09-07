@@ -33,6 +33,9 @@ export default function Exam() {
   const [showSubmit, setShowSubmit] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [tabWarnings, setTabWarnings] = useState(0);
+  const [violationCount, setViolationCount] = useState(0);
+  const VIOLATION_THRESHOLD = 3;
+
   const timerRef = useRef();
   const { token, user } = useAuthStore();
   const navigate = useNavigate();
@@ -48,6 +51,20 @@ export default function Exam() {
     instructions: [],
   });
   const [timer, setTimer] = useState(null);
+  const addViolation = (reason) => {
+    setViolationCount((prev) => {
+      const updated = prev + 1;
+      toast.warning(
+        `Warning: ${reason} (Attempt ${updated}/${VIOLATION_THRESHOLD})`
+      );
+      if (updated >= VIOLATION_THRESHOLD) {
+        toast.error("Too many violations! Auto-submitting...");
+        handleSubmit();
+      }
+      return updated;
+    });
+  };
+
   // Timer logic
   useEffect(() => {
     if (!started || timer === null) return;
@@ -65,7 +82,7 @@ export default function Exam() {
   useEffect(() => {
     const prevent = (e, contxt) => {
       e.preventDefault();
-      toast.warning(`Warning: ${contxt} occurred`);
+      addViolation(contxt);
     };
 
     const handleContextMenu = (e) => prevent(e, "context menu");
@@ -85,12 +102,8 @@ export default function Exam() {
 
   // Strict mode: tab switch warning
   useEffect(() => {
-    const onBlur = () => {
-      setTabWarnings((w) => {
-        if (w >= 2) setShowSubmit(true);
-        return w + 1;
-      });
-    };
+    const onBlur = () => addViolation("Tab switch/blur detected");
+
     window.addEventListener("blur", onBlur);
     return () => window.removeEventListener("blur", onBlur);
   }, []);
@@ -117,7 +130,7 @@ export default function Exam() {
         // re-enter fullscreen if user pressed Esc or tried to exit
         document.documentElement.requestFullscreen().catch((err) => {
           console.error("Re-enter fullscreen failed:", err);
-          toast.warning("Warning: FullScreen Exited");
+          addViolation("Fullscreen exit attempt");
         });
       }
     };
@@ -128,17 +141,7 @@ export default function Exam() {
 
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.hidden) {
-        setTabWarnings((w) => {
-          const newWarnings = w + 1;
-          toast.warning(`Warning: Tab switch detected (${newWarnings})`);
-          if (newWarnings >= 3) {
-            toast.error("Too many violations! Auto-submitting...");
-            handleSubmit();
-          }
-          return newWarnings;
-        });
-      }
+      if (document.hidden) addViolation("Tab switch detected");
     };
 
     const handleKeyDown = (e) => {
@@ -152,7 +155,7 @@ export default function Exam() {
         e.key === "F5"
       ) {
         e.preventDefault();
-        toast.warning("Warning: Restricted key pressed");
+        addViolation("Restricted key pressed");
       }
     };
 
