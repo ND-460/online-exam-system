@@ -122,9 +122,11 @@ export default function TeacherDashboard() {
     setQuestions(qs);
     setShowQuestions(false);
 
+    const totalMarks = qs.reduce((sum, q) => sum + (q.marks || 0), 0);
+
     try {
       if (editingTest) {
-        // Only send the questions array for update
+        
         await axios.put(
           `${import.meta.env.VITE_API_URL}/api/teacher/update-test/${
             editingTest._id
@@ -145,7 +147,7 @@ export default function TeacherDashboard() {
           className,
           minutes,
           rules,
-          outOfMarks,
+          outOfMarks: totalMarks,
           description: testDesc,
           scheduledAt,
           questions: qs,

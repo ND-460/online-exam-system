@@ -1,40 +1,43 @@
 import React, { useState, useEffect } from "react";
 
 export default function AddQuestions({ initialQuestions = [], onSave, onCancel }) {
-  // Initialize with existing questions or default one
   const [questions, setQuestions] = useState(
-  initialQuestions.length > 0
-    ? initialQuestions
-    : [{ question: "", options: ["", "", "", ""], answer: 0 }]
-);
+    initialQuestions.length > 0
+      ? initialQuestions
+      : [{ question: "", options: ["", "", "", ""], answer: 0, marks: 1 }]
+  );
 
-  // Handle question text change
   const handleQuestionChange = (idx, value) => {
     const updated = [...questions];
     updated[idx].question = value;
     setQuestions(updated);
   };
 
-  // Handle option change
   const handleOptionChange = (qIdx, oIdx, value) => {
     const updated = [...questions];
     updated[qIdx].options[oIdx] = value;
     setQuestions(updated);
   };
 
-  // Handle correct answer change
   const handleAnswerChange = (qIdx, value) => {
     const updated = [...questions];
     updated[qIdx].answer = parseInt(value);
     setQuestions(updated);
   };
 
-  // Add new empty question
-  const addQuestion = () => {
-    setQuestions([...questions, { question: "", options: ["", "", "", ""], answer: 0 }]);
+  const handleMarksChange = (qIdx, value) => {
+    const updated = [...questions];
+    updated[qIdx].marks = Number(value) || 0;
+    setQuestions(updated);
   };
 
-  // Remove question
+  const addQuestion = () => {
+    setQuestions([
+      ...questions,
+      { question: "", options: ["", "", "", ""], answer: 0, marks: 1 },
+    ]);
+  };
+
   const removeQuestion = (idx) => {
     setQuestions(questions.filter((_, i) => i !== idx));
   };
@@ -51,7 +54,12 @@ export default function AddQuestions({ initialQuestions = [], onSave, onCancel }
           <div className="flex justify-between items-center mb-2">
             <label className="font-semibold text-white">Question {idx + 1}</label>
             {questions.length > 1 && (
-              <button onClick={() => removeQuestion(idx)} className="text-red-400 hover:underline text-xs">Remove</button>
+              <button
+                onClick={() => removeQuestion(idx)}
+                className="text-red-400 hover:underline text-xs"
+              >
+                Remove
+              </button>
             )}
           </div>
           <input
@@ -71,7 +79,7 @@ export default function AddQuestions({ initialQuestions = [], onSave, onCancel }
               />
             ))}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3 mb-2">
             <label className="text-blue-200 text-sm">Correct Answer:</label>
             <select
               className="bg-[#151e2e] border border-[#232f4b] rounded-md px-2 py-1 text-white"
@@ -83,12 +91,37 @@ export default function AddQuestions({ initialQuestions = [], onSave, onCancel }
               ))}
             </select>
           </div>
+          <div className="flex items-center gap-3">
+            <label className="text-blue-200 text-sm">Marks:</label>
+            <input
+              type="number"
+              min="1"
+              className="w-24 bg-[#151e2e] border border-[#232f4b] rounded-md px-2 py-1 text-white"
+              value={q.marks}
+              onChange={(e) => handleMarksChange(idx, e.target.value)}
+            />
+          </div>
         </div>
       ))}
-      <button onClick={addQuestion} className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-md font-semibold mb-4">Add Another Question</button>
+      <button
+        onClick={addQuestion}
+        className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-md font-semibold mb-4"
+      >
+        Add Another Question
+      </button>
       <div className="flex gap-4 mt-4">
-        <button onClick={handleSave} className="bg-violet-600 hover:bg-violet-700 text-white px-6 py-3 rounded-md font-semibold text-lg">Save Questions</button>
-        <button onClick={onCancel} className="bg-transparent border border-blue-200 text-blue-200 px-6 py-3 rounded-md font-semibold text-lg">Cancel</button>
+        <button
+          onClick={handleSave}
+          className="bg-violet-600 hover:bg-violet-700 text-white px-6 py-3 rounded-md font-semibold text-lg"
+        >
+          Save Questions
+        </button>
+        <button
+          onClick={onCancel}
+          className="bg-transparent border border-blue-200 text-blue-200 px-6 py-3 rounded-md font-semibold text-lg"
+        >
+          Cancel
+        </button>
       </div>
     </div>
   );
