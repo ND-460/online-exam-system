@@ -51,13 +51,14 @@ export default function Exam() {
     instructions: [],
   });
   const [timer, setTimer] = useState(null);
+  const submittingRef = useRef(false)
   const addViolation = (reason) => {
     setViolationCount((prev) => {
       const updated = prev + 1;
       toast.warning(
         `Warning: ${reason} (Attempt ${updated}/${VIOLATION_THRESHOLD})`
       );
-      if (updated >= VIOLATION_THRESHOLD) {
+      if (updated >= VIOLATION_THRESHOLD && !submittingRef.current) {
         toast.error("Too many violations! Auto-submitting...");
         handleSubmit();
       }
@@ -80,6 +81,7 @@ export default function Exam() {
 
   // Strict mode: disable right-click, copy, paste
   useEffect(() => {
+    if (!started) return
     const prevent = (e, contxt) => {
       e.preventDefault();
       addViolation(contxt);
@@ -98,18 +100,20 @@ export default function Exam() {
       document.removeEventListener("copy", handleCopy);
       document.removeEventListener("paste", handlePaste);
     };
-  }, []);
+  }, [started]);
 
   // Strict mode: tab switch warning
   useEffect(() => {
+    if(!started) return 
     const onBlur = () => addViolation("Tab switch/blur detected");
 
     window.addEventListener("blur", onBlur);
     return () => window.removeEventListener("blur", onBlur);
-  }, []);
+  }, [started]);
 
   // Fullscreen logic
   useEffect(() => {
+    if (!started) return
     const enterFullscreen = async () => {
       try {
         if (fullscreen && !document.fullscreenElement) {
@@ -122,12 +126,23 @@ export default function Exam() {
       }
     };
     enterFullscreen();
-  }, [fullscreen]);
+  }, [fullscreen,started]);
+
+  useEffect(() => {
+    if(!started) return
+    const interval = setInterval(() => {
+      if (!document.hasFocus()) {
+        addViolation("Focus lost (other site or app)");
+      }
+    }, 1000); 
+    return () => clearInterval(interval);
+  }, [started]);
+
   // Prevent exit fullscreen
   useEffect(() => {
+    if(!started) return
     const handleExit = () => {
       if (!document.fullscreenElement && fullscreen) {
-        // re-enter fullscreen if user pressed Esc or tried to exit
         document.documentElement.requestFullscreen().catch((err) => {
           console.error("Re-enter fullscreen failed:", err);
           addViolation("Fullscreen exit attempt");
@@ -137,9 +152,10 @@ export default function Exam() {
 
     document.addEventListener("fullscreenchange", handleExit);
     return () => document.removeEventListener("fullscreenchange", handleExit);
-  }, [fullscreen]);
+  }, [fullscreen,started]);
 
   useEffect(() => {
+    if (!started) return
     const handleVisibility = () => {
       if (document.hidden) addViolation("Tab switch detected");
     };
@@ -166,7 +182,7 @@ export default function Exam() {
       document.removeEventListener("visibilitychange", handleVisibility);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, []);
+  }, [started]);
 
   // Palette update
   useEffect(() => {
@@ -360,6 +376,8 @@ export default function Exam() {
 
   // Submit logic
   async function handleSubmit() {
+    if (submittingRef.current) return;
+    submittingRef.current = true
     try {
       const payload = {
         answers: answers,

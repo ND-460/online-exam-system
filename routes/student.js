@@ -311,6 +311,10 @@ router.post("/attempt-test/:testId", auth, async (req, res) => {
   if (!studentId) return res.status(401).json({ message: "Unauthorized" });
 
   try {
+    const existingResult = await Result.findOne({ studentId, testId });
+    if (existingResult) {
+      return res.status(400).json({ message: "Test already submitted" });
+    }
     const test = await Test.findById(testId);
     if (!test) return res.status(404).json({ message: "Test not found" });
     const student = await Student.findOne({ profileInfo: studentId });
@@ -482,7 +486,7 @@ router.get("/test/:testId", async (req, res) => {
 
 router.get("/performance", auth, async (req, res) => {
   try {
-    const userId = req.user?.id; 
+    const userId = req.user?.id;
 
     const student = await Student.findOne({ profileInfo: userId });
     if (!student) {
