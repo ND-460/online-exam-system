@@ -482,7 +482,7 @@ router.get("/test/:testId", async (req, res) => {
 
 router.get("/performance", auth, async (req, res) => {
   try {
-    const userId = req.user?.id; // from JWT
+    const userId = req.user?.id; 
 
     const student = await Student.findOne({ profileInfo: userId });
     if (!student) {

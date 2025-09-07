@@ -111,20 +111,59 @@ export default function Exam() {
     enterFullscreen();
   }, [fullscreen]);
   // Prevent exit fullscreen
-useEffect(() => {
-  const handleExit = () => {
-    if (!document.fullscreenElement && fullscreen) {
-      // re-enter fullscreen if user pressed Esc or tried to exit
-      document.documentElement.requestFullscreen().catch((err) => {
-        console.error("Re-enter fullscreen failed:", err);
-        toast.warning("Warning: FullScreen Exited")
-      });
-    }
-  };
+  useEffect(() => {
+    const handleExit = () => {
+      if (!document.fullscreenElement && fullscreen) {
+        // re-enter fullscreen if user pressed Esc or tried to exit
+        document.documentElement.requestFullscreen().catch((err) => {
+          console.error("Re-enter fullscreen failed:", err);
+          toast.warning("Warning: FullScreen Exited");
+        });
+      }
+    };
 
-  document.addEventListener("fullscreenchange", handleExit);
-  return () => document.removeEventListener("fullscreenchange", handleExit);
-}, [fullscreen]);
+    document.addEventListener("fullscreenchange", handleExit);
+    return () => document.removeEventListener("fullscreenchange", handleExit);
+  }, [fullscreen]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.hidden) {
+        setTabWarnings((w) => {
+          const newWarnings = w + 1;
+          toast.warning(`Warning: Tab switch detected (${newWarnings})`);
+          if (newWarnings >= 3) {
+            toast.error("Too many violations! Auto-submitting...");
+            handleSubmit();
+          }
+          return newWarnings;
+        });
+      }
+    };
+
+    const handleKeyDown = (e) => {
+      if (
+        e.key === "F12" ||
+        (e.ctrlKey &&
+          e.shiftKey &&
+          ["I", "J", "C"].includes(e.key.toUpperCase())) ||
+        (e.ctrlKey &&
+          ["S", "U", "C", "X", "V", "R", "P"].includes(e.key.toUpperCase())) ||
+        e.key === "F5"
+      ) {
+        e.preventDefault();
+        toast.warning("Warning: Restricted key pressed");
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   // Palette update
   useEffect(() => {
