@@ -33,6 +33,9 @@ export default function Exam() {
   const [showSubmit, setShowSubmit] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [tabWarnings, setTabWarnings] = useState(0);
+  const [violationCount, setViolationCount] = useState(0);
+  const VIOLATION_THRESHOLD = 3;
+
   const timerRef = useRef();
   const { token, user } = useAuthStore();
   const navigate = useNavigate();
@@ -48,6 +51,21 @@ export default function Exam() {
     instructions: [],
   });
   const [timer, setTimer] = useState(null);
+  const submittingRef = useRef(false)
+  const addViolation = (reason) => {
+    setViolationCount((prev) => {
+      const updated = prev + 1;
+      toast.warning(
+        `Warning: ${reason} (Attempt ${updated}/${VIOLATION_THRESHOLD})`
+      );
+      if (updated >= VIOLATION_THRESHOLD && !submittingRef.current) {
+        toast.error("Too many violations! Auto-submitting...");
+        handleSubmit();
+      }
+      return updated;
+    });
+  };
+
   // Timer logic
   useEffect(() => {
     if (!started || timer === null) return;
@@ -63,9 +81,10 @@ export default function Exam() {
 
   // Strict mode: disable right-click, copy, paste
   useEffect(() => {
+    if (!started) return
     const prevent = (e, contxt) => {
       e.preventDefault();
-      toast.warning(`Warning: ${contxt} occurred`);
+      addViolation(contxt);
     };
 
     const handleContextMenu = (e) => prevent(e, "context menu");
@@ -81,22 +100,20 @@ export default function Exam() {
       document.removeEventListener("copy", handleCopy);
       document.removeEventListener("paste", handlePaste);
     };
-  }, []);
+  }, [started]);
 
   // Strict mode: tab switch warning
   useEffect(() => {
-    const onBlur = () => {
-      setTabWarnings((w) => {
-        if (w >= 2) setShowSubmit(true);
-        return w + 1;
-      });
-    };
+    if(!started) return 
+    const onBlur = () => addViolation("Tab switch/blur detected");
+
     window.addEventListener("blur", onBlur);
     return () => window.removeEventListener("blur", onBlur);
-  }, []);
+  }, [started]);
 
   // Fullscreen logic
   useEffect(() => {
+    if (!started) return
     const enterFullscreen = async () => {
       try {
         if (fullscreen && !document.fullscreenElement) {
@@ -109,22 +126,63 @@ export default function Exam() {
       }
     };
     enterFullscreen();
-  }, [fullscreen]);
-  // Prevent exit fullscreen
-useEffect(() => {
-  const handleExit = () => {
-    if (!document.fullscreenElement && fullscreen) {
-      // re-enter fullscreen if user pressed Esc or tried to exit
-      document.documentElement.requestFullscreen().catch((err) => {
-        console.error("Re-enter fullscreen failed:", err);
-        toast.warning("Warning: FullScreen Exited")
-      });
-    }
-  };
+  }, [fullscreen,started]);
 
-  document.addEventListener("fullscreenchange", handleExit);
-  return () => document.removeEventListener("fullscreenchange", handleExit);
-}, [fullscreen]);
+  useEffect(() => {
+    if(!started) return
+    const interval = setInterval(() => {
+      if (!document.hasFocus()) {
+        addViolation("Focus lost (other site or app)");
+      }
+    }, 1000); 
+    return () => clearInterval(interval);
+  }, [started]);
+
+  // Prevent exit fullscreen
+  useEffect(() => {
+    if(!started) return
+    const handleExit = () => {
+      if (!document.fullscreenElement && fullscreen) {
+        document.documentElement.requestFullscreen().catch((err) => {
+          console.error("Re-enter fullscreen failed:", err);
+          addViolation("Fullscreen exit attempt");
+        });
+      }
+    };
+
+    document.addEventListener("fullscreenchange", handleExit);
+    return () => document.removeEventListener("fullscreenchange", handleExit);
+  }, [fullscreen,started]);
+
+  useEffect(() => {
+    if (!started) return
+    const handleVisibility = () => {
+      if (document.hidden) addViolation("Tab switch detected");
+    };
+
+    const handleKeyDown = (e) => {
+      if (
+        e.key === "F12" ||
+        (e.ctrlKey &&
+          e.shiftKey &&
+          ["I", "J", "C"].includes(e.key.toUpperCase())) ||
+        (e.ctrlKey &&
+          ["S", "U", "C", "X", "V", "R", "P"].includes(e.key.toUpperCase())) ||
+        e.key === "F5"
+      ) {
+        e.preventDefault();
+        addViolation("Restricted key pressed");
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [started]);
 
   // Palette update
   useEffect(() => {
@@ -318,6 +376,8 @@ useEffect(() => {
 
   // Submit logic
   async function handleSubmit() {
+    if (submittingRef.current) return;
+    submittingRef.current = true
     try {
       const payload = {
         answers: answers,

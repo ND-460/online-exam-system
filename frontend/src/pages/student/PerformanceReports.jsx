@@ -20,7 +20,7 @@ export default function PerformanceReports({ token }) {
     const fetchPerformance = async () => {
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_API_URL}/api/student/performance`, // 👈 no userId here
+          `${import.meta.env.VITE_API_URL}/api/student/performance`, 
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
