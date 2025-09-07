@@ -24,8 +24,46 @@ export default function TeacherDashboard() {
   const { logout, token, user } = useAuthStore();
   const [scheduledAt, setScheduledAt] = useState(null);
   const [selectedTest, setSelectedTest] = useState(null);
+  const [errors, setErrors] = useState({});
 
   const navigate = useNavigate();
+  const validateForm = () => {
+    let newErrors = {};
+
+    if (!testTitle.trim()) {
+      newErrors.testTitle = "Test title is required";
+    } else if (testTitle.trim().length < 3) {
+      newErrors.testTitle = "Title must be at least 3 characters";
+    }
+
+    if (!testType) {
+      newErrors.testType = "Test type is required";
+    }
+
+    if (!className.trim()) {
+      newErrors.className = "Class name is required";
+    }
+
+    if (!minutes || minutes <= 0) {
+      newErrors.minutes = "Duration must be greater than 0";
+    }
+
+    if (rules.some((rule) => rule.trim() === "")) {
+      newErrors.rules = "Rules cannot contain empty entries";
+    }
+
+    if (testDesc.length > 300) {
+      newErrors.testDesc = "Description cannot exceed 300 characters";
+    }
+
+    if (scheduledAt && scheduledAt < new Date()) {
+      newErrors.scheduledAt = "Scheduled date cannot be in the past";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   useEffect(() => {
     if (!user) {
       navigate("/login");
@@ -116,7 +154,11 @@ export default function TeacherDashboard() {
   };
 
   const handleNextQuestions = () => {
-    setShowQuestions(true);
+    if (validateForm()) {
+      setShowQuestions(true);
+    } else {
+       Object.values(errors).forEach((msg) => toast.error(msg));
+    }
   };
   const handleSaveQuestions = async (qs) => {
     setQuestions(qs);
@@ -126,7 +168,6 @@ export default function TeacherDashboard() {
 
     try {
       if (editingTest) {
-        
         await axios.put(
           `${import.meta.env.VITE_API_URL}/api/teacher/update-test/${
             editingTest._id
@@ -259,6 +300,7 @@ export default function TeacherDashboard() {
                     value={testTitle}
                     onChange={(e) => setTestTitle(e.target.value)}
                   />
+                  
                   <select
                     className="w-48 bg-[#151e2e] border border-[#232f4b] rounded-md px-4 py-3 text-white text-lg"
                     value={testType}
@@ -423,7 +465,7 @@ export default function TeacherDashboard() {
                   Filter by test or student, see code output and score.
                 </p>
                 {selectedTest ? (
-                  <ViewSubmissions testId={selectedTest} token = {token}/>
+                  <ViewSubmissions testId={selectedTest} token={token} />
                 ) : (
                   <div className="h-24 flex items-center justify-center text-blue-300 text-xs">
                     Select a test from "Manage Tests" to view submissions.
@@ -438,7 +480,7 @@ export default function TeacherDashboard() {
               <div className="bg-gradient-to-br from-black via-[#181f2e] to-[#232f4b] rounded-2xl p-6 border border-[#232f4b] shadow-xl w-full">
                 <h3 className="font-bold mb-2">Analytics (Snapshot)</h3>
                 {selectedTest ? (
-                  <Analytics testId={selectedTest} token = {token} />
+                  <Analytics testId={selectedTest} token={token} />
                 ) : (
                   <div className="h-32 flex items-center justify-center text-blue-300 text-xs">
                     Select a test to view analytics.
