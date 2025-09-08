@@ -8,6 +8,8 @@ import DatePicker from "react-datepicker";
 import "react-toastify/ReactToastify.css";
 import ViewSubmissions from "./ViewSubmissions";
 import Analytics from "./Analytics";
+import ImportQuestionsModal from "./ImportQuestionsModal";
+
 export default function TeacherDashboard() {
   const [tests, setTests] = useState([]);
   const [testTitle, setTestTitle] = useState("");
@@ -24,8 +26,16 @@ export default function TeacherDashboard() {
   const { logout, token, user } = useAuthStore();
   const [scheduledAt, setScheduledAt] = useState(null);
   const [selectedTest, setSelectedTest] = useState(null);
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   const navigate = useNavigate();
+
+  // Calculate total marks from questions
+  const calculateTotalMarks = (questions) => {
+    const total = questions.reduce((total, q) => total + (q.marks || 1), 0);
+    return total > 0 ? total : 1; // Ensure minimum of 1 mark
+  };
+
   useEffect(() => {
     if (!user) {
       navigate("/login");
@@ -122,12 +132,15 @@ export default function TeacherDashboard() {
     setQuestions(qs);
     setShowQuestions(false);
 
+    // Calculate total marks from questions
+    const totalMarks = calculateTotalMarks(qs);
+    setOutOfMarks(totalMarks);
+
     try {
       if (editingTest) {
         // Only send the questions array for update
         await axios.put(
-          `${import.meta.env.VITE_API_URL}/api/teacher/update-test/${
-            editingTest._id
+          `${import.meta.env.VITE_API_URL}/api/teacher/update-test/${editingTest._id
           }`,
           { questions: qs },
           {
@@ -138,6 +151,20 @@ export default function TeacherDashboard() {
         toast.success("Test updated successfully!");
         setEditingTest(null);
       } else {
+        // Validate required fields before creating test
+        if (!testTitle.trim()) {
+          toast.error("Test Title is required");
+          return;
+        }
+        if (!className.trim()) {
+          toast.error("Class Name is required");
+          return;
+        }
+        if (qs.length === 0) {
+          toast.error("At least one question is required");
+          return;
+        }
+
         const payload = {
           teacherId: user._id,
           testName: testTitle,
@@ -145,11 +172,13 @@ export default function TeacherDashboard() {
           className,
           minutes,
           rules,
-          outOfMarks,
+          outOfMarks: totalMarks,
           description: testDesc,
           scheduledAt,
           questions: qs,
         };
+
+        console.log("Creating test with payload:", payload);
 
         await axios.post(
           `${import.meta.env.VITE_API_URL}/api/teacher/create-test`,
@@ -164,9 +193,11 @@ export default function TeacherDashboard() {
 
       await refreshTests();
     } catch (err) {
-      console.error(err);
+      console.error("Error saving test:", err);
+      console.error("Error response:", err.response?.data);
+      console.error("Error status:", err.response?.status);
       // alert("Error saving test");
-      toast.error("Error saving test");
+      toast.error(`Error saving test: ${err.response?.data || err.message}`);
     }
   };
 
@@ -234,9 +265,7 @@ export default function TeacherDashboard() {
                   </span> */}
                   <div className="flex gap-3">
                     <button
-                      onClick={() =>
-                        alert("Import from CSV/Excel coming soon!")
-                      }
+                      onClick={() => setIsImportOpen(true)}
                       className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-medium text-sm"
                     >
                       Import CSV/Excel
@@ -303,6 +332,21 @@ export default function TeacherDashboard() {
                       value={minutes}
                       onChange={(e) => setMinutes(Number(e.target.value))}
                     />
+                  </div>
+
+                  {/* Total Marks Display */}
+                  <div className="flex flex-col">
+                    <label className="text-blue-200 text-sm mb-1">
+                      Total Marks
+                    </label>
+                    <div className="w-32 bg-[#151e2e] border border-[#232f4b] rounded-md px-3 py-3 text-white text-lg text-center">
+                      {outOfMarks || "0"}
+                    </div>
+                    {outOfMarks === 0 && (
+                      <span className="text-xs text-blue-300 mt-1">
+                        Add questions to see total
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -421,7 +465,7 @@ export default function TeacherDashboard() {
                   Filter by test or student, see code output and score.
                 </p>
                 {selectedTest ? (
-                  <ViewSubmissions testId={selectedTest} token = {token}/>
+                  <ViewSubmissions testId={selectedTest} token={token} />
                 ) : (
                   <div className="h-24 flex items-center justify-center text-blue-300 text-xs">
                     Select a test from "Manage Tests" to view submissions.
@@ -436,7 +480,7 @@ export default function TeacherDashboard() {
               <div className="bg-gradient-to-br from-black via-[#181f2e] to-[#232f4b] rounded-2xl p-6 border border-[#232f4b] shadow-xl w-full">
                 <h3 className="font-bold mb-2">Analytics (Snapshot)</h3>
                 {selectedTest ? (
-                  <Analytics testId={selectedTest} token = {token} />
+                  <Analytics testId={selectedTest} token={token} />
                 ) : (
                   <div className="h-32 flex items-center justify-center text-blue-300 text-xs">
                     Select a test to view analytics.
@@ -458,33 +502,27 @@ export default function TeacherDashboard() {
           </div>
         </>
       )}
+      <ImportQuestionsModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onImport={(qs, testDetails) => {
+          // Set test details from imported file
+          if (testDetails) {
+            setTestTitle(testDetails.testTitle);
+            setClassName(testDetails.className);
+            setScheduledAt(testDetails.testSchedule ? new Date(testDetails.testSchedule) : null);
+            setMinutes(testDetails.testDuration);
+            setOutOfMarks(testDetails.totalMarks);
+          } else {
+            // Calculate total marks from questions if no test details
+            const totalMarks = calculateTotalMarks(qs);
+            setOutOfMarks(totalMarks);
+          }
+          setQuestions(qs);
+          setShowQuestions(true);
+          setIsImportOpen(false);
+        }}
+      />
     </div>
   );
-
-  //         {/* View Submissions */}
-  //         <div className="bg-gradient-to-br from-black via-[#181f2e] to-[#232f4b] rounded-2xl p-6 border border-[#232f4b] shadow-xl w-full">
-  //           <h3 className="font-bold mb-2">View Submissions</h3>
-  //           <p className="text-blue-200 text-xs mb-2">Filter by test or student, see code output and score.</p>
-  //           <div className="h-24 flex items-center justify-center text-blue-300 text-xs">[Submissions Table Placeholder]</div>
-  //         </div>
-  //       </div>
-
-  //       {/* Right Sidebar */}
-  //       <div className="flex flex-col gap-6">
-  //         {/* Analytics (Snapshot) */}
-  //         <div className="bg-gradient-to-br from-black via-[#181f2e] to-[#232f4b] rounded-2xl p-6 border border-[#232f4b] shadow-xl w-full">
-  //           <h3 className="font-bold mb-2">Analytics (Snapshot)</h3>
-  //           <div className="h-32 flex items-center justify-center text-blue-300 text-xs">[Charts Placeholder]</div>
-  //         </div>
-
-  //         {/* Invite Students */}
-  //         <div className="bg-gradient-to-br from-black via-[#181f2e] to-[#232f4b] rounded-2xl p-6 border border-[#232f4b] shadow-xl w-full">
-  //           <h3 className="font-bold mb-2">Invite Students</h3>
-  //           <p className="text-blue-200 text-xs mb-3">Send email invites or generate enroll links.</p>
-  //           <button className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md font-semibold">Generate Link</button>
-  //         </div>
-  //       </div>
-  //     </div>
-  //   </div>
-  // );
 }

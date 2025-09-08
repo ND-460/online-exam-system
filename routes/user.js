@@ -88,13 +88,17 @@ router.post(
 
       const userData = await user.save();
 
+      // TODO: Add notification to admin panel for new user registration
+      // This would typically be done via WebSocket or a notification service
+      console.log(`New user registered: ${firstName} ${lastName} (${email}) - Role: ${role}`);
+
       switch (role) {
         case STUDENT:
           try {
             student = Student({
               profileInfo: userData._id,
               attemptedTests: [],
-              testStatus:[]
+              testStatus: []
             });
             await student.save();
           } catch (err) {
@@ -686,6 +690,139 @@ router.put("/profile/:profileID", auth, async (req, res) => {
   } catch (err) {
     console.log(err.message);
     res.status(500).send("Error in Updating Profile");
+  }
+});
+
+/**
+ * @method - GET
+ * @param - /admin/users
+ * @description - Get all users for admin panel
+ */
+router.get("/admin/users", auth, async (req, res) => {
+  try {
+    // Check if user is admin
+    const adminUser = await User.findById(req.user.id);
+    if (!adminUser || adminUser.role !== 'admin') {
+      return res.status(403).json({ message: "Access denied. Admin role required." });
+    }
+
+    const users = await User.find({}, { password: 0 }).sort({ createdAt: -1 });
+    res.status(200).json({ users });
+  } catch (err) {
+    console.log(err.message);
+    res.status(500).json({ message: "Error fetching users" });
+  }
+});
+
+/**
+ * @method - PUT
+ * @param - /admin/users/:userId/status
+ * @description - Update user status (approve, block, etc.)
+ */
+router.put("/admin/users/:userId/status", auth, async (req, res) => {
+  try {
+    // Check if user is admin
+    const adminUser = await User.findById(req.user.id);
+    if (!adminUser || adminUser.role !== 'admin') {
+      return res.status(403).json({ message: "Access denied. Admin role required." });
+    }
+
+    const { userId } = req.params;
+    const { status } = req.body;
+
+    if (!['pending', 'active', 'blocked'].includes(status)) {
+      return res.status(400).json({ message: "Invalid status. Must be pending, active, or blocked." });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { status },
+      { new: true, select: '-password' }
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      message: `User status updated to ${status}`,
+      user
+    });
+  } catch (err) {
+    console.log(err.message);
+    res.status(500).json({ message: "Error updating user status" });
+  }
+});
+
+/**
+ * @method - DELETE
+ * @param - /admin/users/:userId
+ * @description - Delete a user
+ */
+router.delete("/admin/users/:userId", auth, async (req, res) => {
+  try {
+    // Check if user is admin
+    const adminUser = await User.findById(req.user.id);
+    if (!adminUser || adminUser.role !== 'admin') {
+      return res.status(403).json({ message: "Access denied. Admin role required." });
+    }
+
+    const { userId } = req.params;
+
+    // Prevent admin from deleting themselves
+    if (userId === req.user.id) {
+      return res.status(400).json({ message: "Cannot delete your own account" });
+    }
+
+    const user = await User.findByIdAndDelete(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Also delete associated student/teacher records
+    await Student.findOneAndDelete({ profileInfo: userId });
+    await Teacher.findOneAndDelete({ profileInfo: userId });
+
+    res.status(200).json({ message: "User deleted successfully" });
+  } catch (err) {
+    console.log(err.message);
+    res.status(500).json({ message: "Error deleting user" });
+  }
+});
+
+/**
+ * @method - GET
+ * @param - /admin/stats
+ * @description - Get admin dashboard statistics
+ */
+router.get("/admin/stats", auth, async (req, res) => {
+  try {
+    // Check if user is admin
+    const adminUser = await User.findById(req.user.id);
+    if (!adminUser || adminUser.role !== 'admin') {
+      return res.status(403).json({ message: "Access denied. Admin role required." });
+    }
+
+    const totalUsers = await User.countDocuments();
+    const activeUsers = await User.countDocuments({ status: 'active' });
+    const pendingUsers = await User.countDocuments({ status: 'pending' });
+    const blockedUsers = await User.countDocuments({ status: 'blocked' });
+    const students = await User.countDocuments({ role: 'student' });
+    const teachers = await User.countDocuments({ role: 'teacher' });
+    const admins = await User.countDocuments({ role: 'admin' });
+
+    res.status(200).json({
+      totalUsers,
+      activeUsers,
+      pendingUsers,
+      blockedUsers,
+      students,
+      teachers,
+      admins
+    });
+  } catch (err) {
+    console.log(err.message);
+    res.status(500).json({ message: "Error fetching statistics" });
   }
 });
 
