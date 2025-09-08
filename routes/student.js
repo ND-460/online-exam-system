@@ -335,7 +335,7 @@ router.post("/attempt-test/:testId", auth, async (req, res) => {
     test.questions.forEach((q, i) => {
       const submitted = answers[i];
       const isCorrect = submitted === q.answer;
-      if (isCorrect) score++;
+      if (isCorrect) score += q.marks || 1;
       evaluatedAnswers.push({
         question: q._id,
         submitted,
