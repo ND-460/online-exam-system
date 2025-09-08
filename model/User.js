@@ -17,10 +17,10 @@ const userSchema = new moongose.Schema({
     phone: {
         type: String,
         required: true,
-        default:"N/A"
+        default: "N/A"
         // unique: true
     },
-    section:{
+    section: {
         type: String,
         required: true,
         default: 'Test'
@@ -39,6 +39,11 @@ const userSchema = new moongose.Schema({
         // enum: ['student', 'teacher'],
         required: true,
         default: 'student'
+    },
+    status: {
+        type: String,
+        enum: ['pending', 'active', 'blocked'],
+        default: 'pending'
     },
     password: {
         type: String,
