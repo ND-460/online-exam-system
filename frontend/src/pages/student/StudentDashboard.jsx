@@ -31,6 +31,12 @@ export default function StudentDashboard() {
   const [myTests, setMyTests] = useState([]);
   const [openEditor, setOpenEditor] = useState(false);
   const [code, setCode] = useState("// Start coding here...");
+
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterCategory, setFilterCategory] = useState("all");
+  const [sortBy, setSortBy] = useState("scheduledAt");
+  const [sortOrder, setSortOrder] = useState("asc");
+
   const navigate = useNavigate();
   const { logout, user, token } = useAuthStore();
 
@@ -121,6 +127,52 @@ export default function StudentDashboard() {
       console.error("Error fetching my tests:", err);
     }
   };
+
+  const getFilteredSortedTests = () => {
+    let filtered = [...myTests];
+
+    if (filterStatus !== "all") {
+      filtered = filtered.filter((test) => {
+        if (filterStatus === "upcoming")
+          return (
+            !test.submitBy.includes(user._id) &&
+            new Date(test.scheduledAt) > new Date()
+          );
+        if (filterStatus === "ongoing") {
+          const start = new Date(test.scheduledAt);
+          const end = new Date(start.getTime() + test.minutes * 60000);
+          return (
+            !test.submitBy.includes(user._id) &&
+            new Date() >= start &&
+            new Date() <= end
+          );
+        }
+        if (filterStatus === "completed")
+          return test.submitBy.includes(user._id);
+        return true;
+      });
+    }
+
+    if (filterCategory !== "all") {
+      filtered = filtered.filter((test) => test.category === filterCategory);
+    }
+
+    filtered.sort((a, b) => {
+      if (sortBy === "scheduledAt") {
+        return sortOrder === "asc"
+          ? new Date(a.scheduledAt) - new Date(b.scheduledAt)
+          : new Date(b.scheduledAt) - new Date(a.scheduledAt);
+      } else if (sortBy === "name") {
+        return sortOrder === "asc"
+          ? a.testName.localeCompare(b.testName)
+          : b.testName.localeCompare(a.testName);
+      }
+      return 0;
+    });
+
+    return filtered;
+  };
+
   const languageMap = {
     JavaScript: "javascript",
     Python: "python",
@@ -363,10 +415,60 @@ export default function StudentDashboard() {
               ×
             </button>
             <h3 className="text-2xl font-bold text-white mb-6">My Tests</h3>
+
+            {/* Filters & Sorting */}
+            <div className="flex flex-wrap gap-4 mb-4">
+              {/* Status Filter */}
+              <select
+                className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+              >
+                <option value="all">All Status</option>
+                <option value="upcoming">Upcoming</option>
+                <option value="ongoing">Ongoing</option>
+                <option value="completed">Completed</option>
+              </select>
+
+              {/* Category Filter */}
+              <select
+                className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded"
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+              >
+                <option value="all">All Categories</option>
+                {[...new Set(myTests.map((t) => t.category))].map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+
+              {/* Sort By */}
+              <select
+                className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                <option value="scheduledAt">Date</option>
+                <option value="name">Name</option>
+              </select>
+
+              {/* Sort Order */}
+              <select
+                className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+              >
+                <option value="asc">Ascending</option>
+                <option value="desc">Descending</option>
+              </select>
+            </div>
+
             <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-[#2a3957] scrollbar-track-[#151e2e]">
               <ul className="divide-y divide-gray-700">
-                {myTests.length > 0 ? (
-                  myTests.map((test) => (
+                {getFilteredSortedTests().length > 0 ? (
+                  getFilteredSortedTests().map((test) => (
                     <li
                       key={test._id}
                       className="py-4 flex justify-between items-center hover:bg-[#232f4b] px-3 rounded-md transition"
