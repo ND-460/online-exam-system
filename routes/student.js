@@ -8,26 +8,38 @@ const Result = require("../model/Result");
 require("dotenv").config();
 
 // Get test counts for a student
-router.get("/tests/student/:studentId", auth, async (req, res) => {
-  const studentId = req.params.studentId;
+router.get("/tests/student/:userId", auth, async (req, res) => {
+  const userId = req.params.userId;
 
   try {
-    const upcoming = await Test.countDocuments({
-      assignedTo: studentId,
-      attempted: false,
-    });
-    const ongoing = await Test.countDocuments({
-      assignedTo: studentId,
-      attempted: false /* add extra filter if you track time */,
-    });
-    const completed = await Test.countDocuments({
-      assignedTo: studentId,
-      attempted: true,
+    const student = await Student.findOne({ profileInfo: userId });
+    if (!student) return res.status(404).json({ message: "Student not found" });
+
+    const now = new Date();
+    const tests = await Test.find({ assignedTo: userId });
+
+    let upcoming = 0;
+    let ongoing = 0;
+    let completed = 0;
+
+    tests.forEach((test) => {
+      const startTime = new Date(test.scheduledAt);
+      const endTime = new Date(startTime.getTime() + test.minutes * 60000);
+
+      if (test.attempted) {
+        completed++;
+      } else if (now < startTime) {
+        upcoming++;
+      } else if (now >= startTime && now <= endTime) {
+        ongoing++;
+      } else if (now > endTime) {
+        completed++;
+      }
     });
 
     res.status(200).json({ upcoming, ongoing, completed });
   } catch (err) {
-    console.error(err);
+    console.error("Error fetching student tests:", err);
     res.status(500).send("Error fetching student tests");
   }
 });
@@ -304,31 +316,38 @@ router.put("/update-profile/:profileID", auth, async (req, res) => {
 // POST /api/student/attempt-test/:testId
 router.post("/attempt-test/:testId", auth, async (req, res) => {
   const { testId } = req.params;
-  const studentId = req.user?.id;
+  const userId = req.user?.id; // this is User._id from JWT
   const { answers } = req.body;
   const date = Date.now();
 
-  if (!studentId) return res.status(401).json({ message: "Unauthorized" });
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
   try {
-    const existingResult = await Result.findOne({ studentId, testId });
-    if (existingResult) {
-      return res.status(400).json({ message: "Test already submitted" });
-    }
-    const test = await Test.findById(testId);
-    if (!test) return res.status(404).json({ message: "Test not found" });
-    const student = await Student.findOne({ profileInfo: studentId });
+    // Find the Student linked to this User
+    const student = await Student.findOne({ profileInfo: userId });
     if (!student)
       return res.status(404).json({ message: "Student profile not found" });
 
-    if (!test.assignedTo.includes(studentId))
-      return res
-        .status(403)
-        .json({ message: "You are not assigned to this test" });
-
-    if (test.submitBy.includes(studentId))
+    // Prevent duplicate submissions
+    const existingResult = await Result.findOne({ studentId: student._id, testId });
+    if (existingResult) {
       return res.status(400).json({ message: "Test already submitted" });
+    }
 
+    const test = await Test.findById(testId);
+    if (!test) return res.status(404).json({ message: "Test not found" });
+
+    // Ensure the student is assigned
+    if (!test.assignedTo.includes(userId)) {
+      return res.status(403).json({ message: "You are not assigned to this test" });
+    }
+
+    // Ensure not already submitted
+    if (test.submitBy.includes(userId)) {
+      return res.status(400).json({ message: "Test already submitted" });
+    }
+
+    // Evaluate answers
     let score = 0;
     const evaluatedAnswers = [];
 
@@ -344,13 +363,15 @@ router.post("/attempt-test/:testId", auth, async (req, res) => {
       });
     });
 
+    // Mark test as submitted for this user
     await Test.updateOne(
       { _id: testId },
-      { $addToSet: { submitBy: studentId }, attempted: true }
+      { $addToSet: { submitBy: userId }, attempted: true }
     );
 
+    // Update student’s attemptedTests
     await Student.updateOne(
-      { _id: studentId },
+      { _id: student._id },
       {
         $push: {
           attemptedTests: {
@@ -369,6 +390,7 @@ router.post("/attempt-test/:testId", auth, async (req, res) => {
       { arrayFilters: [{ "elem.testId": test._id }] }
     );
 
+    // Save Result
     await Result.create({
       studentId: student._id,
       testId: test._id,
@@ -386,10 +408,11 @@ router.post("/attempt-test/:testId", auth, async (req, res) => {
       total: test.questions.length,
     });
   } catch (err) {
-    console.error(err);
+    console.error("Error in attempt-test:", err);
     res.status(500).json({ message: "Error submitting test" });
   }
 });
+
 
 /**
  * @method - PUT
@@ -521,5 +544,62 @@ router.get("/performance", auth, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+router.get("/active/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+   
+    const student = await Student.findOne({ profileInfo: userId }).populate("profileInfo");
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    const attemptedTestIds = student.attemptedTests.map((t) => t.testId.toString());
+
+
+    const tests = await Test.find({ assignedTo: userId });
+
+    const now = new Date();
+
+    const activeOrUpcoming = tests
+      .filter((test) => !attemptedTestIds.includes(test._id.toString())) 
+      .map((test) => {
+        const startTime = new Date(test.scheduledAt);
+        const endTime = new Date(startTime.getTime() + test.minutes * 60000);
+
+        let status = null;
+        if (now >= startTime && now <= endTime) {
+          status = "active";
+        } else if (now < startTime) {
+          status = "upcoming";
+        }
+
+        if (status) {
+          return {
+            _id: test._id,
+            testName: test.testName,
+            category: test.category,
+            className: test.className,
+            minutes: test.minutes,
+            rules: test.rules,
+            outOfMarks: test.outOfMarks,
+            scheduledAt: test.scheduledAt,
+            status,
+          };
+        }
+
+        return null;
+      })
+      .filter(Boolean);
+
+    res.json(activeOrUpcoming);
+  } catch (error) {
+    console.error("Error fetching active tests:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
 
 module.exports = router;
