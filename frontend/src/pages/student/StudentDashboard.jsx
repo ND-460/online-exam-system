@@ -2,20 +2,21 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import PerformanceReports from "./PerformanceReports";
+import {useDebounce} from 'use-debounce';
 import axios from "axios";
 
 import { toast } from "react-toastify";
 
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
-  Legend,
-} from "recharts";
+// import {
+//   BarChart,
+//   Bar,
+//   XAxis,
+//   YAxis,
+//   Tooltip,
+//   ResponsiveContainer,
+//   CartesianGrid,
+//   Legend,
+// } from "recharts";
 import Editor from "@monaco-editor/react";
 
 export default function StudentDashboard() {
@@ -25,12 +26,20 @@ export default function StudentDashboard() {
     ongoing: 0,
     completed: 0,
   });
-  const [activeTest, setActiveTest] = useState(null);
+  const [activeTests, setActiveTests] = useState([]);
   const [timer, setTimer] = useState("");
   const [showTestsModal, setShowTestsModal] = useState(false);
   const [myTests, setMyTests] = useState([]);
   const [openEditor, setOpenEditor] = useState(false);
   const [code, setCode] = useState("// Start coding here...");
+
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterCategory, setFilterCategory] = useState("all");
+  const [sortBy, setSortBy] = useState("scheduledAt");
+  const [sortOrder, setSortOrder] = useState("asc");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery] = useDebounce(searchQuery, 900);
+
   const navigate = useNavigate();
   const { logout, user, token } = useAuthStore();
 
@@ -38,6 +47,11 @@ export default function StudentDashboard() {
     logout();
     navigate("/");
   };
+  useEffect(() => {
+  // This runs only after the debounce delay
+  console.log("Debounced search value updated:", debouncedSearchQuery);
+  // You can also show a loading spinner while typing if needed
+}, [debouncedSearchQuery]);
 
   useEffect(() => {
     if (!user) {
@@ -51,18 +65,8 @@ export default function StudentDashboard() {
       toast.error("Unauthorised access");
     }
   }, [user, navigate]);
+
   // Fetch test counts and next active test
-
-  const performanceData = [
-    { week: "Week 1", score: 65 },
-    { week: "Week 2", score: 72 },
-    { week: "Week 3", score: 80 },
-    { week: "Week 4", score: 75 },
-    { week: "Week 5", score: 90 },
-  ];
-
-  // Fetch test counts and active test
-
   useEffect(() => {
     const fetchTests = async () => {
       try {
@@ -75,10 +79,10 @@ export default function StudentDashboard() {
         setTestCounts(countsRes.data.payload || countsRes.data);
 
         const activeRes = await axios.get(
-          `${import.meta.env.VITE_API_URL}/tests/active/${user._id}`,
+          `${import.meta.env.VITE_API_URL}/api/student/active/${user._id}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        setActiveTest(activeRes.data);
+        setActiveTests(Array.isArray(activeRes.data) ? activeRes.data : []);
       } catch (err) {
         console.error("Error fetching tests:", err);
       }
@@ -89,11 +93,11 @@ export default function StudentDashboard() {
 
   // Countdown timer
   useEffect(() => {
-    if (!activeTest) return;
+    if (!activeTests) return;
 
     const interval = setInterval(() => {
       const now = new Date().getTime();
-      const start = new Date(activeTest.startTime).getTime();
+      const start = new Date(activeTests.startTime).getTime();
       const distance = start - now;
 
       if (distance <= 0) {
@@ -113,7 +117,7 @@ export default function StudentDashboard() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [activeTest]);
+  }, [activeTests]);
 
   const fetchMyTests = async () => {
     try {
@@ -131,6 +135,46 @@ export default function StudentDashboard() {
       console.error("Error fetching my tests:", err);
     }
   };
+
+  const getFilteredSortedTests = () => {
+  let filtered = [...myTests];
+
+  // Filter by status
+  if (filterStatus !== "all") {
+    filtered = filtered.filter((t) => {
+      if (filterStatus === "completed") return t.submitBy.includes(user._id);
+      if (filterStatus === "ongoing") return t.assignedTo.includes(user._id) && !t.submitBy.includes(user._id);
+      if (filterStatus === "upcoming") return !t.assignedTo.includes(user._id) && !t.submitBy.includes(user._id);
+      return true;
+    });
+  }
+
+  // Filter by category
+  if (filterCategory !== "all") {
+    filtered = filtered.filter((t) => t.category === filterCategory);
+  }
+
+  // Filter by debounced search query
+  if (debouncedSearchQuery.trim() !== "") {
+    filtered = filtered.filter((t) =>
+      t.testName.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+    );
+  }
+
+  // Sort
+  filtered.sort((a, b) => {
+    let aValue = sortBy === "name" ? a.testName.toLowerCase() : new Date(a.scheduledAt);
+    let bValue = sortBy === "name" ? b.testName.toLowerCase() : new Date(b.scheduledAt);
+
+    if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
+    if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  return filtered;
+};
+
+
   const languageMap = {
     JavaScript: "javascript",
     Python: "python",
@@ -215,31 +259,71 @@ export default function StudentDashboard() {
               </div>
             </div>
 
-            {/* Active Test */}
-            <div className="flex-1 bg-gradient-to-br from-black via-[#181f2e] to-[#232f4b] rounded-3xl p-8 border border-[#232f4b] shadow-2xl flex flex-col justify-between transition duration-300 hover:scale-[1.01]">
-              <h3 className="text-2xl font-bold mb-6">Active Test</h3>
-              {activeTest ? (
-                <>
-                  <p className="text-blue-200 text-base mb-4">
-                    Next: {activeTest.testName}
-                  </p>
-                  <div className="text-5xl font-mono font-bold text-green-300 mb-6">
-                    {timer}
-                  </div>
-                  <div className="flex gap-4">
-                    <button
-                      className="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-6 py-3 rounded-lg font-semibold text-lg shadow-md hover:shadow-lg transition duration-300"
-                      onClick={() => navigate(`/exam/${activeTest._id}`)}
+            {/* Active Tests */}
+            <div className="flex-1 bg-gradient-to-br from-black via-[#181f2e] to-[#232f4b] rounded-3xl p-8 border border-[#232f4b] shadow-2xl flex flex-col transition duration-300 hover:scale-[1.01]">
+              <h3 className="text-2xl font-bold mb-6">
+                Active / Upcoming Tests
+              </h3>
+              {activeTests.length > 0 ? (
+                <ul className="space-y-4">
+                  {activeTests.map((test) => (
+                    <li
+                      key={test._id}
+                      className="flex justify-between items-center p-4 rounded-lg bg-[#151e2e] hover:bg-[#232f4b] transition"
                     >
-                      Join
-                    </button>
-                    <button className="flex-1 bg-[#232f4b] hover:bg-[#2a3957] text-white px-6 py-3 rounded-lg font-semibold border border-[#2a3957] text-lg transition duration-300">
-                      Details
-                    </button>
-                  </div>
-                </>
+                      <div>
+                        <p className="text-lg font-semibold text-white">
+                          {test.testName}
+                        </p>
+                        <p className="text-sm text-gray-400">
+                          {test.category} • {test.className} • {test.minutes}{" "}
+                          mins •{" "}
+                          {new Date(test.scheduledAt).toLocaleDateString(
+                            "en-IN",
+                            {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              hour12: true,
+                            }
+                          )}
+                        </p>
+                        <p className="text-xs text-blue-300">
+                          Status:{" "}
+                          {test.status === "active"
+                            ? "Ongoing"
+                            : test.status === "upcoming"
+                            ? "Upcoming"
+                            : "Expired"}
+                        </p>
+                      </div>
+                      <div>
+                        {test.status === "active" ? (
+                          <button
+                            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-semibold"
+                            onClick={() => navigate(`/exam/${test._id}`)}
+                          >
+                            Join
+                          </button>
+                        ) : test.status === "upcoming" ? (
+                          <span className="text-yellow-400 text-sm font-medium">
+                            Upcoming
+                          </span>
+                        ) : (
+                          <span className="text-gray-500 text-sm font-medium">
+                            Expired
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               ) : (
-                <p className="text-blue-200 text-base">No active test</p>
+                <p className="text-blue-200 text-base">
+                  No active or upcoming tests
+                </p>
               )}
             </div>
           </div>
@@ -333,10 +417,68 @@ export default function StudentDashboard() {
               ×
             </button>
             <h3 className="text-2xl font-bold text-white mb-6">My Tests</h3>
+
+            {/* Filters,Searching & Sorting */}
+            <div className="flex flex-wrap gap-4 mb-4">
+              {/* Search */}
+              <input
+                type="text"
+                placeholder="Search by test name..."
+                className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded flex-1 min-w-[150px]"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {/* Status Filter */}
+              <select
+                className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+              >
+                <option value="all">All Status</option>
+                <option value="upcoming">Upcoming</option>
+                <option value="ongoing">Ongoing</option>
+                <option value="completed">Completed</option>
+              </select>
+
+              {/* Category Filter */}
+              <select
+                className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded"
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+              >
+                <option value="all">All Categories</option>
+                {[...new Set(myTests.map((t) => t.category))].map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+
+              {/* Sort By */}
+              <select
+                className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                <option value="scheduledAt">Date</option>
+                <option value="name">Name</option>
+              </select>
+
+              {/* Sort Order */}
+              <select
+                className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+              >
+                <option value="asc">Ascending</option>
+                <option value="desc">Descending</option>
+              </select>
+            </div>
+
             <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-[#2a3957] scrollbar-track-[#151e2e]">
               <ul className="divide-y divide-gray-700">
-                {myTests.length > 0 ? (
-                  myTests.map((test) => ( 
+                {getFilteredSortedTests().length > 0 ? (
+                  getFilteredSortedTests().map((test) => (
                     <li
                       key={test._id}
                       className="py-4 flex justify-between items-center hover:bg-[#232f4b] px-3 rounded-md transition"
