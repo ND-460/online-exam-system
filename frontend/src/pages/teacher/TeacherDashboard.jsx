@@ -26,7 +26,7 @@ export default function TeacherDashboard() {
   const { logout, token, user } = useAuthStore();
   const [scheduledAt, setScheduledAt] = useState(null);
   const [selectedTest, setSelectedTest] = useState(null);
-<<<<<<< HEAD
+
   const [errors, setErrors] = useState({});
 
   const navigate = useNavigate();
@@ -65,16 +65,16 @@ export default function TeacherDashboard() {
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-=======
+
   const [isImportOpen, setIsImportOpen] = useState(false);
 
-  const navigate = useNavigate();
+ 
 
   // Calculate total marks from questions
   const calculateTotalMarks = (questions) => {
     const total = questions.reduce((total, q) => total + (q.marks || 1), 0);
     return total > 0 ? total : 1; // Ensure minimum of 1 mark
->>>>>>> Dhyey
+
   };
 
   useEffect(() => {
@@ -177,13 +177,12 @@ export default function TeacherDashboard() {
     setQuestions(qs);
     setShowQuestions(false);
 
-<<<<<<< HEAD
-    const totalMarks = qs.reduce((sum, q) => sum + (q.marks || 0), 0);
-=======
+
+
     // Calculate total marks from questions
     const totalMarks = calculateTotalMarks(qs);
     setOutOfMarks(totalMarks);
->>>>>>> Dhyey
+
 
     try {
       if (editingTest) {
@@ -574,4 +573,5 @@ export default function TeacherDashboard() {
       />
     </div>
   );
+}
 }
