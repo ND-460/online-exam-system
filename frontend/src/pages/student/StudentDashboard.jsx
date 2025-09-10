@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import PerformanceReports from "./PerformanceReports";
+import {useDebounce} from 'use-debounce';
 import axios from "axios";
 
 import { toast } from "react-toastify";
@@ -36,6 +37,8 @@ export default function StudentDashboard() {
   const [filterCategory, setFilterCategory] = useState("all");
   const [sortBy, setSortBy] = useState("scheduledAt");
   const [sortOrder, setSortOrder] = useState("asc");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery] = useDebounce(searchQuery, 900);
 
   const navigate = useNavigate();
   const { logout, user, token } = useAuthStore();
@@ -44,6 +47,11 @@ export default function StudentDashboard() {
     logout();
     navigate("/");
   };
+  useEffect(() => {
+  // This runs only after the debounce delay
+  console.log("Debounced search value updated:", debouncedSearchQuery);
+  // You can also show a loading spinner while typing if needed
+}, [debouncedSearchQuery]);
 
   useEffect(() => {
     if (!user) {
@@ -129,49 +137,43 @@ export default function StudentDashboard() {
   };
 
   const getFilteredSortedTests = () => {
-    let filtered = [...myTests];
+  let filtered = [...myTests];
 
-    if (filterStatus !== "all") {
-      filtered = filtered.filter((test) => {
-        if (filterStatus === "upcoming")
-          return (
-            !test.submitBy.includes(user._id) &&
-            new Date(test.scheduledAt) > new Date()
-          );
-        if (filterStatus === "ongoing") {
-          const start = new Date(test.scheduledAt);
-          const end = new Date(start.getTime() + test.minutes * 60000);
-          return (
-            !test.submitBy.includes(user._id) &&
-            new Date() >= start &&
-            new Date() <= end
-          );
-        }
-        if (filterStatus === "completed")
-          return test.submitBy.includes(user._id);
-        return true;
-      });
-    }
-
-    if (filterCategory !== "all") {
-      filtered = filtered.filter((test) => test.category === filterCategory);
-    }
-
-    filtered.sort((a, b) => {
-      if (sortBy === "scheduledAt") {
-        return sortOrder === "asc"
-          ? new Date(a.scheduledAt) - new Date(b.scheduledAt)
-          : new Date(b.scheduledAt) - new Date(a.scheduledAt);
-      } else if (sortBy === "name") {
-        return sortOrder === "asc"
-          ? a.testName.localeCompare(b.testName)
-          : b.testName.localeCompare(a.testName);
-      }
-      return 0;
+  // Filter by status
+  if (filterStatus !== "all") {
+    filtered = filtered.filter((t) => {
+      if (filterStatus === "completed") return t.submitBy.includes(user._id);
+      if (filterStatus === "ongoing") return t.assignedTo.includes(user._id) && !t.submitBy.includes(user._id);
+      if (filterStatus === "upcoming") return !t.assignedTo.includes(user._id) && !t.submitBy.includes(user._id);
+      return true;
     });
+  }
 
-    return filtered;
-  };
+  // Filter by category
+  if (filterCategory !== "all") {
+    filtered = filtered.filter((t) => t.category === filterCategory);
+  }
+
+  // Filter by debounced search query
+  if (debouncedSearchQuery.trim() !== "") {
+    filtered = filtered.filter((t) =>
+      t.testName.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+    );
+  }
+
+  // Sort
+  filtered.sort((a, b) => {
+    let aValue = sortBy === "name" ? a.testName.toLowerCase() : new Date(a.scheduledAt);
+    let bValue = sortBy === "name" ? b.testName.toLowerCase() : new Date(b.scheduledAt);
+
+    if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
+    if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  return filtered;
+};
+
 
   const languageMap = {
     JavaScript: "javascript",
@@ -416,8 +418,16 @@ export default function StudentDashboard() {
             </button>
             <h3 className="text-2xl font-bold text-white mb-6">My Tests</h3>
 
-            {/* Filters & Sorting */}
+            {/* Filters,Searching & Sorting */}
             <div className="flex flex-wrap gap-4 mb-4">
+              {/* Search */}
+              <input
+                type="text"
+                placeholder="Search by test name..."
+                className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded flex-1 min-w-[150px]"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
               {/* Status Filter */}
               <select
                 className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded"
