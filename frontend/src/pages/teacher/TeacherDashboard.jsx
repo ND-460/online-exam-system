@@ -28,7 +28,8 @@ export default function TeacherDashboard() {
   const [selectedTest, setSelectedTest] = useState(null);
 
   const [errors, setErrors] = useState({});
-
+  
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const navigate = useNavigate();
   const validateForm = () => {
     let newErrors = {};
@@ -66,10 +67,9 @@ export default function TeacherDashboard() {
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
 
-  const [isImportOpen, setIsImportOpen] = useState(false);
 
  
-
+  }
   // Calculate total marks from questions
   const calculateTotalMarks = (questions) => {
     const total = questions.reduce((total, q) => total + (q.marks || 1), 0);
@@ -573,5 +573,4 @@ export default function TeacherDashboard() {
       />
     </div>
   );
-}
 }
