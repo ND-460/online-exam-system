@@ -12,8 +12,8 @@ const student = require("./routes/student");
 const teacher = require("./routes/teacher");
 
 //database connection
-const connectMoongoseDb = require("./config/db");
-connectMoongoseDb();
+const connectMongooseDb = require("./config/db");
+connectMongooseDb();
 const app = express();
 
 //middlewares
