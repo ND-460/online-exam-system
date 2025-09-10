@@ -12,10 +12,16 @@ router.get("/tests/student/:userId", auth, async (req, res) => {
   const userId = req.params.userId;
 
   try {
+    // Find the student document by userId
     const student = await Student.findOne({ profileInfo: userId });
-    if (!student) return res.status(404).json({ message: "Student not found" });
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
 
+    const studentId = student._id; // actual student _id
     const now = new Date();
+
+    // Fetch all tests assigned to this student (using userId in assignedTo)
     const tests = await Test.find({ assignedTo: userId });
 
     let upcoming = 0;
@@ -23,26 +29,30 @@ router.get("/tests/student/:userId", auth, async (req, res) => {
     let completed = 0;
 
     tests.forEach((test) => {
-      const startTime = new Date(test.scheduledAt);
-      const endTime = new Date(startTime.getTime() + test.minutes * 60000);
+      const startTime = test.scheduledAt ? new Date(test.scheduledAt) : null;
+      const endTime = startTime && test.minutes
+        ? new Date(startTime.getTime() + test.minutes * 60000)
+        : null;
 
-      if (test.attempted) {
+      if (test.submitBy.includes(userId)) {
+        // Student has submitted this test
         completed++;
-      } else if (now < startTime) {
-        upcoming++;
-      } else if (now >= startTime && now <= endTime) {
+      } else if (startTime && endTime && now >= startTime && now <= endTime) {
+        // Test is currently ongoing
         ongoing++;
-      } else if (now > endTime) {
-        completed++;
+      } else if (startTime && now < startTime) {
+        // Test is scheduled in future
+        upcoming++;
       }
     });
 
     res.status(200).json({ upcoming, ongoing, completed });
   } catch (err) {
-    console.error("Error fetching student tests:", err);
+    console.error(err);
     res.status(500).send("Error fetching student tests");
   }
 });
+
 
 /**
  * @method - GET
@@ -475,26 +485,18 @@ router.put("/update-test-status/:testID", auth, async (req, res) => {
 router.get("/assigned-tests/:userId", auth, async (req, res) => {
   try {
     const userId = req.params.userId;
-    const now = new Date();
 
+    // Fetch all tests assigned to this user
     const tests = await Test.find({ assignedTo: userId });
 
-    const validTests = tests.filter((test) => {
-      if (!test.scheduledAt || !test.minutes) return false;
-
-      const startTime = new Date(test.scheduledAt);
-      const endTime = new Date(test.scheduledAt);
-      endTime.setMinutes(endTime.getMinutes() + test.minutes);
-
-      return now >= startTime && now <= endTime;
-    });
-
-    res.status(200).json({ tests: validTests });
+    res.status(200).json({ tests });
   } catch (err) {
     console.error("Error fetching assigned tests:", err);
     res.status(500).send("Server error");
   }
 });
+
+
 
 router.get("/test/:testId", async (req, res) => {
   try {
