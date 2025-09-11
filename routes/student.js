@@ -505,8 +505,6 @@ router.get("/assigned-tests/:userId", auth, async (req, res) => {
 });
 
 
-
-
 router.get("/test/:testId", async (req, res) => {
   try {
     const test = await Test.findById(req.params.testId);
@@ -566,15 +564,20 @@ router.get("/active/:userId", async (req, res) => {
       return res.status(404).json({ message: "Student not found" });
     }
 
+    
     const attemptedTestIds = student.attemptedTests.map((t) => t.testId.toString());
 
-
+    
     const tests = await Test.find({ assignedTo: userId });
 
     const now = new Date();
 
     const activeOrUpcoming = tests
-      .filter((test) => !attemptedTestIds.includes(test._id.toString())) 
+      .filter(
+        (test) =>
+          !attemptedTestIds.includes(test._id.toString()) && 
+          !test.submitBy.includes(userId) 
+      )
       .map((test) => {
         const startTime = new Date(test.scheduledAt);
         const endTime = new Date(startTime.getTime() + test.minutes * 60000);
@@ -610,6 +613,7 @@ router.get("/active/:userId", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
 
 
 
