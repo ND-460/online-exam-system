@@ -494,8 +494,8 @@ router.get("/assigned-tests/:userId", auth, async (req, res) => {
   try {
     const userId = req.params.userId;
 
-    // Fetch all tests assigned to this user
-    const tests = await Test.find({ assignedTo: userId });
+    // fetch tests where assignedTo contains the userId
+    const tests = await Test.find({ assignedTo: { $in: [userId] } });
 
     res.status(200).json({ tests });
   } catch (err) {
@@ -503,6 +503,7 @@ router.get("/assigned-tests/:userId", auth, async (req, res) => {
     res.status(500).send("Server error");
   }
 });
+
 
 
 
