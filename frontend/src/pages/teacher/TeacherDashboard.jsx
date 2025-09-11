@@ -102,21 +102,6 @@ export default function TeacherDashboard() {
 
   };
 
-  useEffect(() => {
-    if (!user) {
-      navigate("/login");
-    } else if (user.role !== "teacher") {
-      if (user.role === "student") {
-        navigate("/student");
-      } else if (user.role === "admin") {
-        navigate("/admin");
-      }
-      toast.error("Unauthorised access");
-    }
-  }, [user, navigate]);
-
-
-
   // check role & redirect
   useEffect(() => {
     if (!user) {

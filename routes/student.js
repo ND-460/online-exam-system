@@ -18,7 +18,7 @@ router.get("/tests/student/:userId", auth, async (req, res) => {
   }
 
   try {
-    // Find student linked to this user
+   
     const student = await Student.findOne({ profileInfo: userId });
     if (!student) {
       return res.status(404).json({ message: "Student not found for this User ID" });
@@ -40,7 +40,7 @@ router.get("/tests/student/:userId", auth, async (req, res) => {
           ? new Date(startTime.getTime() + test.minutes * 60000)
           : null;
 
-      // ✅ Check if student attempted this test
+     
       const attempted = student.attemptedTests.some(
         (a) => a.testId.toString() === test._id.toString()
       );
@@ -334,7 +334,7 @@ router.put("/update-profile/:profileID", auth, async (req, res) => {
 // POST /api/student/attempt-test/:testId
 router.post("/attempt-test/:testId", auth, async (req, res) => {
   const { testId } = req.params;
-  const userId = req.user?.id; // this is User._id from JWT
+  const userId = req.user?.id; 
   const { answers } = req.body;
   const date = Date.now();
 
