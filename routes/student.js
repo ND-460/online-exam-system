@@ -5,23 +5,28 @@ const Student = require("../model/Student");
 const Test = require("../model/Test");
 const User = require("../model/User");
 const Result = require("../model/Result");
+const mongoose = require("mongoose");
 require("dotenv").config();
 
-// Get test counts for a student
+
+
 router.get("/tests/student/:userId", auth, async (req, res) => {
-  const userId = req.params.userId;
+  const { userId } = req.params;
+
+  if (!mongoose.isValidObjectId(userId)) {
+    return res.status(400).json({ message: "Invalid User ID" });
+  }
 
   try {
-    // Find the student document by userId
+    // Find student linked to this user
     const student = await Student.findOne({ profileInfo: userId });
     if (!student) {
-      return res.status(404).json({ message: "Student not found" });
+      return res.status(404).json({ message: "Student not found for this User ID" });
     }
 
-    const studentId = student._id; // actual student _id
     const now = new Date();
 
-    // Fetch all tests assigned to this student (using userId in assignedTo)
+    // Fetch tests assigned to this user
     const tests = await Test.find({ assignedTo: userId });
 
     let upcoming = 0;
@@ -30,26 +35,29 @@ router.get("/tests/student/:userId", auth, async (req, res) => {
 
     tests.forEach((test) => {
       const startTime = test.scheduledAt ? new Date(test.scheduledAt) : null;
-      const endTime = startTime && test.minutes
-        ? new Date(startTime.getTime() + test.minutes * 60000)
-        : null;
+      const endTime =
+        startTime && test.minutes
+          ? new Date(startTime.getTime() + test.minutes * 60000)
+          : null;
 
-      if (test.submitBy.includes(userId)) {
-        // Student has submitted this test
+      // ✅ Check if student attempted this test
+      const attempted = student.attemptedTests.some(
+        (a) => a.testId.toString() === test._id.toString()
+      );
+
+      if (attempted) {
         completed++;
       } else if (startTime && endTime && now >= startTime && now <= endTime) {
-        // Test is currently ongoing
         ongoing++;
-      } else if (startTime && now < startTime) {
-        // Test is scheduled in future
+      } else if (!startTime || now < startTime) {
         upcoming++;
       }
     });
 
     res.status(200).json({ upcoming, ongoing, completed });
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error fetching student tests");
+    console.error("Error fetching student tests:", err);
+    res.status(500).json({ message: "Error fetching student tests" });
   }
 });
 
