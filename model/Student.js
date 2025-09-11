@@ -1,16 +1,16 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const studentSchema = new mongoose.Schema({
   profileInfo: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'users',
+    ref: "users",
     required: true,
   },
   attemptedTests: [
     {
       testId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Test',
+        ref: "Test",
       },
       testName: String,
       score: Number,
@@ -25,12 +25,12 @@ const studentSchema = new mongoose.Schema({
     {
       testId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Test',
+        ref: "Test",
       },
       status: {
         type: String,
-        enum: ['not_started', 'in_progress', 'submitted'],
-        default: 'not_started',
+        enum: ["not_started", "in_progress", "submitted"],
+        default: "not_started",
       },
       startedAt: Date,
       endedAt: Date,
@@ -42,4 +42,4 @@ const studentSchema = new mongoose.Schema({
   },
 });
 
-module.exports = mongoose.model('Student', studentSchema);
+module.exports = mongoose.model("Student", studentSchema);

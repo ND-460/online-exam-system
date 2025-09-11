@@ -1,14 +1,14 @@
-const moongoose = require('mongoose');
+const mongoose = require('mongoose');
 
-const teacherSchema = new moongoose.Schema({
+const teacherSchema = new mongoose.Schema({
     profileInfo:{
-        type: moongoose.Schema.Types.ObjectId,
+        type: mongoose.Schema.Types.ObjectId,
         ref: 'users'
     },
     createdAt: {
         type: Date,
-        default: Date.now()
+        default: Date.now
     },
 })
 
-module.exports = moongoose.model('teachers',teacherSchema);
+module.exports = mongoose.model('teachers',teacherSchema);
