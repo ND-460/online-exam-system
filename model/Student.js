@@ -40,6 +40,13 @@ const studentSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  rollNumber: { type: String, default: "N/A" },
+  gradeLevel: { type: String, default: "N/A" },
+  department: { type: String, default: "General" },
+  guardian:{
+    name: { type: String, default: "N/A" },
+    phone: { type: String, default: "N/A" },
+  }
 });
 
 module.exports = mongoose.model("Student", studentSchema);

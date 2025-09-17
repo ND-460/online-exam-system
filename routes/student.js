@@ -10,8 +10,8 @@ require("dotenv").config();
 
 
 
-router.get("/tests/student/:userId", auth, async (req, res) => {
-  const { userId } = req.params;
+router.get("/tests/student/:userId?", auth, async (req, res) => {
+  const  userId  = req.params.userId || req.user?.id;
 
   if (!mongoose.isValidObjectId(userId)) {
     return res.status(400).json({ message: "Invalid User ID" });
@@ -490,9 +490,9 @@ router.put("/update-test-status/:testID", auth, async (req, res) => {
   }
 });
 
-router.get("/assigned-tests/:userId", auth, async (req, res) => {
+router.get("/assigned-tests/:userId?", auth, async (req, res) => {
   try {
-    const userId = req.params.userId;
+    const userId = req.params.userId || req.user?.id;
 
    
     const tests = await Test.find({ assignedTo: { $in: [userId] } });
@@ -577,9 +577,9 @@ router.get("/performance", auth, async (req, res) => {
   }
 });
 
-router.get("/active/:userId", async (req, res) => {
+router.get("/active/:userId?",auth, async (req, res) => {
   try {
-    const { userId } = req.params;
+    const  userId  = req.params.userId || req.user?.id;
 
    
     const student = await Student.findOne({ profileInfo: userId }).populate("profileInfo");
