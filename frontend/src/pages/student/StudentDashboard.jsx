@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import PerformanceReports from "./PerformanceReports";
-import {useDebounce} from 'use-debounce';
+import { useDebounce } from "use-debounce";
 import axios from "axios";
 
 import { toast } from "react-toastify";
@@ -48,10 +48,10 @@ export default function StudentDashboard() {
     navigate("/");
   };
   useEffect(() => {
-  // This runs only after the debounce delay
-  console.log("Debounced search value updated:", debouncedSearchQuery);
-  // You can also show a loading spinner while typing if needed
-}, [debouncedSearchQuery]);
+    // This runs only after the debounce delay
+    console.log("Debounced search value updated:", debouncedSearchQuery);
+    // You can also show a loading spinner while typing if needed
+  }, [debouncedSearchQuery]);
 
   useEffect(() => {
     if (!user) {
@@ -137,43 +137,62 @@ export default function StudentDashboard() {
   };
 
   const getFilteredSortedTests = () => {
-  let filtered = [...myTests];
+    let filtered = [...myTests];
+    const now = new Date();
 
-  // Filter by status
-  if (filterStatus !== "all") {
-    filtered = filtered.filter((t) => {
-      if (filterStatus === "completed") return t.submitBy.includes(user._id);
-      if (filterStatus === "ongoing") return t.assignedTo.includes(user._id) && !t.submitBy.includes(user._id);
-      if (filterStatus === "upcoming") return !t.assignedTo.includes(user._id) && !t.submitBy.includes(user._id);
-      return true;
+    
+    filtered = filtered.map((t) => {
+      const startTime = new Date(t.scheduledAt);
+      const endTime = new Date(startTime.getTime() + t.minutes * 60000); 
+
+      let status = "upcoming";
+      if (t.submitBy.includes(user._id)) {
+        status = "completed";
+      } else if (now >= startTime && now <= endTime) {
+        status = "ongoing";
+      } else if (now < startTime) {
+        status = "upcoming";
+      } else {
+        status = "expired"; 
+      }
+
+      return { ...t, status };
     });
-  }
 
-  // Filter by category
-  if (filterCategory !== "all") {
-    filtered = filtered.filter((t) => t.category === filterCategory);
-  }
+    // Filter by status
+    if (filterStatus !== "all") {
+      filtered = filtered.filter((t) => t.status === filterStatus);
+    } else {
+      // Exclude expired by default
+      filtered = filtered.filter((t) => t.status !== "expired");
+    }
 
-  // Filter by debounced search query
-  if (debouncedSearchQuery.trim() !== "") {
-    filtered = filtered.filter((t) =>
-      t.testName.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
-    );
-  }
+    // Filter by category
+    if (filterCategory !== "all") {
+      filtered = filtered.filter((t) => t.category === filterCategory);
+    }
 
-  // Sort
-  filtered.sort((a, b) => {
-    let aValue = sortBy === "name" ? a.testName.toLowerCase() : new Date(a.scheduledAt);
-    let bValue = sortBy === "name" ? b.testName.toLowerCase() : new Date(b.scheduledAt);
+    // Filter by debounced search query
+    if (debouncedSearchQuery.trim() !== "") {
+      filtered = filtered.filter((t) =>
+        t.testName.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+      );
+    }
 
-    if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
-    if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
-    return 0;
-  });
+    // Sort
+    filtered.sort((a, b) => {
+      let aValue =
+        sortBy === "name" ? a.testName.toLowerCase() : new Date(a.scheduledAt);
+      let bValue =
+        sortBy === "name" ? b.testName.toLowerCase() : new Date(b.scheduledAt);
 
-  return filtered;
-};
+      if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
 
+    return filtered;
+  };
 
   const languageMap = {
     JavaScript: "javascript",
@@ -490,21 +509,24 @@ export default function StudentDashboard() {
                         - <span className="text-gray-300">{test.category}</span>
                       </div>
                       <div>
-                        {test.assignedTo.includes(user._id) &&
-                        !test.submitBy.includes(user._id) ? (
+                        {test.status === "ongoing" ? (
                           <button
                             className="text-green-400 text-sm font-medium hover:underline"
                             onClick={() => navigate(`/exam/${test._id}`)}
                           >
-                            Can Attempt
+                            Join Now
                           </button>
-                        ) : test.submitBy.includes(user._id) ? (
+                        ) : test.status === "upcoming" ? (
+                          <span className="text-yellow-400 text-sm font-medium">
+                            Upcoming
+                          </span>
+                        ) : test.status === "completed" ? (
                           <span className="text-purple-400 text-sm font-medium">
                             Completed
                           </span>
                         ) : (
                           <span className="text-gray-500 text-sm font-medium">
-                            Not Assigned
+                            Expired
                           </span>
                         )}
                       </div>

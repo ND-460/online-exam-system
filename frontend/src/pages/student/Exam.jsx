@@ -51,7 +51,7 @@ export default function Exam() {
     instructions: [],
   });
   const [timer, setTimer] = useState(null);
-  const submittingRef = useRef(false)
+  const submittingRef = useRef(false);
   const addViolation = (reason) => {
     setViolationCount((prev) => {
       const updated = prev + 1;
@@ -81,7 +81,7 @@ export default function Exam() {
 
   // Strict mode: disable right-click, copy, paste
   useEffect(() => {
-    if (!started) return
+    if (!started) return;
     const prevent = (e, contxt) => {
       e.preventDefault();
       addViolation(contxt);
@@ -104,7 +104,7 @@ export default function Exam() {
 
   // Strict mode: tab switch warning
   useEffect(() => {
-    if(!started) return 
+    if (!started) return;
     const onBlur = () => addViolation("Tab switch/blur detected");
 
     window.addEventListener("blur", onBlur);
@@ -113,7 +113,7 @@ export default function Exam() {
 
   // Fullscreen logic
   useEffect(() => {
-    if (!started) return
+    if (!started) return;
     const enterFullscreen = async () => {
       try {
         if (fullscreen && !document.fullscreenElement) {
@@ -126,21 +126,21 @@ export default function Exam() {
       }
     };
     enterFullscreen();
-  }, [fullscreen,started]);
+  }, [fullscreen, started]);
 
   useEffect(() => {
-    if(!started) return
+    if (!started) return;
     const interval = setInterval(() => {
       if (!document.hasFocus()) {
         addViolation("Focus lost (other site or app)");
       }
-    }, 1000); 
+    }, 1000);
     return () => clearInterval(interval);
   }, [started]);
 
   // Prevent exit fullscreen
   useEffect(() => {
-    if(!started) return
+    if (!started) return;
     const handleExit = () => {
       if (!document.fullscreenElement && fullscreen) {
         document.documentElement.requestFullscreen().catch((err) => {
@@ -152,10 +152,10 @@ export default function Exam() {
 
     document.addEventListener("fullscreenchange", handleExit);
     return () => document.removeEventListener("fullscreenchange", handleExit);
-  }, [fullscreen,started]);
+  }, [fullscreen, started]);
 
   useEffect(() => {
-    if (!started) return
+    if (!started) return;
     const handleVisibility = () => {
       if (document.hidden) addViolation("Tab switch detected");
     };
@@ -255,6 +255,18 @@ export default function Exam() {
         <div>
           <div className="mb-4 text-lg font-semibold text-white">
             {q.question}
+          </div>
+          <div className="flex items-center gap-4 mb-4 text-sm text-gray-300">
+            <span>
+              Marks:{" "}
+              <span className="font-semibold text-blue-400">{q.marks}</span>
+            </span>
+            <span>
+              Difficulty:{" "}
+              <span className="font-semibold capitalize text-green-400">
+                {q.difficulty}
+              </span>
+            </span>
           </div>
           <div className="flex flex-col gap-2">
             {q.options.map((opt, i) => (
@@ -377,7 +389,7 @@ export default function Exam() {
   // Submit logic
   async function handleSubmit() {
     if (submittingRef.current) return;
-    submittingRef.current = true
+    submittingRef.current = true;
     try {
       const payload = {
         answers: answers,
