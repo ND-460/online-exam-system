@@ -1,10 +1,22 @@
 import React, { useState, useEffect } from "react";
 
-export default function AddQuestions({ initialQuestions = [], onSave, onCancel }) {
+export default function AddQuestions({
+  initialQuestions = [],
+  onSave,
+  onCancel,
+}) {
   const [questions, setQuestions] = useState(
     initialQuestions.length > 0
       ? initialQuestions
-      : [{ question: "", options: ["", "", "", ""], answer: 0, marks: 1 }]
+      : [
+          {
+            question: "",
+            options: ["", "", "", ""],
+            answer: 0,
+            marks: 1,
+            difficulty: "medium",
+          },
+        ]
   );
 
   const [errors, setErrors] = useState([]);
@@ -33,10 +45,16 @@ export default function AddQuestions({ initialQuestions = [], onSave, onCancel }
     setQuestions(updated);
   };
 
+  const handleDifficultyChange = (qIdx, value) => {
+    const updated = [...questions];
+    updated[qIdx].difficulty = value;
+    setQuestions(updated);
+  }
+
   const addQuestion = () => {
     setQuestions([
       ...questions,
-      { question: "", options: ["", "", "", ""], answer: 0, marks: 1 },
+      { question: "", options: ["", "", "", ""], answer: 0, marks: 1,difficulty: "medium" },
     ]);
   };
 
@@ -44,7 +62,7 @@ export default function AddQuestions({ initialQuestions = [], onSave, onCancel }
     setQuestions(questions.filter((_, i) => i !== idx));
   };
 
-  // ✅ Validation function (without answer check)
+  
   const validateQuestions = () => {
     const newErrors = [];
 
@@ -86,7 +104,9 @@ export default function AddQuestions({ initialQuestions = [], onSave, onCancel }
           className="mb-6 p-4 bg-[#181f2e] rounded-xl border border-[#232f4b]"
         >
           <div className="flex justify-between items-center mb-2">
-            <label className="font-semibold text-white">Question {idx + 1}</label>
+            <label className="font-semibold text-white">
+              Question {idx + 1}
+            </label>
             {questions.length > 1 && (
               <button
                 onClick={() => removeQuestion(idx)}
@@ -137,7 +157,19 @@ export default function AddQuestions({ initialQuestions = [], onSave, onCancel }
               ))}
             </select>
           </div>
-
+          {/* Difficulty */}
+          <div className="flex items-center gap-3 mb-2">
+            <label className="text-blue-200 text-sm">Difficulty:</label>
+            <select
+              className="bg-[#151e2e] border border-[#232f4b] rounded-md px-2 py-1 text-white"
+              value={q.difficulty}
+              onChange={(e) => handleDifficultyChange(idx, e.target.value)}
+            >
+              <option value="easy">Easy</option>
+              <option value="medium">Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+          </div>
           <div className="flex items-center gap-3">
             <label className="text-blue-200 text-sm">Marks:</label>
             <input
