@@ -8,6 +8,7 @@ import Blog from './pages/misc/Blog';
 import About from './pages/misc/About';
 import Contact from './pages/misc/Contact';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminDashboardNew from './pages/admin/AdminDashboardNew';
 import Questions from './pages/admin/Questions';
 import Results from './pages/admin/Results';
 import Analytics from './pages/admin/Analytics';
@@ -35,7 +36,8 @@ function App() {
         <Route path="/blog" element={<Blog />} />
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
-        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/admin" element={<AdminDashboardNew />} />
+        <Route path="/admin-old" element={<AdminDashboard />} />
         <Route path="/admin/questions" element={<Questions />} />
         <Route path="/admin/results" element={<Results />} />
         <Route path="/admin/analytics" element={<Analytics />} />
@@ -44,7 +46,7 @@ function App() {
         <Route path="/exam/:testId" element={<Exam />} />
         <Route path="/result" element={<Result />} />
         <Route path="/error" element={<Error />} />
-        <Route path='/profile' element={<ProfilePage/>}/>
+        <Route path='/profile' element={<ProfilePage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       <ToastContainer position="top-right" autoClose={3000} />

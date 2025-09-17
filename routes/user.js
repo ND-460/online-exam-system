@@ -826,4 +826,178 @@ router.get("/admin/stats", auth, async (req, res) => {
   }
 });
 
+/**
+ * @method - GET
+ * @param - /admin/tests
+ * @description - Get all tests for admin panel
+ */
+router.get("/admin/tests", auth, async (req, res) => {
+  try {
+    // Check if user is admin
+    const adminUser = await User.findById(req.user.id);
+    if (!adminUser || adminUser.role !== 'admin') {
+      return res.status(403).json({ message: "Access denied. Admin role required." });
+    }
+
+    const Test = require("../model/Test");
+    const tests = await Test.find()
+      .populate('teacherId', 'firstName lastName email')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ tests });
+  } catch (err) {
+    console.log(err.message);
+    res.status(500).json({ message: "Error fetching tests" });
+  }
+});
+
+/**
+ * @method - GET
+ * @param - /admin/results
+ * @description - Get all results for admin panel
+ */
+router.get("/admin/results", auth, async (req, res) => {
+  try {
+    // Check if user is admin
+    const adminUser = await User.findById(req.user.id);
+    if (!adminUser || adminUser.role !== 'admin') {
+      return res.status(403).json({ message: "Access denied. Admin role required." });
+    }
+
+    const Result = require("../model/Result");
+    const results = await Result.find()
+      .populate('studentId', 'firstName lastName email')
+      .populate('testId', 'testName totalMarks passingMarks')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ results });
+  } catch (err) {
+    console.log(err.message);
+    res.status(500).json({ message: "Error fetching results" });
+  }
+});
+
+/**
+ * @method - GET
+ * @param - /admin/reports/test/:testId
+ * @description - Download test report
+ */
+router.get("/admin/reports/test/:testId", auth, async (req, res) => {
+  try {
+    // Check if user is admin
+    const adminUser = await User.findById(req.user.id);
+    if (!adminUser || adminUser.role !== 'admin') {
+      return res.status(403).json({ message: "Access denied. Admin role required." });
+    }
+
+    const { testId } = req.params;
+    const Test = require("../model/Test");
+    const Result = require("../model/Result");
+
+    const test = await Test.findById(testId).populate('teacherId', 'firstName lastName');
+    if (!test) {
+      return res.status(404).json({ message: "Test not found" });
+    }
+
+    const results = await Result.find({ testId })
+      .populate('studentId', 'firstName lastName email')
+      .sort({ score: -1 });
+
+    // Generate PDF report (you can use libraries like puppeteer, jsPDF, etc.)
+    // For now, we'll return JSON data that can be used to generate reports
+    const reportData = {
+      test: {
+        name: test.testName,
+        totalMarks: test.totalMarks,
+        passingMarks: test.passingMarks,
+        duration: test.minutes,
+        teacher: `${test.teacherId.firstName} ${test.teacherId.lastName}`,
+        createdAt: test.createdAt
+      },
+      results: results.map(result => ({
+        student: `${result.studentId.firstName} ${result.studentId.lastName}`,
+        email: result.studentId.email,
+        score: result.score,
+        status: result.status,
+        submittedAt: result.submittedAt
+      })),
+      statistics: {
+        totalAttempts: results.length,
+        passed: results.filter(r => r.score >= test.passingMarks).length,
+        failed: results.filter(r => r.score < test.passingMarks).length,
+        averageScore: results.length > 0 ? (results.reduce((sum, r) => sum + r.score, 0) / results.length).toFixed(2) : 0
+      }
+    };
+
+    // Set headers for PDF download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=test-report-${testId}.pdf`);
+
+    // For now, return JSON. In production, you'd generate actual PDF
+    res.status(200).json(reportData);
+  } catch (err) {
+    console.log(err.message);
+    res.status(500).json({ message: "Error generating test report" });
+  }
+});
+
+/**
+ * @method - GET
+ * @param - /admin/reports/student/:studentId
+ * @description - Download student report
+ */
+router.get("/admin/reports/student/:studentId", auth, async (req, res) => {
+  try {
+    // Check if user is admin
+    const adminUser = await User.findById(req.user.id);
+    if (!adminUser || adminUser.role !== 'admin') {
+      return res.status(403).json({ message: "Access denied. Admin role required." });
+    }
+
+    const { studentId } = req.params;
+    const Result = require("../model/Result");
+
+    const student = await User.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    const results = await Result.find({ studentId })
+      .populate('testId', 'testName totalMarks passingMarks teacherId')
+      .sort({ submittedAt: -1 });
+
+    const reportData = {
+      student: {
+        name: `${student.firstName} ${student.lastName}`,
+        email: student.email,
+        joinedAt: student.createdAt
+      },
+      results: results.map(result => ({
+        testName: result.testId.testName,
+        score: result.score,
+        totalMarks: result.testId.totalMarks,
+        passingMarks: result.testId.passingMarks,
+        status: result.status,
+        submittedAt: result.submittedAt
+      })),
+      statistics: {
+        totalTests: results.length,
+        passed: results.filter(r => r.score >= r.testId.passingMarks).length,
+        failed: results.filter(r => r.score < r.testId.passingMarks).length,
+        averageScore: results.length > 0 ? (results.reduce((sum, r) => sum + r.score, 0) / results.length).toFixed(2) : 0
+      }
+    };
+
+    // Set headers for PDF download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=student-report-${studentId}.pdf`);
+
+    // For now, return JSON. In production, you'd generate actual PDF
+    res.status(200).json(reportData);
+  } catch (err) {
+    console.log(err.message);
+    res.status(500).json({ message: "Error generating student report" });
+  }
+});
+
 module.exports = router;
