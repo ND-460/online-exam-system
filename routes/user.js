@@ -60,6 +60,9 @@ router.post(
       className,
       section,
       role,
+      dateOfBirth,
+      gender,
+      organisation:{name,address},
     } = req.body;
 
     try {
@@ -81,6 +84,9 @@ router.post(
         role,
         className,
         section,
+        dateOfBirth,
+        gender,
+        organisation:{name,address},
       });
 
       const salt = await bcrypt.genSalt(10);
@@ -633,28 +639,69 @@ router.post("/logout", function (req, res, next) {
  * @description -  get profiles of common user
  */
 
+// router.get("/profile/:profileID", auth, async (req, res) => {
+//   const profileID = req.params.profileID;
+
+//   try {
+//     let obj = await Student.findOne({ _id: profileID });
+//     if (!obj) {
+//       obj = await Teacher.findOne({ _id: profileID });
+//     }
+//     if (!obj) {
+//       obj = await User.findOne({ _id: profileID });
+//     }
+
+//     if (!obj) {
+//       return res.status(404).json({ message: "Profile not found" });
+//     }
+
+//     return res.status(200).json({ obj });
+//   } catch (err) {
+//     console.log(err.message);
+//     res.status(500).send("Error in fetching Profile Data");
+//   }
+// });
+
 router.get("/profile/:profileID", auth, async (req, res) => {
-  const profileID = req.params.profileID;
-
   try {
-    let obj = await Student.findOne({ _id: profileID });
-    if (!obj) {
-      obj = await Teacher.findOne({ _id: profileID });
-    }
-    if (!obj) {
-      obj = await User.findOne({ _id: profileID });
+    const profileID = req.params.profileID || req.user?.id;
+
+    let user = await User.findById(profileID);
+    let roleData = null;
+
+    if (user) {
+      // User found → check role collection
+      if (user.role === "student") {
+        roleData = await Student.findOne({ profileInfo: user._id });
+      } else if (user.role === "teacher") {
+        roleData = await Teacher.findOne({ profileInfo: user._id });
+      }
+    } else {
+      // User not found → check Student/Teacher collection
+      roleData = await Student.findById(profileID) || await Teacher.findById(profileID);
+      if (roleData) {
+        // Get the linked User via profileInfo
+        user = await User.findById(roleData.profileInfo);
+        if (!user) return res.status(404).json({ message: "Linked User not found" });
+      } else {
+        return res.status(404).json({ message: "User or role data not found" });
+      }
     }
 
-    if (!obj) {
-      return res.status(404).json({ message: "Profile not found" });
-    }
-
-    return res.status(200).json({ obj });
+    return res.status(200).json({
+      obj: {
+        ...user.toObject(),
+        ...(roleData ? roleData.toObject() : {}),
+      },
+      role: user.role,
+      roleRegistered: !!roleData,
+    });
   } catch (err) {
-    console.log(err.message);
+    console.error(err.message);
     res.status(500).send("Error in fetching Profile Data");
   }
 });
+
 
 
 /**
@@ -663,35 +710,105 @@ router.get("/profile/:profileID", auth, async (req, res) => {
  * @description -  update profiles of common user
  */
 
+// router.put("/profile/:profileID", auth, async (req, res) => {
+//   const profileID = req.params.profileID;
+
+//   try {
+//     // Check in Student, Teacher, then User
+//     let updatedData =
+//       (await Student.findOneAndUpdate({ _id: profileID }, req.body, {
+//         new: true,
+//       })) ||
+//       (await Teacher.findOneAndUpdate({ _id: profileID }, req.body, {
+//         new: true,
+//       })) ||
+//       (await User.findOneAndUpdate({ _id: profileID }, req.body, {
+//         new: true,
+//       }));
+
+//     if (!updatedData) {
+//       return res.status(404).json({ message: "Profile not found" });
+//     }
+
+//     return res.status(200).json({
+//       message: "Profile successfully updated",
+//       updatedData,
+//     });
+//   } catch (err) {
+//     console.log(err.message);
+//     res.status(500).send("Error in Updating Profile");
+//   }
+// });
+
 router.put("/profile/:profileID", auth, async (req, res) => {
-  const profileID = req.params.profileID;
-
   try {
-    // Check in Student, Teacher, then User
-    let updatedData =
-      (await Student.findOneAndUpdate({ _id: profileID }, req.body, {
-        new: true,
-      })) ||
-      (await Teacher.findOneAndUpdate({ _id: profileID }, req.body, {
-        new: true,
-      })) ||
-      (await User.findOneAndUpdate({ _id: profileID }, req.body, {
-        new: true,
-      }));
+    const profileID = req.params.profileID || req.user?.id;
 
-    if (!updatedData) {
-      return res.status(404).json({ message: "Profile not found" });
+    let user = await User.findById(profileID);
+    let roleData = null;
+
+    if (!user) {
+      // Check role collections
+      roleData = await Student.findById(profileID) || await Teacher.findById(profileID);
+      if (!roleData) return res.status(404).json({ message: "User or role data not found" });
+
+      // Get linked User
+      user = await User.findById(roleData.profileInfo);
+      if (!user) return res.status(404).json({ message: "Linked User not found" });
+    } else {
+      // User exists → check role collection
+      if (user.role === "student") {
+        roleData = await Student.findOne({ profileInfo: user._id });
+      } else if (user.role === "teacher") {
+        roleData = await Teacher.findOne({ profileInfo: user._id });
+      }
+    }
+
+    // Split fields
+    const userFields = ["firstName", "lastName", "email", "phone", "dateOfBirth", "gender", "organisation"];
+    const userUpdates = {};
+    const roleUpdates = {};
+
+    for (const key in req.body) {
+      if (userFields.includes(key) || key.startsWith("organisation")) {
+        userUpdates[key] = req.body[key];
+      } else {
+        roleUpdates[key] = req.body[key];
+      }
+    }
+
+    // Update User
+    const updatedUser = await User.findByIdAndUpdate(user._id, { $set: userUpdates }, { new: true });
+
+    // Update/Create role document
+    if (user.role === "student") {
+      roleData = await Student.findOneAndUpdate(
+        { profileInfo: updatedUser._id },
+        { $set: roleUpdates },
+        { new: true, upsert: true }
+      );
+    } else if (user.role === "teacher") {
+      roleData = await Teacher.findOneAndUpdate(
+        { profileInfo: updatedUser._id },
+        { $set: roleUpdates },
+        { new: true, upsert: true }
+      );
     }
 
     return res.status(200).json({
       message: "Profile successfully updated",
-      updatedData,
+      obj: {
+        ...updatedUser.toObject(),
+        ...(roleData ? roleData.toObject() : {}),
+      },
+      roleRegistered: !!roleData,
     });
   } catch (err) {
-    console.log(err.message);
+    console.error(err.message);
     res.status(500).send("Error in Updating Profile");
   }
 });
+
 
 /**
  * @method - GET

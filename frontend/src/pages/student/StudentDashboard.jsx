@@ -39,6 +39,7 @@ export default function StudentDashboard() {
   const [sortOrder, setSortOrder] = useState("asc");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery] = useDebounce(searchQuery, 900);
+  const [loadingMyTests, setLoadingMyTests] = useState(false);
 
   const navigate = useNavigate();
   const { logout, user, token } = useAuthStore();
@@ -52,7 +53,7 @@ export default function StudentDashboard() {
     console.log("Debounced search value updated:", debouncedSearchQuery);
     // You can also show a loading spinner while typing if needed
   }, [debouncedSearchQuery]);
-
+  
   useEffect(() => {
     if (!user) {
       navigate("/login");
@@ -68,28 +69,31 @@ export default function StudentDashboard() {
 
   // Fetch test counts and next active test
   useEffect(() => {
-    const fetchTests = async () => {
-      try {
-        const countsRes = await axios.get(
-          `${import.meta.env.VITE_API_URL}/api/student/tests/student/${
-            user._id
-          }`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setTestCounts(countsRes.data.payload || countsRes.data);
+  if (!user) return; // don't call until user is loaded
 
-        const activeRes = await axios.get(
-          `${import.meta.env.VITE_API_URL}/api/student/active/${user._id}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setActiveTests(Array.isArray(activeRes.data) ? activeRes.data : []);
-      } catch (err) {
-        console.error("Error fetching tests:", err);
-      }
-    };
+  const fetchTests = async () => {
+    try {
+      // Call API WITHOUT userId
+      const countsRes = await axios.get(
+        `${import.meta.env.VITE_API_URL}/api/student/tests/student`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setTestCounts(countsRes.data.payload || countsRes.data);
 
-    fetchTests();
-  }, [user._id, token]);
+      const activeRes = await axios.get(
+   `${import.meta.env.VITE_API_URL}/api/student/active/`,
+  { headers: { Authorization: `Bearer ${token}` } }
+);
+setActiveTests(Array.isArray(activeRes.data) ? activeRes.data : []);
+
+    } catch (err) {
+      console.error("Error fetching tests:", err);
+    }
+  };
+
+  fetchTests();
+}, [user, token]);
+
 
   // Countdown timer
   useEffect(() => {
@@ -120,21 +124,25 @@ export default function StudentDashboard() {
   }, [activeTests]);
 
   const fetchMyTests = async () => {
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_URL}/api/student/assigned-tests/${
-          user._id
-        }`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+  if (!user) return;
 
-      const testsArray = Array.isArray(res.data.tests) ? res.data.tests : [];
-      setMyTests(testsArray);
-      setShowTestsModal(true);
-    } catch (err) {
-      console.error("Error fetching my tests:", err);
-    }
-  };
+  try {
+    setLoadingMyTests(true); // start loading
+    const res = await axios.get(
+      `${import.meta.env.VITE_API_URL}/api/student/assigned-tests`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    setMyTests(Array.isArray(res.data.tests) ? res.data.tests : []);
+    setShowTestsModal(true);
+  } catch (err) {
+    console.error("Error fetching my tests:", err);
+    toast.error("Failed to load tests");
+  } finally {
+    setLoadingMyTests(false); 
+  }
+};
+
 
   const getFilteredSortedTests = () => {
     let filtered = [...myTests];
@@ -426,122 +434,125 @@ export default function StudentDashboard() {
       </div>
 
       {/* My Tests Modal */}
-      {showTestsModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-[#1a2236] rounded-2xl w-11/12 md:w-2/3 lg:w-1/2 p-6 relative shadow-2xl border border-[#2a3957]">
-            <button
-              className="absolute top-4 right-4 text-white text-lg font-bold hover:text-red-400 transition"
-              onClick={() => setShowTestsModal(false)}
-            >
-              ×
-            </button>
-            <h3 className="text-2xl font-bold text-white mb-6">My Tests</h3>
+{showTestsModal && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-[#1a2236] rounded-2xl w-11/12 md:w-2/3 lg:w-1/2 p-6 relative shadow-2xl border border-[#2a3957]">
+      {/* Close Button */}
+      <button
+        className="absolute top-4 right-4 text-white text-lg font-bold hover:text-red-400 transition"
+        onClick={() => setShowTestsModal(false)}
+      >
+        ×
+      </button>
 
-            {/* Filters,Searching & Sorting */}
-            <div className="flex flex-wrap gap-4 mb-4">
-              {/* Search */}
-              <input
-                type="text"
-                placeholder="Search by test name..."
-                className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded flex-1 min-w-[150px]"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              {/* Status Filter */}
-              <select
-                className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded"
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-              >
-                <option value="all">All Status</option>
-                <option value="upcoming">Upcoming</option>
-                <option value="ongoing">Ongoing</option>
-                <option value="completed">Completed</option>
-              </select>
+      {/* Modal Header */}
+      <h3 className="text-2xl font-bold text-white mb-6">My Tests</h3>
 
-              {/* Category Filter */}
-              <select
-                className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded"
-                value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-              >
-                <option value="all">All Categories</option>
-                {[...new Set(myTests.map((t) => t.category))].map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
+      {/* Filters, Searching & Sorting */}
+      <div className="flex flex-wrap gap-4 mb-4">
+        <input
+          type="text"
+          placeholder="Search by test name..."
+          className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded flex-1 min-w-[150px]"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+        <select
+          className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded"
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+        >
+          <option value="all">All Status</option>
+          <option value="upcoming">Upcoming</option>
+          <option value="ongoing">Ongoing</option>
+          <option value="completed">Completed</option>
+        </select>
+        <select
+          className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded"
+          value={filterCategory}
+          onChange={(e) => setFilterCategory(e.target.value)}
+        >
+          <option value="all">All Categories</option>
+          {[...new Set(myTests.map((t) => t.category))].map((cat) => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </select>
+        <select
+          className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded"
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+        >
+          <option value="scheduledAt">Date</option>
+          <option value="name">Name</option>
+        </select>
+        <select
+          className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded"
+          value={sortOrder}
+          onChange={(e) => setSortOrder(e.target.value)}
+        >
+          <option value="asc">Ascending</option>
+          <option value="desc">Descending</option>
+        </select>
+      </div>
 
-              {/* Sort By */}
-              <select
-                className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-              >
-                <option value="scheduledAt">Date</option>
-                <option value="name">Name</option>
-              </select>
-
-              {/* Sort Order */}
-              <select
-                className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded"
-                value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value)}
-              >
-                <option value="asc">Ascending</option>
-                <option value="desc">Descending</option>
-              </select>
-            </div>
-
-            <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-[#2a3957] scrollbar-track-[#151e2e]">
-              <ul className="divide-y divide-gray-700">
-                {getFilteredSortedTests().length > 0 ? (
-                  getFilteredSortedTests().map((test) => (
-                    <li
-                      key={test._id}
-                      className="py-4 flex justify-between items-center hover:bg-[#232f4b] px-3 rounded-md transition"
-                    >
-                      <div>
-                        <span className="font-semibold text-white">
-                          {test.testName}
-                        </span>{" "}
-                        - <span className="text-gray-300">{test.category}</span>
-                      </div>
-                      <div>
-                        {test.status === "ongoing" ? (
-                          <button
-                            className="text-green-400 text-sm font-medium hover:underline"
-                            onClick={() => navigate(`/exam/${test._id}`)}
-                          >
-                            Join Now
-                          </button>
-                        ) : test.status === "upcoming" ? (
-                          <span className="text-yellow-400 text-sm font-medium">
-                            Upcoming
-                          </span>
-                        ) : test.status === "completed" ? (
-                          <span className="text-purple-400 text-sm font-medium">
-                            Completed
-                          </span>
-                        ) : (
-                          <span className="text-gray-500 text-sm font-medium">
-                            Expired
-                          </span>
-                        )}
-                      </div>
-                    </li>
-                  ))
-                ) : (
-                  <li className="py-4 text-gray-400 text-center">
-                    No tests assigned
-                  </li>
-                )}
-              </ul>
-            </div>
+      {/* Loading / Test List */}
+      <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-[#2a3957] scrollbar-track-[#151e2e]">
+        {loadingMyTests ? (
+          <div className="flex justify-center items-center py-20">
+            <span className="text-blue-300 text-lg animate-pulse">
+              Loading tests...
+            </span>
           </div>
-        </div>
-      )}
+        ) : (
+          <ul className="divide-y divide-gray-700">
+            {getFilteredSortedTests().length > 0 ? (
+              getFilteredSortedTests().map((test) => (
+                <li
+                  key={test._id}
+                  className="py-4 flex justify-between items-center hover:bg-[#232f4b] px-3 rounded-md transition"
+                >
+                  <div>
+                    <span className="font-semibold text-white">
+                      {test.testName}
+                    </span>{" "}
+                    - <span className="text-gray-300">{test.category}</span>
+                  </div>
+                  <div>
+                    {test.status === "ongoing" ? (
+                      <button
+                        className="text-green-400 text-sm font-medium hover:underline"
+                        onClick={() => navigate(`/exam/${test._id}`)}
+                      >
+                        Join Now
+                      </button>
+                    ) : test.status === "upcoming" ? (
+                      <span className="text-yellow-400 text-sm font-medium">
+                        Upcoming
+                      </span>
+                    ) : test.status === "completed" ? (
+                      <span className="text-purple-400 text-sm font-medium">
+                        Completed
+                      </span>
+                    ) : (
+                      <span className="text-gray-500 text-sm font-medium">
+                        Expired
+                      </span>
+                    )}
+                  </div>
+                </li>
+              ))
+            ) : (
+              <li className="py-4 text-gray-400 text-center">
+                No tests assigned
+              </li>
+            )}
+          </ul>
+        )}
+      </div>
+    </div>
+  </div>
+)}
+
     </div>
   );
 }

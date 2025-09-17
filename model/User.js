@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-
 const userSchema = new mongoose.Schema({
     firstName: {
         type: String,
@@ -52,7 +51,13 @@ const userSchema = new mongoose.Schema({
     createdAt: {
         type: Date,
         default: Date.now
-    }
+    },
+    dateOfBirth:{ type: Date },
+    gender: { type: String, enum: ["Male", "Female", "Other"], default: "Other" },
+    organisation: {
+    name: { type: String, default: "N/A" },
+    address: { type: String, default: "N/A" },
+    },
 })
 
 module.exports = mongoose.model('users', userSchema);
