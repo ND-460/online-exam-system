@@ -1,238 +1,201 @@
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { Formik, Form, Field, ErrorMessage } from "formik";
+import * as Yup from "yup";
+import axios from "axios";
+import { useAuthStore } from "../../store/authStore";
+import { toast } from "react-toastify";
+import "react-toastify/ReactToastify.css";
 
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Formik, Form, Field, ErrorMessage } from 'formik';
-import * as Yup from 'yup';
-import axios from 'axios';
-import {useAuthStore} from '../../store/authStore'
-import { toast } from 'react-toastify';
-import 'react-toastify/ReactToastify.css'
 const LoginSchema = Yup.object().shape({
-  role: Yup.string().required('Role is required'),
-  email: Yup.string().required('Email is required').matches(/^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-      'Invalid email format (must contain _@_._)'),
-  password: Yup.string().min(6, 'Password must be at least 6 characters').required('Password is required'),
+  role: Yup.string().required("Role is required"),
+  email: Yup.string()
+    .required("Email is required")
+    .matches(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Invalid email format"),
+  password: Yup.string()
+    .min(6, "Password must be at least 6 characters")
+    .required("Password is required"),
 });
 
-// Crystal Animation Component
-const CrystalElement = ({ className, delay = 0, duration = 10, size = 'w-4 h-4', movementType = 'float' }) => {
-  const getMovementStyle = () => {
-    switch (movementType) {
-      case 'float':
-        return { animation: `float ${duration}s ease-in-out infinite`, animationDelay: `${delay}s` };
-      case 'drift':
-        return { animation: `drift ${duration}s ease-in-out infinite`, animationDelay: `${delay}s` };
-      case 'sway':
-        return { animation: `sway ${duration}s ease-in-out infinite`, animationDelay: `${delay}s` };
-      default:
-        return { animation: `float ${duration}s ease-in-out infinite`, animationDelay: `${delay}s` };
-    }
-  };
-
-  return (
-    <div
-      className={`${className} ${size} bg-gradient-to-br from-black/80 to-zinc-900/70 rounded-lg backdrop-blur-sm border border-zinc-700/60 shadow-xl`}
-      style={getMovementStyle()}
-    />
-  );
-};
-
-// Floating Crystals
-const FloatingCrystals = () => (
-  <>
-    <CrystalElement className="absolute top-20 left-20" delay={0} duration={8} size="w-8 h-8" movementType="float" />
-    <CrystalElement className="absolute top-40 right-32" delay={1} duration={10} size="w-6 h-6" movementType="drift" />
-    <CrystalElement className="absolute bottom-40 left-32" delay={2} duration={12} size="w-7 h-7" movementType="sway" />
-    <CrystalElement className="absolute bottom-20 right-20" delay={0.5} duration={9} size="w-5 h-5" movementType="float" />
-    <CrystalElement className="absolute top-1/3 left-1/4" delay={1.5} duration={11} size="w-4 h-4" movementType="drift" />
-    <CrystalElement className="absolute top-1/2 right-1/4" delay={2.5} duration={7} size="w-6 h-6" movementType="sway" />
-    <CrystalElement className="absolute bottom-1/3 right-1/3" delay={0.8} duration={13} size="w-5 h-5" movementType="float" />
-    <CrystalElement className="absolute top-1/4 right-1/6" delay={1.2} duration={9} size="w-3 h-3" movementType="drift" />
-    <CrystalElement className="absolute top-1/6 left-1/3" delay={2.8} duration={14} size="w-2 h-2" movementType="sway" />
-    <CrystalElement className="absolute bottom-1/6 right-1/4" delay={1.8} duration={11} size="w-3 h-3" movementType="float" />
-    <CrystalElement className="absolute top-2/3 left-1/6" delay={0.3} duration={12} size="w-4 h-4" movementType="drift" />
-    <CrystalElement className="absolute bottom-1/4 left-1/6" delay={2.2} duration={8} size="w-2 h-2" movementType="sway" />
-  </>
-);
-
-// Animated Background
-const AnimatedBackground = () => (
-  <>
-    <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-gradient-to-br from-black/60 to-zinc-900/40 rounded-full animate-pulse blur-xl" style={{ animationDuration: '6s' }}></div>
-    <div className="absolute bottom-1/4 right-1/4 w-40 h-40 bg-gradient-to-br from-zinc-900/50 to-black/30 rounded-full animate-pulse blur-xl" style={{ animationDuration: '8s' }}></div>
-    <div className="absolute top-1/2 left-1/2 w-24 h-24 bg-gradient-to-br from-black/40 to-zinc-800/30 rounded-full animate-pulse blur-xl" style={{ animationDuration: '7s' }}></div>
-    <div className="absolute bottom-1/3 left-1/3 w-36 h-36 bg-gradient-to-br from-zinc-900/30 to-black/20 rounded-full animate-pulse blur-xl" style={{ animationDuration: '9s' }}></div>
-    <div className="absolute top-1/3 left-0 w-48 h-1 bg-gradient-to-r from-transparent via-zinc-700/40 to-transparent animate-pulse" style={{ animationDuration: '4s' }}></div>
-    <div className="absolute bottom-1/3 right-0 w-36 h-1 bg-gradient-to-l from-transparent via-zinc-800/35 to-transparent animate-pulse" style={{ animationDuration: '6s' }}></div>
-    <div className="absolute top-1/2 left-1/4 w-32 h-1 bg-gradient-to-r from-transparent via-zinc-600/30 to-transparent animate-pulse" style={{ animationDuration: '5s' }}></div>
-    <div className="absolute top-1/3 right-1/3 w-40 h-1 bg-gradient-to-l from-transparent via-zinc-700/25 to-transparent animate-pulse" style={{ animationDuration: '7s' }}></div>
-  </>
-);
-
 export default function Login() {
-  const [selectedRole, setSelectedRole] = useState('student');
-  const [error, setError] = useState('');
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [selectedRole, setSelectedRole] = useState("student");
+  const [error, setError] = useState("");
   const navigate = useNavigate();
-  const {login,fetchProfileGoogle,fetchProfile} = useAuthStore()
+  const { login, fetchProfileGoogle, fetchProfile } = useAuthStore();
 
-  useEffect(() => {
-    const handleMouseMove = (e) => setMousePosition({ x: e.clientX, y: e.clientY });
-    window.addEventListener('mousemove', handleMouseMove, { passive: true });
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
-
-  // Handle redirect callback
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("googleSuccess") === "true" && params.get("token")) {
       const token = params.get("token");
       localStorage.setItem("token", token);
       const payload = JSON.parse(atob(token.split(".")[1]));
-      login(payload,token)
-      fetchProfileGoogle()
+      login(payload, token);
+      fetchProfileGoogle();
       navigate(`/${payload.role}`);
     }
-  }, [login,navigate]);
+  }, [login, navigate, fetchProfileGoogle]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-zinc-900 to-black relative overflow-hidden flex items-center justify-center p-4">
-      <AnimatedBackground />
-      <FloatingCrystals />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-50 via-blue-100 to-white px-4"
+    style={{
+    backgroundImage: `url("/images/back-image-min.jpg")`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+  }}>
+      {/* Login Card */}
+      <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 overflow-hidden">
+        {/* Decorative Circle */}
+        <div className="absolute -top-32 -right-32 w-64 h-64 bg-yellow-800 rounded-full opacity-20"></div>
 
-      <div
-        className="absolute w-[400px] h-[400px] bg-gradient-to-r from-black/60 to-transparent rounded-full blur-3xl pointer-events-none transition-all duration-1000 ease-out"
-        style={{ left: mousePosition.x - 200, top: mousePosition.y - 200, transform: 'translate(-50%, -50%)' }}
-      />
-
-      {/* Logo */}
-      <div className="absolute top-6 left-8 flex items-center z-10">
-        <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
-          <defs>
-            <linearGradient id="bolt-gradient" x1="0" y1="0" x2="0" y2="32">
-              <stop stopColor="#FFB347" />
-              <stop offset="1" stopColor="#FF5F6D" />
-            </linearGradient>
-          </defs>
-          <path d="M13 2L4 18H14L11 30L28 10H17L20 2H13Z" fill="url(#bolt-gradient)" />
-        </svg>
-        <span className="text-2xl font-bold text-white ml-2">Exam<span className="text-zinc-400">Volt</span></span>
-      </div>
-
-      {/* Card */}
-      <div className="w-full max-w-sm py-5 px-5 rounded-2xl shadow-2xl bg-zinc-900/80 backdrop-blur-xl border border-zinc-800/60 relative overflow-hidden z-20">
-        <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-black/60 to-zinc-900/40 opacity-60 blur-lg animate-pulse -z-10" />
-        <CrystalElement className="absolute top-3 right-3" delay={0} duration={2} size="w-3 h-3" />
-        <CrystalElement className="absolute bottom-3 left-3" delay={1} duration={3} size="w-2 h-2" />
-
-        <h2 className="text-xl font-bold text-white mb-3 text-center">Welcome Back</h2>
-        <p className="text-zinc-400 text-center mb-4 text-sm">Sign in to your ExamVolt account</p>
-
-        {/* Role Selection */}
-        <div className="mb-4">
-          <label className="block mb-2 font-medium text-zinc-400 text-center text-sm">I am a</label>
-          <div className="flex gap-2">
-            {['student', 'teacher', 'admin'].map((role) => (
-              <button
-                key={role}
-                type="button"
-                onClick={() => setSelectedRole(role)}
-                className={`flex-1 py-2 px-3 rounded-lg font-medium transition-all duration-300 hover:scale-105 text-sm ${
-                  selectedRole === role
-                    ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg'
-                    : 'bg-zinc-900/60 text-zinc-400 border border-zinc-800/60 hover:border-zinc-700/80'
-                }`}
-              >
-                {role.charAt(0).toUpperCase() + role.slice(1)}
-              </button>
-            ))}
-          </div>
+        {/* Logo */}
+        <div className="flex items-center justify-center mb-6">
+          <svg
+            width="36"
+            height="36"
+            viewBox="0 0 32 32"
+            fill="none"
+            className="text-blue-600"
+          >
+            <path
+              d="M13 2L4 18H14L11 30L28 10H17L20 2H13Z"
+              fill="currentColor"
+            />
+          </svg>
+          <span className="ml-2 text-2xl font-bold text-gray-800">
+            Exam<span className="text-blue-600">Volt</span>
+          </span>
         </div>
 
-        {/* Google Redirect Login */}
-        <div className="flex flex-col gap-3 mb-3 w-full">
+        <h2 className="text-2xl font-semibold text-gray-800 text-center mb-2">
+          Welcome Back
+        </h2>
+        <p className="text-sm text-gray-500 text-center mb-6">
+          Sign in to your account
+        </p>
+
+        {/* Role Selection */}
+        <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
+          {["student", "teacher", "admin"].map((role) => (
+            <button
+              key={role}
+              type="button"
+              onClick={() => setSelectedRole(role)}
+              className={`flex-1 py-2 rounded-md text-sm font-medium transition ${
+                selectedRole === role
+                  ? "bg-yellow-800 text-white shadow"
+                  : "text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {role.charAt(0).toUpperCase() + role.slice(1)}
+            </button>
+          ))}
+        </div>
+        {/* Google Sign-In Section */}
+        <div className="flex flex-col gap-3 mb-4">
           <a
-            href={`${import.meta.env.VITE_API_URL}/api/user/auth/google?role=${selectedRole}`}
-            className="w-full py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-center font-bold shadow-md transition-transform hover:scale-105"
+            href={`${
+              import.meta.env.VITE_API_URL
+            }/api/user/auth/google?role=${selectedRole}`}
+            className="w-full py-2 rounded-md bg-yellow-700 hover:bg-yellow-600 text-white text-center font-semibold shadow-sm"
           >
             Continue with Google
           </a>
-          <div className="text-center text-zinc-500 font-medium text-sm">or</div>
+          <div className="text-center text-gray-400 text-sm">or</div>
         </div>
 
-        {/* Email/Password Login */}
+        {/* Formik Form */}
         <Formik
-          initialValues={{ role: selectedRole, email: '', password: '' }}
+          initialValues={{ role: selectedRole, email: "", password: "" }}
           validationSchema={LoginSchema}
           onSubmit={async (values, { setSubmitting }) => {
-            setError('');
+            setError("");
             try {
-              const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/user/login`, {
-                email: values.email,
-                password: values.password,
-                role: selectedRole,
-              });
-              localStorage.setItem('token', res.data.token);
-              login(res.data.user,res.data.token)
-              await fetchProfile()
-              toast.success("Login Successfull")
+              const res = await axios.post(
+                `${import.meta.env.VITE_API_URL}/api/user/login`,
+                {
+                  email: values.email,
+                  password: values.password,
+                  role: selectedRole,
+                }
+              );
+              localStorage.setItem("token", res.data.token);
+              login(res.data.user, res.data.token);
+              await fetchProfile();
+              toast.success("Login Successful");
               navigate(`/${selectedRole}`);
             } catch (err) {
-              setError(err.response?.data?.message || 'Login failed');
-              toast.error("Login Failed")
+              setError(err.response?.data?.message || "Login failed");
+              toast.error("Login Failed");
             } finally {
               setSubmitting(false);
             }
           }}
         >
           {({ isSubmitting }) => (
-            <Form className="flex flex-col gap-3 w-full">
+            <Form className="flex flex-col gap-4">
               <div>
-                <label className="block mb-1 font-medium text-zinc-400 text-sm">Email Address</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">
+                  Email Address
+                </label>
                 <Field
                   type="email"
                   name="email"
-                  className="w-full pl-3 py-2 border border-zinc-800/60 rounded-lg bg-zinc-900/60 text-white text-sm"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   placeholder="Enter your email"
                 />
-                <ErrorMessage name="email" component="div" className="text-red-400 text-xs mt-1" />
+                <ErrorMessage
+                  name="email"
+                  component="div"
+                  className="text-red-500 text-xs mt-1"
+                />
               </div>
 
               <div>
-                <label className="block mb-1 font-medium text-zinc-400 text-sm">Password</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">
+                  Password
+                </label>
                 <Field
                   type="password"
                   name="password"
-                  className="w-full pl-3 py-2 border border-zinc-800/60 rounded-lg bg-zinc-900/60 text-white text-sm"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   placeholder="Enter your password"
                 />
-                <ErrorMessage name="password" component="div" className="text-red-400 text-xs mt-1" />
+                <ErrorMessage
+                  name="password"
+                  component="div"
+                  className="text-red-500 text-xs mt-1"
+                />
               </div>
 
-              {error && <div className="text-red-400 text-xs bg-red-900/20 p-2 rounded-lg border border-red-500/30">{error}</div>}
+              {error && (
+                <div className="text-red-600 text-xs bg-red-50 p-2 rounded-md border border-red-200">
+                  {error}
+                </div>
+              )}
 
               <button
                 type="submit"
-                className="w-full py-2 rounded-lg bg-gradient-to-r from-black to-zinc-900 text-white font-bold shadow-lg hover:scale-105"
                 disabled={isSubmitting}
+                className="w-full py-2 rounded-md bg-yellow-700 hover:bg-yellow-600 text-white font-semibold shadow-sm"
               >
-                {isSubmitting ? 'Signing In...' : 'Sign In'}
+                {isSubmitting ? "Signing In..." : "Sign In"}
               </button>
             </Form>
           )}
         </Formik>
 
-        <p className="mt-3 text-xs text-zinc-400 text-center">
-          Don't have an account?{' '}
-          <a href="/register" className="text-zinc-300 font-semibold hover:text-zinc-200">Sign up</a>
+        {/* Footer */}
+        <p className="mt-5 text-xs text-gray-500 text-center">
+          Don’t have an account?{" "}
+          <a
+            href="/register"
+            className="text-blue-600 font-semibold hover:underline"
+          >
+            Sign up
+          </a>
         </p>
       </div>
-
-      <style jsx>{`
-        @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-20px); } }
-        @keyframes drift { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(20px, -20px); } }
-        @keyframes sway { 0%, 100% { transform: translateX(0px); } 50% { transform: translateX(-20px); } }
-      `}</style>
     </div>
   );
 }
