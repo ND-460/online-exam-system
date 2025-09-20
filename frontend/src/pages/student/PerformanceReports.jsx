@@ -20,17 +20,13 @@ export default function PerformanceReports({ token }) {
     const fetchPerformance = async () => {
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_API_URL}/api/student/performance`, 
+          `${import.meta.env.VITE_API_URL}/api/student/performance`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
         let tests = res.data.performanceData || [];
-
-        // sort by date ascending
         tests = tests.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-        // keep only last 5
-        tests = tests.slice(-5);
+        tests = tests.slice(-5); // last 5 tests
 
         const formatted = tests.map((t, idx) => ({
           test: t.testName || `Test ${idx + 1}`,
@@ -39,20 +35,16 @@ export default function PerformanceReports({ token }) {
 
         setPerformanceData(formatted);
 
-        // performance trend
+        // Determine trend
         if (formatted.length > 1) {
           const latest = formatted[formatted.length - 1].score;
           const prevAvg =
             formatted.slice(0, -1).reduce((sum, t) => sum + t.score, 0) /
             (formatted.length - 1);
 
-          if (latest > prevAvg + 5) {
-            setStatus("good");
-          } else if (latest < prevAvg - 5) {
-            setStatus("bad");
-          } else {
-            setStatus("neutral");
-          }
+          if (latest > prevAvg + 5) setStatus("good");
+          else if (latest < prevAvg - 5) setStatus("bad");
+          else setStatus("neutral");
         }
       } catch (err) {
         console.error("Error fetching performance:", err);
@@ -63,58 +55,67 @@ export default function PerformanceReports({ token }) {
   }, [token]);
 
   return (
-    <div className="bg-gradient-to-br from-black via-[#181f2e] to-[#232f4b] rounded-3xl p-10 border border-[#232f4b] shadow-2xl w-full transition duration-300 hover:scale-[1.01]">
-      <h3 className="font-bold text-xl mb-2">Performance Reports</h3>
-      <p className="text-blue-200 text-sm mb-5">
-        Last 5 tests performance overview.
+    <div className="bg-white dark:bg-[#1f2937] rounded-3xl p-6 shadow-xl border border-gray-200 dark:border-gray-700 w-full transition duration-300 hover:scale-[1.01]">
+      <h3 className="text-xl font-bold mb-2 text-yellow-800 dark:text-white">
+        Performance Reports
+      </h3>
+      <p className="text-yellow-900 dark:text-gray-300 text-sm mb-4">
+        Last 5 tests performance overview
       </p>
 
       {/* Status Indicator */}
       {status && (
-        <div className="mb-6 text-lg font-semibold">
+        <div className="mb-4 text-sm font-semibold">
           {status === "good" && (
-            <span className="text-green-400">📈 Performance is improving</span>
+            <span className="text-green-500 flex items-center gap-2">
+              📈 Performance improving
+            </span>
           )}
           {status === "bad" && (
-            <span className="text-red-400">📉 Performance dropped</span>
+            <span className="text-red-500 flex items-center gap-2">
+              📉 Performance dropped
+            </span>
           )}
           {status === "neutral" && (
-            <span className="text-yellow-400">➖ Performance stable</span>
+            <span className="text-yellow-500 flex items-center gap-2">
+              ➖ Performance stable
+            </span>
           )}
         </div>
       )}
 
-      <div className="h-72 flex items-center justify-center">
+      {/* Bar Chart */}
+      <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={performanceData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#232f4b" />
-            <XAxis dataKey="test" stroke="#b3c2e6">
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <XAxis dataKey="test" stroke="#6b7280">
               <Label
                 value="Tests"
                 offset={-5}
                 position="insideBottom"
-                fill="#b3c2e6"
+                fill="#6b7280"
               />
             </XAxis>
-            <YAxis stroke="#b3c2e6" domain={[0, 100]}>
+            <YAxis stroke="#6b7280" domain={[0, 100]}>
               <Label
                 value="Percentage (%)"
                 angle={-90}
                 position="insideLeft"
-                fill="#b3c2e6"
+                fill="#6b7280"
                 style={{ textAnchor: "middle" }}
               />
             </YAxis>
             <Tooltip
-              formatter={(value) => [`${value}%`, "Percentage"]}
+              formatter={(value) => [`${value}%`, "Score"]}
               contentStyle={{
-                background: "#232f4b",
+                background: "#1f2937",
                 border: "none",
                 color: "#fff",
               }}
             />
             <Legend />
-            <Bar dataKey="score" fill="#7c3aed" radius={[8, 8, 0, 0]} />
+            <Bar dataKey="score" fill="oklch(55.4% 0.135 66.442)" radius={[8, 8, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

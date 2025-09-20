@@ -1,25 +1,16 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import PerformanceReports from "./PerformanceReports";
 import { useDebounce } from "use-debounce";
 import axios from "axios";
-
 import { toast } from "react-toastify";
-
-// import {
-//   BarChart,
-//   Bar,
-//   XAxis,
-//   YAxis,
-//   Tooltip,
-//   ResponsiveContainer,
-//   CartesianGrid,
-//   Legend,
-// } from "recharts";
 import Editor from "@monaco-editor/react";
+import ProfilePage from "../ProfilePage";
 
 export default function StudentDashboard() {
+  const [activeTab, setActiveTab] = useState("dashboard");
+
   const [language, setLanguage] = useState("JavaScript");
   const [testCounts, setTestCounts] = useState({
     upcoming: 0,
@@ -27,12 +18,8 @@ export default function StudentDashboard() {
     completed: 0,
   });
   const [activeTests, setActiveTests] = useState([]);
-  const [timer, setTimer] = useState("");
-  const [showTestsModal, setShowTestsModal] = useState(false);
   const [myTests, setMyTests] = useState([]);
-  const [openEditor, setOpenEditor] = useState(false);
   const [code, setCode] = useState("// Start coding here...");
-
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterCategory, setFilterCategory] = useState("all");
   const [sortBy, setSortBy] = useState("scheduledAt");
@@ -48,152 +35,100 @@ export default function StudentDashboard() {
     logout();
     navigate("/");
   };
-  useEffect(() => {
-    // This runs only after the debounce delay
-    console.log("Debounced search value updated:", debouncedSearchQuery);
-    // You can also show a loading spinner while typing if needed
-  }, [debouncedSearchQuery]);
-  
+
+  // redirect if not student
   useEffect(() => {
     if (!user) {
       navigate("/login");
     } else if (user.role !== "student") {
-      if (user.role === "teacher") {
-        navigate("/teacher");
-      } else if (user.role === "admin") {
-        navigate("/admin");
-      }
-      toast.error("Unauthorised access");
+      if (user.role === "teacher") navigate("/teacher");
+      else if (user.role === "admin") navigate("/admin");
+      toast.error("Unauthorized access");
     }
   }, [user, navigate]);
 
-  // Fetch test counts and next active test
+  // Fetch tests
   useEffect(() => {
-  if (!user) return; // don't call until user is loaded
+    if (!user) return;
+    const fetchTests = async () => {
+      try {
+        const countsRes = await axios.get(
+          `${import.meta.env.VITE_API_URL}/api/student/tests/student`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        setTestCounts(countsRes.data.payload || countsRes.data);
 
-  const fetchTests = async () => {
+        const activeRes = await axios.get(
+          `${import.meta.env.VITE_API_URL}/api/student/active/`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        setActiveTests(Array.isArray(activeRes.data) ? activeRes.data : []);
+      } catch (err) {
+        console.error("Error fetching tests:", err);
+      }
+    };
+    fetchTests();
+  }, [user, token]);
+
+  const fetchMyTests = async () => {
+    if (!user) return;
     try {
-      // Call API WITHOUT userId
-      const countsRes = await axios.get(
-        `${import.meta.env.VITE_API_URL}/api/student/tests/student`,
-        { headers: { Authorization: `Bearer ${token}` } }
+      setLoadingMyTests(true);
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_URL}/api/student/assigned-tests`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
       );
-      setTestCounts(countsRes.data.payload || countsRes.data);
-
-      const activeRes = await axios.get(
-   `${import.meta.env.VITE_API_URL}/api/student/active/`,
-  { headers: { Authorization: `Bearer ${token}` } }
-);
-setActiveTests(Array.isArray(activeRes.data) ? activeRes.data : []);
-
+      setMyTests(Array.isArray(res.data.tests) ? res.data.tests : []);
     } catch (err) {
-      console.error("Error fetching tests:", err);
+      console.error("Error fetching my tests:", err);
+      toast.error("Failed to load tests");
+    } finally {
+      setLoadingMyTests(false);
     }
   };
 
-  fetchTests();
-}, [user, token]);
-
-
-  // Countdown timer
   useEffect(() => {
-    if (!activeTests) return;
-
-    const interval = setInterval(() => {
-      const now = new Date().getTime();
-      const start = new Date(activeTests.startTime).getTime();
-      const distance = start - now;
-
-      if (distance <= 0) {
-        setTimer("00:00:00");
-        clearInterval(interval);
-      } else {
-        const hours = Math.floor((distance / (1000 * 60 * 60)) % 24);
-        const minutes = Math.floor((distance / (1000 * 60)) % 60);
-        const seconds = Math.floor((distance / 1000) % 60);
-        setTimer(
-          `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
-            2,
-            "0"
-          )}:${String(seconds).padStart(2, "0")}`
-        );
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [activeTests]);
-
-  const fetchMyTests = async () => {
-  if (!user) return;
-
-  try {
-    setLoadingMyTests(true); // start loading
-    const res = await axios.get(
-      `${import.meta.env.VITE_API_URL}/api/student/assigned-tests`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    setMyTests(Array.isArray(res.data.tests) ? res.data.tests : []);
-    setShowTestsModal(true);
-  } catch (err) {
-    console.error("Error fetching my tests:", err);
-    toast.error("Failed to load tests");
-  } finally {
-    setLoadingMyTests(false); 
-  }
-};
-
+    if (activeTab === "tests") fetchMyTests();
+  }, [activeTab]);
 
   const getFilteredSortedTests = () => {
     let filtered = [...myTests];
     const now = new Date();
 
-    
     filtered = filtered.map((t) => {
       const startTime = new Date(t.scheduledAt);
-      const endTime = new Date(startTime.getTime() + t.minutes * 60000); 
-
+      const endTime = new Date(startTime.getTime() + t.minutes * 60000);
       let status = "upcoming";
-      if (t.submitBy.includes(user._id)) {
-        status = "completed";
-      } else if (now >= startTime && now <= endTime) {
-        status = "ongoing";
-      } else if (now < startTime) {
-        status = "upcoming";
-      } else {
-        status = "expired"; 
-      }
-
+      if (t.submitBy.includes(user._id)) status = "completed";
+      else if (now >= startTime && now <= endTime) status = "ongoing";
+      else if (now < startTime) status = "upcoming";
+      else status = "expired";
       return { ...t, status };
     });
 
-    // Filter by status
-    if (filterStatus !== "all") {
+    if (filterStatus !== "all")
       filtered = filtered.filter((t) => t.status === filterStatus);
-    } else {
-      // Exclude expired by default
-      filtered = filtered.filter((t) => t.status !== "expired");
-    }
+    else filtered = filtered.filter((t) => t.status !== "expired");
 
-    // Filter by category
-    if (filterCategory !== "all") {
+    if (filterCategory !== "all")
       filtered = filtered.filter((t) => t.category === filterCategory);
-    }
 
-    // Filter by debounced search query
-    if (debouncedSearchQuery.trim() !== "") {
+    if (debouncedSearchQuery.trim() !== "")
       filtered = filtered.filter((t) =>
         t.testName.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
       );
-    }
 
-    // Sort
     filtered.sort((a, b) => {
       let aValue =
         sortBy === "name" ? a.testName.toLowerCase() : new Date(a.scheduledAt);
       let bValue =
         sortBy === "name" ? b.testName.toLowerCase() : new Date(b.scheduledAt);
-
       if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
       if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
       return 0;
@@ -209,47 +144,68 @@ setActiveTests(Array.isArray(activeRes.data) ? activeRes.data : []);
     Java: "java",
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-[#111827] to-[#1f2937] p-6 text-white">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-4">
-          <Link to="/profile">
-            <button className="px-5 py-2 bg-[#232f4b] rounded-lg text-blue-100 hover:bg-[#2a3957] font-semibold transition duration-300 shadow-md hover:shadow-lg">
-              Profile
-            </button>
-          </Link>
-          <h2 className="text-3xl font-extrabold ml-2 bg-gradient-to-r from-violet-400 to-blue-400 bg-clip-text text-transparent drop-shadow-md">
-            Student Dashboard
-          </h2>
-        </div>
-        <button
-          onClick={handleLogout}
-          className="px-5 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 rounded-lg text-white font-semibold shadow-md hover:shadow-xl transition duration-300"
-        >
-          Logout
-        </button>
-      </div>
+  const tabs = [
+    { id: "dashboard", label: "Dashboard", icon: "🏠" },
+    { id: "tests", label: "My Tests", icon: "📝" },
+    { id: "practice", label: "Practice", icon: "💻" },
+    { id: "reports", label: "Reports", icon: "📊" },
+    { id: "profile", label: "Profile", icon: "👤" },
+  ];
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Column */}
-        <div className="lg:col-span-2 flex flex-col gap-8">
-          {/* My Exams + Active Test */}
-          <div className="flex flex-col lg:flex-row gap-8 w-full">
+  return (
+    <div
+      className="min-h-screen flex bg-gradient-to-r from-blue-50 via-blue-100 to-white"
+      style={{
+        backgroundImage: `url("/images/back-image-min.jpg")`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
+    >
+      {/* Sidebar */}
+      <aside className="w-64 bg-white/90 backdrop-blur-md border-r border-gray-200 shadow-lg flex flex-col">
+        <div className="p-6 text-2xl font-bold tracking-tight text-yellow-800">
+          ExamVolt
+        </div>
+        <nav className="flex-1 px-3 space-y-2">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-3 w-full px-4 py-3 rounded-xl font-medium transition ${
+                activeTab === tab.id
+                  ? "bg-yellow-700 text-white shadow"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`}
+            >
+              <span>{tab.icon}</span> {tab.label}
+            </button>
+          ))}
+        </nav>
+        <div className="p-4">
+          <button
+            onClick={handleLogout}
+            className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 px-4 py-2 rounded-lg text-white font-semibold shadow"
+          >
+            Logout
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 p-8 overflow-y-auto">
+        <header className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-extrabold text-white">
+            {tabs.find((t) => t.id === activeTab)?.label}
+          </h1>
+        </header>
+
+        {/* Dashboard */}
+        {activeTab === "dashboard" && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* My Exams */}
-            <div className="flex-1 bg-gradient-to-br from-black via-[#181f2e] to-[#232f4b] rounded-3xl p-8 border border-[#232f4b] shadow-2xl transition duration-300 hover:scale-[1.01]">
-              <div className="flex justify-between items-center mb-8">
-                <h3 className="text-2xl font-bold tracking-tight text-white">
-                  My Exams
-                </h3>
-                <button
-                  className="text-blue-300 text-sm font-semibold hover:underline"
-                  onClick={fetchMyTests}
-                >
-                  See all
-                </button>
-              </div>
-              <div className="flex flex-row gap-6">
+            <div className="p-6 rounded-3xl bg-white shadow-xl border border-gray-200">
+              <h3 className="text-xl font-bold mb-4 text-gray-800">My Exams</h3>
+              <div className="flex gap-6">
                 {[
                   {
                     label: "Upcoming",
@@ -266,293 +222,267 @@ setActiveTests(Array.isArray(activeRes.data) ? activeRes.data : []);
                     count: testCounts.completed,
                     color: "purple",
                   },
-                ].map((card) => (
-                  <div
-                    key={card.label}
-                    className={`flex-1 flex flex-col items-center justify-center rounded-2xl border-2 shadow-lg min-h-[140px] py-6 bg-gradient-to-br from-${card.color}-900 via-${card.color}-800 to-${card.color}-700 border-${card.color}-700 transition duration-300 hover:scale-105`}
-                  >
-                    <span
-                      className={`text-${card.color}-200 text-lg mb-2 font-medium tracking-wide`}
+                ].map((card) => {
+                  let bgClass = "";
+                  let borderClass = "";
+                  let textClass = "";
+                  let countClass = "";
+
+                  switch (card.color) {
+                    case "blue":
+                      bgClass = "bg-blue-50";
+                      borderClass = "border-blue-200";
+                      textClass = "text-blue-600";
+                      countClass = "text-blue-800";
+                      break;
+                    case "green":
+                      bgClass = "bg-green-50";
+                      borderClass = "border-green-200";
+                      textClass = "text-green-600";
+                      countClass = "text-green-800";
+                      break;
+                    case "purple":
+                      bgClass = "bg-purple-50";
+                      borderClass = "border-purple-200";
+                      textClass = "text-purple-600";
+                      countClass = "text-purple-800";
+                      break;
+                  }
+
+                  return (
+                    <div
+                      key={card.label}
+                      className={`flex-1 flex flex-col items-center justify-center rounded-xl min-h-[120px] py-4 ${bgClass} border ${borderClass}`}
                     >
-                      {card.label}
-                    </span>
-                    <span
-                      className={`text-5xl font-extrabold text-${card.color}-400 drop-shadow-lg`}
-                    >
-                      {card.count}
-                    </span>
-                  </div>
-                ))}
+                      <span className={textClass}>{card.label}</span>
+                      <span className={`text-3xl font-bold ${countClass}`}>
+                        {card.count}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
             {/* Active Tests */}
-            <div className="flex-1 bg-gradient-to-br from-black via-[#181f2e] to-[#232f4b] rounded-3xl p-8 border border-[#232f4b] shadow-2xl flex flex-col transition duration-300 hover:scale-[1.01]">
-              <h3 className="text-2xl font-bold mb-6">
+            <div className="p-6 rounded-3xl bg-white shadow-xl border border-gray-200">
+              <h3 className="text-xl font-bold mb-4 text-gray-800">
                 Active / Upcoming Tests
               </h3>
               {activeTests.length > 0 ? (
-                <ul className="space-y-4">
+                <ul className="space-y-3">
                   {activeTests.map((test) => (
                     <li
                       key={test._id}
-                      className="flex justify-between items-center p-4 rounded-lg bg-[#151e2e] hover:bg-[#232f4b] transition"
+                      className="p-3 bg-gray-50 rounded-lg flex justify-between border border-gray-200 bg-yellow-800"
                     >
                       <div>
-                        <p className="text-lg font-semibold text-white">
+                        <p className="font-semibold text-white">
                           {test.testName}
                         </p>
-                        <p className="text-sm text-gray-400">
-                          {test.category} • {test.className} • {test.minutes}{" "}
-                          mins •{" "}
-                          {new Date(test.scheduledAt).toLocaleDateString(
-                            "en-IN",
-                            {
-                              year: "numeric",
-                              month: "short",
-                              day: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              hour12: true,
-                            }
-                          )}
-                        </p>
-                        <p className="text-xs text-blue-300">
-                          Status:{" "}
-                          {test.status === "active"
-                            ? "Ongoing"
-                            : test.status === "upcoming"
-                            ? "Upcoming"
-                            : "Expired"}
-                        </p>
+                        <p className="text-sm text-white">{test.category}</p>
                       </div>
-                      <div>
-                        {test.status === "active" ? (
-                          <button
-                            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-semibold"
-                            onClick={() => navigate(`/exam/${test._id}`)}
-                          >
-                            Join
-                          </button>
-                        ) : test.status === "upcoming" ? (
-                          <span className="text-yellow-400 text-sm font-medium">
-                            Upcoming
-                          </span>
-                        ) : (
-                          <span className="text-gray-500 text-sm font-medium">
-                            Expired
-                          </span>
-                        )}
-                      </div>
+                      {test.status === "active" ? (
+                        <button
+                          onClick={() => navigate(`/exam/${test._id}`)}
+                          className="px-3 py-1 rounded bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          Join
+                        </button>
+                      ) : (
+                        <span className="text-yellow-500 text-sm font-medium">{test.status}</span>
+                      )}
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="text-blue-200 text-base">
-                  No active or upcoming tests
-                </p>
+                <p className="text-gray-500">No active tests</p>
               )}
             </div>
           </div>
-
-          {/* Code Practice Arena */}
-          <div className="bg-gradient-to-br from-black via-[#181f2e] to-[#232f4b] rounded-3xl p-12 border border-[#232f4b] shadow-2xl w-full flex flex-col md:flex-row gap-12 transition duration-300 hover:scale-[1.01]">
-            {/* Left Section */}
-            <div className="flex-1 flex flex-col justify-center">
-              <h3 className="font-semibold text-2xl mb-3">
-                Code Practice Arena
-              </h3>
-              <p className="text-blue-200 text-base mb-6">
-                Open practice problems, choose language, and sharpen your
-                skills.
-              </p>
-
-              {/* Language Selector */}
-              <label className="block text-lg mb-2" htmlFor="language">
-                Language
-              </label>
-              <select
-                id="language"
-                className="w-full bg-[#151e2e] border border-[#232f4b] rounded-lg px-4 py-3 text-white mb-4 text-lg focus:ring-2 focus:ring-violet-500 outline-none transition"
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-              >
-                <option>JavaScript</option>
-                <option>Python</option>
-                <option>C++</option>
-                <option>Java</option>
-              </select>
-
-              {/* Buttons */}
-              <div className="flex gap-4 mt-4">
-                <button
-                  className="flex-1 bg-violet-600 hover:bg-violet-700 text-white px-6 py-3 rounded-lg font-semibold text-lg shadow-md hover:shadow-lg transition"
-                  onClick={() => setOpenEditor(true)}
-                >
-                  Open Editor
-                </button>
-                <button className="flex-1 bg-[#232f4b] hover:bg-[#2a3957] text-white px-6 py-3 rounded-lg font-semibold border border-[#2a3957] text-lg transition">
-                  Join Test (Code)
-                </button>
-              </div>
-            </div>
-
-            {/* Right Section */}
-            <div className="flex-1 mt-8 md:mt-0 flex flex-col justify-center">
-              {!openEditor ? (
-                <>
-                  <div className="text-lg font-semibold mb-4">
-                    Sample Problems
-                  </div>
-                  <ul className="text-blue-100 text-base list-disc ml-6 space-y-2">
-                    <li>Two sum — Easy</li>
-                    <li>Balanced Brackets — Medium</li>
-                    <li>LRU Cache — Hard</li>
-                  </ul>
-                </>
-              ) : (
-                <div className="h-[400px] rounded-xl overflow-hidden border border-[#2a3957]">
-                  <Editor
-                    height="100%"
-                    defaultLanguage="javascript"
-                    language={languageMap[language]}
-                    value={code}
-                    theme="vs-dark"
-                    onChange={(value) => setCode(value || "")}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Performance Reports */}
-          <PerformanceReports userId={user._id} token={token} />
-        </div>
-
-        {/* Right Sidebar */}
-        <div className="flex flex-col gap-6">{/* future widgets */}</div>
-      </div>
-
-      {/* My Tests Modal */}
-{showTestsModal && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div className="bg-[#1a2236] rounded-2xl w-11/12 md:w-2/3 lg:w-1/2 p-6 relative shadow-2xl border border-[#2a3957]">
-      {/* Close Button */}
-      <button
-        className="absolute top-4 right-4 text-white text-lg font-bold hover:text-red-400 transition"
-        onClick={() => setShowTestsModal(false)}
-      >
-        ×
-      </button>
-
-      {/* Modal Header */}
-      <h3 className="text-2xl font-bold text-white mb-6">My Tests</h3>
-
-      {/* Filters, Searching & Sorting */}
-      <div className="flex flex-wrap gap-4 mb-4">
-        <input
-          type="text"
-          placeholder="Search by test name..."
-          className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded flex-1 min-w-[150px]"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-        <select
-          className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded"
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-        >
-          <option value="all">All Status</option>
-          <option value="upcoming">Upcoming</option>
-          <option value="ongoing">Ongoing</option>
-          <option value="completed">Completed</option>
-        </select>
-        <select
-          className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded"
-          value={filterCategory}
-          onChange={(e) => setFilterCategory(e.target.value)}
-        >
-          <option value="all">All Categories</option>
-          {[...new Set(myTests.map((t) => t.category))].map((cat) => (
-            <option key={cat} value={cat}>{cat}</option>
-          ))}
-        </select>
-        <select
-          className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded"
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-        >
-          <option value="scheduledAt">Date</option>
-          <option value="name">Name</option>
-        </select>
-        <select
-          className="bg-[#151e2e] border border-[#2a3957] text-white px-3 py-2 rounded"
-          value={sortOrder}
-          onChange={(e) => setSortOrder(e.target.value)}
-        >
-          <option value="asc">Ascending</option>
-          <option value="desc">Descending</option>
-        </select>
-      </div>
-
-      {/* Loading / Test List */}
-      <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-[#2a3957] scrollbar-track-[#151e2e]">
-        {loadingMyTests ? (
-          <div className="flex justify-center items-center py-20">
-            <span className="text-blue-300 text-lg animate-pulse">
-              Loading tests...
-            </span>
-          </div>
-        ) : (
-          <ul className="divide-y divide-gray-700">
-            {getFilteredSortedTests().length > 0 ? (
-              getFilteredSortedTests().map((test) => (
-                <li
-                  key={test._id}
-                  className="py-4 flex justify-between items-center hover:bg-[#232f4b] px-3 rounded-md transition"
-                >
-                  <div>
-                    <span className="font-semibold text-white">
-                      {test.testName}
-                    </span>{" "}
-                    - <span className="text-gray-300">{test.category}</span>
-                  </div>
-                  <div>
-                    {test.status === "ongoing" ? (
-                      <button
-                        className="text-green-400 text-sm font-medium hover:underline"
-                        onClick={() => navigate(`/exam/${test._id}`)}
-                      >
-                        Join Now
-                      </button>
-                    ) : test.status === "upcoming" ? (
-                      <span className="text-yellow-400 text-sm font-medium">
-                        Upcoming
-                      </span>
-                    ) : test.status === "completed" ? (
-                      <span className="text-purple-400 text-sm font-medium">
-                        Completed
-                      </span>
-                    ) : (
-                      <span className="text-gray-500 text-sm font-medium">
-                        Expired
-                      </span>
-                    )}
-                  </div>
-                </li>
-              ))
-            ) : (
-              <li className="py-4 text-gray-400 text-center">
-                No tests assigned
-              </li>
-            )}
-          </ul>
         )}
-      </div>
-    </div>
-  </div>
-)}
 
+        {/* My Tests */}
+        {activeTab === "tests" && (
+          <div className="bg-white p-6 rounded-3xl shadow-xl border border-gray-200">
+            {/* Filters, Searching & Sorting */}
+            <div className="flex flex-wrap gap-4 mb-4">
+              <input
+                type="text"
+                placeholder="Search by test name..."
+                className="bg-white border border-gray-300 text-gray-800 px-3 py-2 rounded flex-1 min-w-[150px]"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <select
+                className="bg-white border border-gray-300 text-gray-800 px-3 py-2 rounded"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+              >
+                <option value="all">All Status</option>
+                <option value="upcoming">Upcoming</option>
+                <option value="ongoing">Ongoing</option>
+                <option value="completed">Completed</option>
+              </select>
+              <select
+                className="bg-white border border-gray-300 text-gray-800 px-3 py-2 rounded"
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+              >
+                <option value="all">All Categories</option>
+                {[...new Set(myTests.map((t) => t.category))].map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="bg-white border border-gray-300 text-gray-800 px-3 py-2 rounded"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                <option value="scheduledAt">Date</option>
+                <option value="name">Name</option>
+              </select>
+              <select
+                className="bg-white border border-gray-300 text-gray-800 px-3 py-2 rounded"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+              >
+                <option value="asc">Ascending</option>
+                <option value="desc">Descending</option>
+              </select>
+            </div>
+            {/* Table Header */}
+            <div className="grid grid-cols-4 gap-4 bg-gray-100 px-3 py-2 rounded-t-lg font-semibold text-gray-700">
+              <div>Test Name</div>
+              <div>Category</div>
+              <div>Status</div>
+              <div>Action</div>
+            </div>
+
+            {/* Loading / Test List */}
+            <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+              {loadingMyTests ? (
+                <div className="flex justify-center items-center py-20">
+                  <span className="text-blue-600 text-lg animate-pulse">
+                    Loading tests...
+                  </span>
+                </div>
+              ) : (
+                <ul className="divide-y divide-gray-200">
+                  {getFilteredSortedTests().length > 0 ? (
+                    getFilteredSortedTests().map((test) => (
+                      <li
+                        key={test._id}
+                        className="grid grid-cols-4 gap-4 py-4 items-center hover:bg-gray-50 px-3 rounded-md transition"
+                      >
+                        <div className="font-semibold text-gray-800">
+                          {test.testName}
+                        </div>
+                        <div className="text-gray-500">{test.category}</div>
+                        <div>
+                          {test.status === "ongoing" ? (
+                            <span className="text-green-600 text-sm font-medium">
+                              Ongoing
+                            </span>
+                          ) : test.status === "upcoming" ? (
+                            <span className="text-yellow-600 text-sm font-medium">
+                              Upcoming
+                            </span>
+                          ) : test.status === "completed" ? (
+                            <span className="text-purple-600 text-sm font-medium">
+                              Completed
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 text-sm font-medium">
+                              Expired
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          {test.status === "ongoing" ? (
+                            <button
+                              className="text-green-600 text-sm font-medium hover:underline"
+                              onClick={() => navigate(`/exam/${test._id}`)}
+                            >
+                              Join Now
+                            </button>
+                          ) : test.status === "completed" ? (
+                            <span className="text-black-600 text-sm font-medium">
+                              Attempted
+                            </span>
+                          ) : test.status === "upcoming" ? (
+                            <span className="text-purple-600 text-sm font-medium">
+                              Attempt at schedule
+                            </span>
+                          ) : (
+                            <span className="text-red-400 text-sm font-medium">
+                              Expired
+                            </span>
+                          )}
+                        </div>
+                      </li>
+                    ))
+                  ) : (
+                    <li className="py-4 text-gray-500 text-center col-span-4">
+                      No tests assigned
+                    </li>
+                  )}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Practice */}
+        {activeTab === "practice" && (
+          <div className="bg-white p-6 rounded-3xl shadow-xl border border-gray-200">
+            <h3 className="text-xl font-bold mb-4 text-gray-800">
+              Code Practice Arena
+            </h3>
+            <select
+              className="bg-gray-100 border border-gray-300 rounded-lg px-4 py-2 text-gray-800 mb-4"
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+            >
+              <option>JavaScript</option>
+              <option>Python</option>
+              <option>C++</option>
+              <option>Java</option>
+            </select>
+            <div className="h-[400px] rounded-xl overflow-hidden border border-gray-200">
+              <Editor
+                height="100%"
+                language={languageMap[language]}
+                value={code}
+                theme="vs-light"
+                onChange={(v) => setCode(v || "")}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Reports */}
+        {activeTab === "reports" && (
+          <div className="bg-white p-6 rounded-3xl shadow-xl border border-gray-200 bg-yellow-800">
+            <PerformanceReports userId={user._id} token={token} />
+          </div>
+        )}
+
+        {/* Profile */}
+        {activeTab === "profile" && (
+          // <div className="p-6 rounded-3xl bg-white shadow-xl border border-gray-200">
+          //   <h3 className="text-xl font-bold mb-4 text-gray-800">My Profile</h3>
+          //   <Link to="/profile" className="text-blue-600 font-semibold hover:underline">
+          //     Go to Profile Page
+          //   </Link>
+          // </div>
+          <div className="flex-1">
+            <ProfilePage />
+          </div>
+        )}
+      </main>
     </div>
   );
 }
