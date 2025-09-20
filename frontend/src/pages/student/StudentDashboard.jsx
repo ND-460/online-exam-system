@@ -194,7 +194,7 @@ export default function StudentDashboard() {
       {/* Main Content */}
       <main className="flex-1 p-8 overflow-y-auto">
         <header className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-extrabold text-gray-800">
+          <h1 className="text-3xl font-extrabold text-white">
             {tabs.find((t) => t.id === activeTab)?.label}
           </h1>
         </header>
@@ -465,7 +465,7 @@ export default function StudentDashboard() {
 
         {/* Reports */}
         {activeTab === "reports" && (
-          <div className="bg-white p-6 rounded-3xl shadow-xl border border-gray-200">
+          <div className="bg-white p-6 rounded-3xl shadow-xl border border-gray-200 bg-yellow-800">
             <PerformanceReports userId={user._id} token={token} />
           </div>
         )}
