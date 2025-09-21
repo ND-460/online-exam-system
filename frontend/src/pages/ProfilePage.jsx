@@ -63,12 +63,7 @@ const ProfilePage = () => {
   return (
     <div
       className="min-h-screen flex items-center justify-center px-4"
-      style={{
-        backgroundImage: `url("/images/profile-back.png")`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-      }}
+      
     >
       <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-8 overflow-hidden">
         {/* Decorative Circle */}

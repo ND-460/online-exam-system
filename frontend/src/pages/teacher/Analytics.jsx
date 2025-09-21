@@ -43,7 +43,7 @@ const Analytics = ({ testId, token }) => {
 
   if (loading) {
     return (
-      <div className="h-24 flex items-center justify-center text-blue-300 text-xs">
+      <div className="h-24 flex items-center justify-center text-yellow-700 text-xs">
         Loading analytics...
       </div>
     );
@@ -51,7 +51,7 @@ const Analytics = ({ testId, token }) => {
 
   if (!analytics || Object.keys(analytics).length === 0) {
     return (
-      <div className="h-24 flex items-center justify-center text-blue-300 text-xs">
+      <div className="h-24 flex items-center justify-center text-yellow-700 text-xs">
         No analytics available.
       </div>
     );
@@ -85,55 +85,62 @@ const Analytics = ({ testId, token }) => {
   });
 
   return (
-    <div className="p-4 bg-[#1e293b] rounded-lg shadow-md text-blue-100">
-      <h2 className="text-lg font-semibold mb-4">Test Analytics</h2>
-      <ul className="space-y-2 text-sm mb-6">
-        <li>Average Score: {avgScore.toFixed(2)}</li>
-        <li>Average %: {Number(analytics.avgPercentage ?? 0).toFixed(2)}%</li>
+  <div className="bg-white dark:bg-[#1f2937] rounded-3xl p-6 shadow-xl border border-gray-200 dark:border-gray-700 w-full transition duration-300 hover:scale-[1.01]">
+    {/* Title */}
+    <h3 className="text-xl font-bold mb-2 text-yellow-800 dark:text-white">
+      Test Analytics
+    </h3>
+    <p className="text-yellow-900 dark:text-gray-300 text-sm mb-4">
+      Overview of students who performed in this test
+    </p>
 
-        <li>Highest Score: {highestScore.toFixed(2)}</li>
-        <li>Lowest Score: {lowestScore.toFixed(2)}</li>
-        <li>Total Students: {totalStudents}</li>
-        <li>Total Submissions: {scoreDistribution.length}</li>
-      </ul>
+    {/* Stats */}
+    <ul className="space-y-2 text-sm mb-6 text-yellow-800 dark:text-blue-200">
+      <li>Average Score: {avgScore.toFixed(2)}</li>
+      <li>Average %: {Number(analytics.avgPercentage ?? 0).toFixed(2)}%</li>
+      <li>Highest Score: {highestScore.toFixed(2)}</li>
+      <li>Lowest Score: {lowestScore.toFixed(2)}</li>
+      <li>Total Students: {totalStudents}</li>
+      <li>Total Submissions: {scoreDistribution.length}</li>
+    </ul>
 
-      <div className="h-72 flex items-center justify-center">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={bins}
-            margin={{ top: 20, right: 20, left: 20, bottom: 40 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="#232f4b" />
-            <XAxis dataKey="range" stroke="#b3c2e6">
-              <Label
-                value="Score Range (%)"
-                offset={-5}
-                position="insideBottom"
-                fill="#b3c2e6"
-              />
-            </XAxis>
-            <YAxis allowDecimals={false} stroke="#b3c2e6">
-              <Label
-                value="Number of Students"
-                angle={-90}
-                position="insideLeft"
-                fill="#b3c2e6"
-                style={{ textAnchor: "middle" }}
-              />
-            </YAxis>
-            <Tooltip
-              contentStyle={{
-                background: "#232f4b",
-                border: "none",
-                color: "#fff",
-              }}
+    {/* Chart */}
+    <div className="h-64">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={bins}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          <XAxis dataKey="range" stroke="#6b7280">
+            <Label
+              value="Score Range (%)"
+              offset={-5}
+              position="insideBottom"
+              fill="#6b7280"
             />
-            <Bar dataKey="count" fill="#7c3aed" radius={[8, 8, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+          </XAxis>
+          <YAxis allowDecimals={false} stroke="#6b7280">
+            <Label
+              value="Number of Students"
+              angle={-90}
+              position="insideLeft"
+              fill="#6b7280"
+              style={{ textAnchor: "middle" }}
+            />
+          </YAxis>
+          <Tooltip
+            contentStyle={{
+              background: "#1f2937",
+              border: "none",
+              color: "#fff",
+            }}
+          />
+          
+          <Bar dataKey="count" fill="oklch(55.4% 0.135 66.442)" radius={[8, 8, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
     </div>
-  );
+  </div>
+);
+
 };
 
 export default Analytics;
