@@ -1,0 +1,234 @@
+/* Main container */
+.main-content {
+  display: flex;
+  min-height: 80vh;
+  gap: 1rem;
+  overflow: hidden; /* prevent main scroll affecting sidebar */
+}
+
+/* Question Panel (fixed size, scroll stays inside panel if needed) */
+.question-panel {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start; /* top align */
+  padding: 2rem;
+  overflow: hidden;
+}
+
+/* Question Box */
+.question-box {
+  width: 100%;
+  max-width: 700px;
+  background: #fff;
+  border-radius: 1.5rem;
+  padding: 2rem;
+  border: 2px solid #facc15; /* yellow-300 */
+  box-shadow: 0px 4px 12px rgba(0,0,0,0.2);
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Navigation Buttons */
+.nav-buttons {
+  margin-top: 2rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.middle-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Buttons */
+.btn {
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.btn.prev,
+.btn.next { background: #92400e; }
+.btn.prev:hover,
+.btn.next:hover { background: #b45309; }
+
+.btn.action { background: #ca8a04; }
+.btn.action:hover { background: #eab308; }
+
+/* Sidebar */
+.sidebar {
+  width: 16rem;
+  background: #fff;
+  border-left: 2px solid #facc15;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem 0.5rem;
+  position: sticky;
+  top: 0;
+  height: 80vh; /* limit sidebar height */
+  overflow-y: auto; /* scrollable if needed */
+}
+
+/* Sidebar title */
+.sidebar-title {
+  font-weight: bold;
+  color: #92400e;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+/* Question Palette buttons */
+.palette {
+  display: flex;
+  flex-wrap: wrap;         /* allows buttons to wrap to next row */
+  justify-content: center; /* center buttons horizontally */
+  gap: 0.5rem;             /* spacing between buttons */
+  padding: 1rem 0;
+  width: 100%;
+}
+
+.palette-btn {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  font-weight: bold;
+  color: #92400e;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.palette-btn:hover {
+  transform: scale(1.1);
+}
+
+/* Legend at bottom */
+.legend {
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  color: #92400e;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* Legend dots */
+.dot {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 9999px;
+  margin-right: 0.5rem;
+}
+
+.dot.not-visited { background: #f7fcc0; } /* lighter gray */
+.dot.answered { background: #16a34a; }    /* fresh green */
+.dot.review { background: #7c3aed; }      /* vibrant purple */
+.dot.not-answered { background: #dc2626; } /* strong red */
+
+
+
+/* Legend */
+.legend {
+  margin-top: 1.5rem;
+  font-size: 0.8rem;
+  color: #92400e;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.dot {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 9999px;
+  margin-right: 0.5rem;
+}
+
+.dot.not-visited { background: #6b7280; } /* gray-500 */
+.dot.answered { background: #22c55e; } /* green-500 */
+.dot.review { background: #a855f7; } /* purple-500 */
+.dot.not-answered { background: #ef4444; } /* red-500 */
+
+/* Responsive: stack on small screens */
+@media (max-width: 768px) {
+  .main-content {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: 100%;
+    height: auto;
+    position: relative;
+    border-left: none;
+    border-top: 2px solid #facc15;
+    overflow-y: visible;
+  }
+}
+
+.footer-controls {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: #fff;
+  border-top: 2px solid #facc15; /* yellow-300 */
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  z-index: 30;
+  flex-wrap: wrap; /* stack buttons on small screens */
+  gap: 0.5rem;
+}
+
+/* Buttons */
+.footer-controls .btn {
+  padding: 0.75rem 2rem;
+  border-radius: 0.5rem;
+  font-weight: bold;
+  font-size: 1.125rem; /* text-lg */
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+/* Save & Next */
+.footer-controls .save-next {
+  background: #92400e; /* yellow-800 */
+}
+.footer-controls .save-next:hover {
+  background: #b45309; /* hover yellow-700 */
+}
+
+/* Submit Test */
+.footer-controls .submit-test {
+  background: #dc2626; /* red-600 */
+}
+.footer-controls .submit-test:hover {
+  background: #b91c1c; /* red-700 */
+}
+
+/* Responsive: stack buttons on small screens */
+@media (max-width: 768px) {
+  .footer-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .footer-controls .btn {
+    width: 100%;
+    text-align: center;
+  }
+}

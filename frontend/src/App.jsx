@@ -14,7 +14,6 @@ import Results from './pages/admin/Results';
 import Analytics from './pages/admin/Analytics';
 import StudentDashboard from './pages/student/StudentDashboard';
 import Exam from './pages/student/Exam';
-import Result from './pages/student/Result';
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import NotFound from './pages/misc/NotFound';
 import Error from './pages/misc/Error';
@@ -44,7 +43,7 @@ function App() {
         <Route path="/student" element={<StudentDashboard />} />
         <Route path="/teacher" element={<TeacherDashboard />} />
         <Route path="/exam/:testId" element={<Exam />} />
-        <Route path="/result" element={<Result />} />
+        {/* <Route path="/result" element={<Result />} /> */}
         <Route path="/error" element={<Error />} />
         <Route path='/profile' element={<ProfilePage />} />
         <Route path="*" element={<NotFound />} />
