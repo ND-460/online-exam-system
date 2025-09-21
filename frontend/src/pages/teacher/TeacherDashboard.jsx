@@ -10,6 +10,7 @@ import "react-toastify/ReactToastify.css";
 import ViewSubmissions from "./ViewSubmissions";
 import Analytics from "./Analytics";
 import ImportQuestionsModal from "./ImportQuestionsModal";
+import ProfilePage from "../ProfilePage";
 
 export default function TeacherDashboard() {
   const [tests, setTests] = useState([]);
@@ -28,64 +29,40 @@ export default function TeacherDashboard() {
   const { logout, token, user } = useAuthStore();
   const [scheduledAt, setScheduledAt] = useState(null);
   const [selectedTest, setSelectedTest] = useState(null);
-
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [errors, setErrors] = useState({});
   const [isImportOpen, setIsImportOpen] = useState(false);
   const navigate = useNavigate();
 
   const validateForm = () => {
     let newErrors = {};
-
-    if (!testTitle.trim()) {
-      newErrors.testTitle = "Test title is required";
-    } else if (testTitle.trim().length < 3) {
+    if (!testTitle.trim()) newErrors.testTitle = "Test title is required";
+    else if (testTitle.trim().length < 3)
       newErrors.testTitle = "Title must be at least 3 characters";
-    }
 
-    if (!testType) {
-      newErrors.testType = "Test type is required";
-    }
-
-    if (!className.trim()) {
-      newErrors.className = "Class name is required";
-    }
-
-    if (!minutes || minutes <= 0) {
-      newErrors.minutes = "Duration must be greater than 0";
-    }
-
-    if (rules.some((rule) => rule.trim() === "")) {
-      newErrors.rules = "Rules cannot contain empty entries";
-    }
-
-    if (testDesc.length > 300) {
-      newErrors.testDesc = "Description cannot exceed 300 characters";
-    }
-
-    if (scheduledAt && scheduledAt < new Date()) {
+    if (!testType) newErrors.testType = "Test type is required";
+    if (!className.trim()) newErrors.className = "Class name is required";
+    if (!minutes || minutes <= 0) newErrors.minutes = "Duration must be > 0";
+    if (rules.some((r) => r.trim() === "")) newErrors.rules = "Rules cannot be empty";
+    if (testDesc.length > 300) newErrors.testDesc = "Description cannot exceed 300 characters";
+    if (scheduledAt && scheduledAt < new Date())
       newErrors.scheduledAt = "Scheduled date cannot be in the past";
-    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // Calculate total marks from questions
   const calculateTotalMarks = (questions) => {
     const total = questions.reduce((total, q) => total + (q.marks || 1), 0);
-    return total > 0 ? total : 1; // Ensure minimum of 1 mark
+    return total > 0 ? total : 1;
   };
 
   useEffect(() => {
-    if (!user) {
-      navigate("/login");
-    } else if (user.role !== "teacher") {
-      if (user.role === "student") {
-        navigate("/student");
-      } else if (user.role === "admin") {
-        navigate("/admin");
-      }
-      toast.error("Unauthorised access");
+    if (!user) navigate("/login");
+    else if (user.role !== "teacher") {
+      if (user.role === "student") navigate("/student");
+      else if (user.role === "admin") navigate("/admin");
+      toast.error("Unauthorized access");
     }
   }, [user, navigate]);
 
@@ -94,17 +71,13 @@ export default function TeacherDashboard() {
       try {
         const res = await axios.get(
           `${import.meta.env.VITE_API_URL}/api/teacher/tests/${user._id}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
+          { headers: { Authorization: `Bearer ${token}` } }
         );
-        console.log(res.data);
         setTests(res.data);
       } catch (err) {
         console.error(err);
       }
     };
-
     fetchTests();
   }, [user._id, token]);
 
@@ -125,19 +98,11 @@ export default function TeacherDashboard() {
   }, [user]);
 
   const handleDeleteTest = async (test) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to delete test "${test.testName}"?`
-      )
-    )
-      return;
-
+    if (!window.confirm(`Are you sure you want to delete "${test.testName}"?`)) return;
     try {
       await axios.delete(
         `${import.meta.env.VITE_API_URL}/api/teacher/delete-test/${test._id}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       toast.success("Test deleted successfully!");
       await refreshTests();
@@ -148,16 +113,12 @@ export default function TeacherDashboard() {
   };
 
   const handleNextQuestions = () => {
-    if (validateForm()) {
-      setShowQuestions(true);
-    } else {
-      Object.values(errors).forEach((msg) => toast.error(msg));
-    }
+    if (validateForm()) setShowQuestions(true);
+    else Object.values(errors).forEach((msg) => toast.error(msg));
   };
 
   const handleAIGenerator = () => setShowAIGenerator(true);
   const handleCancelAI = () => setShowAIGenerator(false);
-
   const handleAIQuestionsGenerated = (aiQuestions) => {
     setQuestions(aiQuestions);
     setShowAIGenerator(false);
@@ -167,8 +128,6 @@ export default function TeacherDashboard() {
   const handleSaveQuestions = async (qs) => {
     setQuestions(qs);
     setShowQuestions(false);
-
-    // Calculate total marks from questions
     const totalMarks = calculateTotalMarks(qs);
     setOutOfMarks(totalMarks);
 
@@ -177,26 +136,11 @@ export default function TeacherDashboard() {
         await axios.put(
           `${import.meta.env.VITE_API_URL}/api/teacher/update-test/${editingTest._id}`,
           { questions: qs },
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
+          { headers: { Authorization: `Bearer ${token}` } }
         );
         toast.success("Test updated successfully!");
         setEditingTest(null);
       } else {
-        if (!testTitle.trim()) {
-          toast.error("Test Title is required");
-          return;
-        }
-        if (!className.trim()) {
-          toast.error("Class Name is required");
-          return;
-        }
-        if (qs.length === 0) {
-          toast.error("At least one question is required");
-          return;
-        }
-
         const payload = {
           teacherId: user._id,
           testName: testTitle,
@@ -209,22 +153,16 @@ export default function TeacherDashboard() {
           scheduledAt,
           questions: qs,
         };
-
-        console.log("Creating test with payload:", payload);
-
         await axios.post(
           `${import.meta.env.VITE_API_URL}/api/teacher/create-test`,
           payload,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
+          { headers: { Authorization: `Bearer ${token}` } }
         );
         toast.success("Test created successfully!");
       }
-
       await refreshTests();
     } catch (err) {
-      console.error("Error saving test:", err);
+      console.error(err);
       toast.error(`Error saving test: ${err.response?.data || err.message}`);
     }
   };
@@ -242,34 +180,57 @@ export default function TeacherDashboard() {
   };
 
   const handleCancelQuestions = () => setShowQuestions(false);
-
   const handleLogout = () => {
     logout();
     navigate("/login");
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#151e2e] to-[#1a2236] p-6 text-white">
-      {/* Top Bar */}
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-4">
-          <h2 className="text-2xl font-bold">Teacher Dashboard</h2>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link to="/profile">
-            <button className="px-4 py-1 bg-[#232f4b] rounded-md text-blue-100 hover:bg-[#2a3957] font-semibold">
-              Profile
-            </button>
-          </Link>
-          <button
-            onClick={handleLogout}
-            className="px-4 py-1 bg-red-600 rounded-md text-white hover:bg-red-700 font-semibold"
-          >
-            Logout
-          </button>
-        </div>
-      </div>
+  <div className="min-h-screen flex bg-gradient-to-r from-blue-50 via-blue-100 to-white text-gray-900">
 
+    {/* Sidebar */}
+    <aside className="w-64 bg-white/90 backdrop-blur-md border-r border-gray-200 shadow-lg p-6 flex flex-col">
+      <h2 className="text-2xl font-bold mb-8 text-yellow-800">Teacher Dashboard</h2>
+      <nav className="flex-1 flex flex-col gap-3">
+        {[
+          { id: "dashboard", label: "Dashboard" },
+          { id: "manage", label: "Manage Tests" },
+          { id: "submissions", label: "Submissions" },
+          { id: "analytics", label: "Analytics" },
+          { id: "profile", label: "Profile" },
+          { id: "invite", label: "Invite Students" },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`w-full text-left px-4 py-2 rounded-xl font-medium transition
+              ${activeTab === tab.id ? "bg-yellow-700 text-white shadow" : "text-gray-700 hover:bg-gray-100"}`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+      <div className="mt-auto flex flex-col gap-2">
+        {/* <Link to="/profile">
+          <button className="w-full bg-yellow-200 hover:bg-yellow-300 px-4 py-2 rounded-md text-yellow-800 font-semibold">
+            Profile
+          </button>
+        </Link> */}
+        <button
+          onClick={handleLogout}
+          className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 px-4 py-2 rounded-md font-semibold text-white"
+        >
+          Logout
+        </button>
+      </div>
+    </aside>
+
+    {/* Main Content */}
+    <main className="flex-1 p-8 overflow-y-auto space-y-8" style={{
+        backgroundImage: `url("/images/back-image-min.jpg")`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}>
       {showAIGenerator ? (
         <AIQuestionGenerator
           onQuestionsGenerated={handleAIQuestionsGenerated}
@@ -283,25 +244,23 @@ export default function TeacherDashboard() {
         />
       ) : (
         <>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left/Main Column */}
-            <div className="lg:col-span-2 flex flex-col gap-6">
+          {activeTab === "dashboard" && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
               {/* Create New Test */}
-              <div className="bg-gradient-to-br from-black via-[#181f2e] to-[#232f4b] rounded-3xl p-10 border-2 border-[#232f4b] shadow-2xl w-full min-h-[260px]">
+              <div className="bg-white p-8 rounded-3xl border border-gray-200 shadow-xl">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-2xl font-bold tracking-tight text-white">
-                    Create New Test
-                  </h3>
+                  <h3 className="text-2xl font-bold text-yellow-900">Create New Test</h3>
                   <div className="flex gap-3">
                     <button
                       onClick={() => setIsImportOpen(true)}
-                      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-medium text-sm"
+                      className="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-md text-white text-sm"
                     >
                       Import CSV/Excel
                     </button>
                     <button
                       onClick={handleAIGenerator}
-                      className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md font-medium text-sm"
+                      className="bg-purple-500 hover:bg-purple-600 px-4 py-2 rounded-md text-white text-sm"
                     >
                       AI Question Generator
                     </button>
@@ -310,13 +269,13 @@ export default function TeacherDashboard() {
 
                 <div className="flex gap-4 mb-4">
                   <input
-                    className="flex-1 bg-[#151e2e] border border-[#232f4b] rounded-md px-4 py-3 text-white text-lg mr-2"
+                    className="flex-1 bg-gray-50 border border-gray-300 rounded-md px-4 py-2 text-gray-900"
                     placeholder="Test Title"
                     value={testTitle}
                     onChange={(e) => setTestTitle(e.target.value)}
                   />
                   <select
-                    className="w-48 bg-[#151e2e] border border-[#232f4b] rounded-md px-4 py-3 text-white text-lg"
+                    className="w-48 bg-gray-50 border border-gray-300 rounded-md px-4 py-2 text-gray-900"
                     value={testType}
                     onChange={(e) => setTestType(e.target.value)}
                   >
@@ -327,61 +286,50 @@ export default function TeacherDashboard() {
                 </div>
 
                 <div className="flex flex-col mb-4">
-                  <label className="text-blue-200 text-sm mb-1">
-                    Schedule Test:
-                  </label>
+                  <label className="text-yellow-700 mb-1">Schedule Test:</label>
                   <DatePicker
                     selected={scheduledAt}
                     onChange={(date) => setScheduledAt(date)}
                     showTimeSelect
                     timeIntervals={15}
                     dateFormat="MMMM d, yyyy h:mm aa"
-                    className="bg-[#151e2e] border border-[#232f4b] rounded-md px-4 py-2 text-white"
-                    calendarClassName="bg-[#151e2e] text-white rounded-md shadow-lg"
+                    className="bg-gray-50 border border-gray-300 rounded-md px-4 py-2 text-gray-900"
+                    calendarClassName="bg-white text-gray-900 rounded-md shadow-lg"
                   />
                 </div>
 
                 <div className="flex gap-4 mb-4">
                   <input
-                    className="flex-1 bg-[#151e2e] border border-[#232f4b] rounded-md px-4 py-3 text-white text-lg"
-                    placeholder="Class Name (e.g., Class 10)"
+                    className="flex-1 bg-gray-50 border border-gray-300 rounded-md px-4 py-2 text-gray-900"
+                    placeholder="Class Name"
                     value={className}
                     onChange={(e) => setClassName(e.target.value)}
                   />
                   <div className="flex flex-col">
-                    <label className="text-blue-200 text-sm mb-1">
-                      Duration (minutes)
-                    </label>
+                    <label className="text-yellow-700 mb-1">Duration (minutes)</label>
                     <input
                       type="number"
                       min={1}
-                      className="w-32 bg-[#151e2e] border border-[#232f4b] rounded-md px-4 py-2 text-white text-lg"
+                      className="w-32 bg-gray-50 border border-gray-300 rounded-md px-4 py-2 text-gray-900"
                       placeholder="30"
                       value={minutes}
                       onChange={(e) => setMinutes(Number(e.target.value))}
                     />
                   </div>
                   <div className="flex flex-col">
-                    <label className="text-blue-200 text-sm mb-1">
-                      Total Marks
-                    </label>
-                    <div className="w-32 bg-[#151e2e] border border-[#232f4b] rounded-md px-3 py-3 text-white text-lg text-center">
+                    <label className="text-yellow-700 mb-1">Total Marks</label>
+                    <div className="w-32 bg-gray-50 border border-gray-300 rounded-md px-3 py-2 text-center">
                       {outOfMarks || "0"}
                     </div>
-                    {outOfMarks === 0 && (
-                      <span className="text-xs text-blue-300 mt-1">
-                        Add questions to see total
-                      </span>
-                    )}
                   </div>
                 </div>
 
                 <div className="mb-4">
-                  <label className="text-blue-200 mb-1 block">Test Rules:</label>
+                  <label className="text-yellow-700 mb-1 block">Test Rules:</label>
                   {rules.map((rule, idx) => (
                     <div key={idx} className="flex gap-2 mb-2">
                       <input
-                        className="flex-1 bg-[#151e2e] border border-[#232f4b] rounded-md px-3 py-2 text-white"
+                        className="flex-1 bg-gray-50 border border-gray-300 rounded-md px-3 py-2 text-gray-900"
                         placeholder={`Rule ${idx + 1}`}
                         value={rule}
                         onChange={(e) => {
@@ -392,7 +340,7 @@ export default function TeacherDashboard() {
                       />
                       {rules.length > 1 && (
                         <button
-                          className="text-red-400 hover:underline"
+                          className="text-red-500 hover:underline"
                           onClick={() => setRules(rules.filter((_, i) => i !== idx))}
                         >
                           Remove
@@ -401,7 +349,7 @@ export default function TeacherDashboard() {
                     </div>
                   ))}
                   <button
-                    className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-md text-sm"
+                    className="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-md text-sm text-white"
                     onClick={() => setRules([...rules, ""])}
                   >
                     Add Rule
@@ -409,112 +357,91 @@ export default function TeacherDashboard() {
                 </div>
 
                 <textarea
-                  className="w-full bg-[#151e2e] border border-[#232f4b] rounded-md px-4 py-3 text-white text-lg mb-4"
+                  className="w-full bg-gray-50 border border-gray-300 rounded-md px-4 py-2 mb-4 text-gray-900"
                   placeholder="Short description"
                   value={testDesc}
                   onChange={(e) => setTestDesc(e.target.value)}
                   rows={3}
                 />
-                <div className="flex gap-4">
-                  <button
-                    onClick={handleNextQuestions}
-                    className="bg-violet-600 hover:bg-violet-700 text-white px-6 py-3 rounded-md font-semibold text-lg"
-                  >
-                    Next: Questions
-                  </button>
-                </div>
-              </div>
-
-              {/* Manage Tests */}
-              <div className="bg-gradient-to-br from-black via-[#181f2e] to-[#232f4b] rounded-3xl p-10 border-2 border-[#232f4b] shadow-2xl w-full min-h-[180px]">
-                <h3 className="text-2xl font-bold mb-4">Manage Tests</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-blue-100 text-lg">
-                    <thead>
-                      <tr className="border-b border-[#232f4b]">
-                        <th className="py-3 font-semibold">Title</th>
-                        <th className="py-3 font-semibold">Type</th>
-                        <th className="py-3 font-semibold">Class</th>
-                        <th className="py-3 font-semibold " colSpan={2}>
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {tests.length > 0 ? (
-                        tests.map((t) => (
-                          <tr key={t._id}>
-                            <td>{t.testName}</td>
-                            <td>{t.category}</td>
-                            <td>{t.className}</td>
-                            <td>
-                              <button onClick={() => handleEditTest(t)}>Edit</button>
-                            </td>
-                            <td>
-                              <button onClick={() => handleDeleteTest(t)}>Delete</button>
-                            </td>
-                            <td>
-                              <button
-                                onClick={() => setSelectedTest(t._id)}
-                                className="text-blue-400 underline"
-                              >
-                                View
-                              </button>
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={4}>No tests found</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* View Submissions */}
-              <div className="bg-gradient-to-br from-black via-[#181f2e] to-[#232f4b] rounded-2xl p-6 border border-[#232f4b] shadow-xl w-full">
-                <h3 className="font-bold mb-2">View Submissions</h3>
-                <p className="text-blue-200 text-xs mb-2">
-                  Filter by test or student, see code output and score.
-                </p>
-                {selectedTest ? (
-                  <ViewSubmissions testId={selectedTest} token={token} />
-                ) : (
-                  <div className="h-24 flex items-center justify-center text-blue-300 text-xs">
-                    Select a test from "Manage Tests" to view submissions.
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Right Sidebar */}
-            <div className="flex flex-col gap-6">
-              {/* Analytics */}
-              <div className="bg-gradient-to-br from-black via-[#181f2e] to-[#232f4b] rounded-2xl p-6 border border-[#232f4b] shadow-xl w-full">
-                <h3 className="font-bold mb-2">Analytics (Snapshot)</h3>
-                {selectedTest ? (
-                  <Analytics testId={selectedTest} token={token} />
-                ) : (
-                  <div className="h-32 flex items-center justify-center text-blue-300 text-xs">
-                    Select a test to view analytics.
-                  </div>
-                )}
-              </div>
-
-              {/* Invite Students */}
-              <div className="bg-gradient-to-br from-black via-[#181f2e] to-[#232f4b] rounded-2xl p-6 border border-[#232f4b] shadow-xl w-full">
-                <h3 className="font-bold mb-2">Invite Students</h3>
-                <p className="text-blue-200 text-xs mb-3">
-                  Send email invites or generate enroll links.
-                </p>
-                <button className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md font-semibold">
-                  Generate Link
+                <button
+                  onClick={handleNextQuestions}
+                  className="bg-yellow-600 hover:bg-yellow-700 px-6 py-3 rounded-md font-semibold text-white"
+                >
+                  Next: Questions
                 </button>
               </div>
             </div>
+          )}
+
+          {activeTab === "manage" && (
+            <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-xl">
+              <h3 className="text-2xl font-bold mb-4 text-yellow-900">Manage Tests</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-gray-900">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="py-2">Title</th>
+                      <th className="py-2">Type</th>
+                      <th className="py-2">Class</th>
+                      <th className="py-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tests.length ? (
+                      tests.map((t) => (
+                        <tr key={t._id} className="hover:bg-gray-50">
+                          <td>{t.testName}</td>
+                          <td>{t.category}</td>
+                          <td>{t.className}</td>
+                          <td className="flex gap-2">
+                            <button className="text-blue-600 hover:underline" onClick={() => handleEditTest(t)}>Edit</button>
+                            <button className="text-red-600 hover:underline" onClick={() => handleDeleteTest(t)}>Delete</button>
+                            <button className="text-green-600 hover:underline" onClick={() => setSelectedTest(t._id)}>View</button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="text-center py-4 text-gray-500">No tests found</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "submissions" && selectedTest && (
+            <ViewSubmissions testId={selectedTest} token={token} />
+          )}
+
+          {activeTab === "analytics" && selectedTest && (
+            <Analytics testId={selectedTest} token={token} />
+          )}
+
+          {activeTab === "profile" && (
+          // <div className="p-6 rounded-3xl bg-white shadow-xl border border-gray-200">
+          //   <h3 className="text-xl font-bold mb-4 text-gray-800">My Profile</h3>
+          //   <Link to="/profile" className="text-blue-600 font-semibold hover:underline">
+          //     Go to Profile Page
+          //   </Link>
+          // </div>
+          <div className="flex-1">
+            <ProfilePage />
           </div>
+        )}
+
+          {activeTab === "invite" && (
+            <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-xl w-full">
+              <h3 className="font-bold mb-2 text-yellow-900">Invite Students</h3>
+              <p className="text-yellow-700 text-sm mb-3">
+                Send email invites or generate enrollment links.
+              </p>
+              <button className="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-md font-semibold text-white">
+                Generate Link
+              </button>
+            </div>
+          )}
         </>
       )}
 
@@ -537,6 +464,8 @@ export default function TeacherDashboard() {
           setIsImportOpen(false);
         }}
       />
-    </div>
-  );
+    </main>
+  </div>
+);
+
 }
