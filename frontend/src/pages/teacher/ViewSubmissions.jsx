@@ -49,26 +49,35 @@ const ViewSubmissions = ({ testId, token }) => {
   }
 
   return (
+  <div className="bg-white dark:bg-[#1f2937] rounded-3xl p-6 shadow-xl border border-gray-200 dark:border-gray-700 w-full transition duration-300 hover:scale-[1.01]">
+    {/* Title */}
+    <h3 className="text-xl font-bold mb-2 text-yellow-800 dark:text-white">
+      Submissions
+    </h3>
+    <p className="text-yellow-900 dark:text-gray-300 text-sm mb-4">
+      List of students who submitted the test
+    </p>
+
+    {/* Table */}
     <div className="overflow-x-auto">
-      <table className="min-w-full text-sm text-blue-200">
+      <table className="min-w-full text-sm text-blue-100 dark:text-blue-200">
         <thead>
-          <tr className="border-b border-[#232f4b]">
-            <th className="text-left p-2">Student</th>
-            <th className="text-left p-2">Score</th>
-            <th className="text-left p-2">Submitted At</th>
+          <tr className="border-b border-gray-300 dark:border-gray-600">
+            <th className="text-left p-3 text-yellow-800">Student</th>
+            <th className="text-left p-3 text-yellow-800">Score</th>
+            <th className="text-left p-3 text-yellow-800">Submitted At</th>
           </tr>
         </thead>
         <tbody>
           {submissions.map((sub, idx) => (
-            <tr key={idx} className="border-b border-[#232f4b]">
-              <td className="p-2">
+            <tr key={idx} className="border-b border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-[#2a3350] transition">
+              <td className="p-3 text-yellow-800">
                 {sub.studentId?.profileInfo
                   ? `${sub.studentId.profileInfo.firstName} ${sub.studentId.profileInfo.lastName}`
                   : "Unknown"}
               </td>
-
-              <td className="p-2">{sub.score ?? "-"}</td>
-              <td className="p-2">
+              <td className="p-3 text-yellow-800">{sub.score ?? "-"}</td>
+              <td className="p-3 text-yellow-800">
                 {sub.attemptedAt
                   ? new Date(sub.attemptedAt).toLocaleString()
                   : "-"}
@@ -78,7 +87,9 @@ const ViewSubmissions = ({ testId, token }) => {
         </tbody>
       </table>
     </div>
-  );
+  </div>
+);
+
 };
 
 export default ViewSubmissions;
