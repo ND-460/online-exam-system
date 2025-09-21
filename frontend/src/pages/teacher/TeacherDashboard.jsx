@@ -457,13 +457,27 @@ export default function TeacherDashboard() {
               </div>
             )}
 
-            {activeTab === "submissions" && selectedTest && (
-              <ViewSubmissions testId={selectedTest} token={token} />
-            )}
+            {activeTab === "submissions" &&
+              (selectedTest ? (
+                <ViewSubmissions testId={selectedTest} token={token} />
+              ) : (
+                <div className="bg-white dark:bg-[#1f2937] p-6 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200">
+                  <p className="text-center">
+                    Select a test from "Manage Tests" to view submissions.
+                  </p>
+                </div>
+              ))}
 
-            {activeTab === "analytics" && selectedTest && (
-              <Analytics testId={selectedTest} token={token} />
-            )}
+            {activeTab === "analytics" &&
+              (selectedTest ? (
+                <Analytics testId={selectedTest} token={token} />
+              ) : (
+                <div className="bg-white dark:bg-[#1f2937] p-6 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200">
+                  <p className="text-center">
+                    Select a test from "Manage Tests" to view analytics.
+                  </p>
+                </div>
+              ))}
 
             {activeTab === "profile" && (
               // <div className="p-6 rounded-3xl bg-white shadow-xl border border-gray-200">
