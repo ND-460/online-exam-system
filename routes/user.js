@@ -15,7 +15,7 @@ const passport = require("passport");
 require("dotenv").config();
 
 const { OAuth2Client } = require("google-auth-library");
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const client = process.env.GOOGLE_CLIENT_ID ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID) : null;
 
 //transporter for nodemailer
 var transporter = nodemailer.createTransport(

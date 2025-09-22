@@ -39,7 +39,18 @@ app.use(passport.initialize());
 // app.use(passport.session());
 
 //listening to the server
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`Server is running on ${process.env.BASE_URL}`);
+const PORT = process.env.PORT || 5000;
+const server = app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`Port ${PORT} is in use. Trying port ${PORT + 1}...`);
+    app.listen(PORT + 1, () => {
+      console.log(`Server running on port ${PORT + 1}`);
+    });
+  } else {
+    throw err;
+  }
 });

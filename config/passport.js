@@ -8,16 +8,20 @@ const Teacher = require("../model/Teacher");
 const Student = require("../model/Student");
 require("dotenv").config();
 
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+// Check if Google OAuth credentials are available
+const hasGoogleCredentials = process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_SECRET_ID;
 
-passport.use(
-  new GoogleStrategy(
-    {
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_SECRET_ID,
-      callbackURL: `${process.env.BASE_URL}/api/user/oauth2/redirect/google`,
-      passReqToCallback: true,
-    },
+const googleClient = hasGoogleCredentials ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID) : null;
+
+if (hasGoogleCredentials) {
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_SECRET_ID,
+        callbackURL: `${process.env.BASE_URL}/api/user/oauth2/redirect/google`,
+        passReqToCallback: true,
+      },
     async (req, accessToken, refreshToken, profile, done) => {
       try {
         console.log("Google Profile received:", profile);
@@ -58,7 +62,11 @@ passport.use(
       }
     }
   )
-);
+  );
+} else {
+  console.warn("⚠️  Google OAuth credentials not found. Google authentication will be disabled.");
+  console.warn("   To enable Google OAuth, set GOOGLE_CLIENT_ID and GOOGLE_SECRET_ID in your .env file");
+}
 
 passport.serializeUser((user, done) => {
   done(null, user.id);
