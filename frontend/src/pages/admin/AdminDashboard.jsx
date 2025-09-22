@@ -9,26 +9,7 @@ import { toast } from "react-toastify";
 import axios from "axios";
 import notificationService from "../../utils/notificationService";
 // Dynamic notifications will be managed in state
-const quickStats = [
-  { label: "Total Users", value: 0, icon: <Users className="w-6 h-6" />, change: "+0%", color: "from-blue-500 to-blue-700", key: "totalUsers" },
-  { label: "Active Users", value: 0, icon: <CheckCircle className="w-6 h-6" />, change: "+0%", color: "from-green-500 to-green-700", key: "activeUsers" },
-  { label: "Pending Users", value: 0, icon: <Clock className="w-6 h-6" />, change: "+0%", color: "from-orange-500 to-orange-700", key: "pendingUsers" },
-  { label: "Blocked Users", value: 0, icon: <XCircle className="w-6 h-6" />, change: "+0%", color: "from-red-500 to-red-700", key: "blockedUsers" },
-];
-const announcements = [
-  { id: 1, text: "System maintenance on Aug 15th." },
-  { id: 2, text: "New coding test format released!" },
-];
-const feedbacks = [
-  { id: 1, tag: "Bug Report", msg: "Timer not working on mobile." },
-  { id: 2, tag: "Feature Request", msg: "Add dark mode for students." },
-  { id: 3, tag: "Bug Report", msg: "Profile picture upload fails." },
-];
-const activities = [
-  { id: 1, text: "John created a test.", icon: <FileText className="w-4 h-4" /> },
-  { id: 2, text: "Mary submitted feedback.", icon: <MessageCircle className="w-4 h-4" /> },
-  { id: 3, text: "Alice upgraded subscription.", icon: <CreditCard className="w-4 h-4" /> },
-];
+// Removed dummy data - now using real data from backend
 
 export default function AdminDashboard() {
   const [theme, setTheme] = useState("light");
@@ -186,17 +167,7 @@ export default function AdminDashboard() {
     // Initialize notifications
     setNotifications(notificationService.getNotifications());
 
-    // Add some sample notifications for demo purposes
-    if (notificationService.getNotifications().length === 0) {
-      notificationService.addNotification(
-        "Welcome to the Admin Panel! You can now manage users and view system statistics.",
-        'info'
-      );
-      notificationService.addNotification(
-        "System is running smoothly. All services are operational.",
-        'success'
-      );
-    }
+    // Initialize with empty notifications - real notifications will come from backend
 
     return unsubscribe;
   }, []);
@@ -378,20 +349,16 @@ export default function AdminDashboard() {
               >
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Active / Upcoming Tests</h3>
                 <div className="space-y-3">
-                  <div className="bg-orange-600 text-white rounded-lg p-4 flex justify-between items-center">
-                    <div>
-                      <h4 className="font-semibold">Dhyey</h4>
-                      <p className="text-sm opacity-90">MCQ</p>
+                  {loading ? (
+                    <div className="text-center py-4">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto text-orange-500" />
+                      <p className="text-sm text-gray-500 mt-2">Loading tests...</p>
                     </div>
-                    <span className="text-sm opacity-90">upcoming</span>
-                  </div>
-                  <div className="bg-gray-100 rounded-lg p-4 flex justify-between items-center">
-                    <div>
-                      <h4 className="font-semibold text-gray-800">Sample Test 2</h4>
-                      <p className="text-sm text-gray-600">Programming</p>
+                  ) : (
+                    <div className="text-center py-4">
+                      <p className="text-gray-500">No active tests found</p>
                     </div>
-                    <span className="text-sm text-gray-600">scheduled</span>
-                  </div>
+                  )}
                 </div>
               </motion.div>
 
@@ -686,57 +653,37 @@ export default function AdminDashboard() {
                   
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="font-semibold text-gray-800">Phone:</span>
-                    <span className="text-gray-700">{user?.phone || "987654321"}</span>
+                    <span className="text-gray-700">{user?.phone || "—"}</span>
                   </div>
                   
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="font-semibold text-gray-800">Section:</span>
-                    <span className="text-gray-700">{user?.section || "A"}</span>
+                    <span className="text-gray-700">{user?.section || "—"}</span>
                   </div>
                   
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="font-semibold text-gray-800">Class:</span>
-                    <span className="text-gray-700">{user?.class || "10"}</span>
+                    <span className="text-gray-700">{user?.className || "—"}</span>
                   </div>
                   
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="font-semibold text-gray-800">DOB:</span>
-                    <span className="text-gray-700">{user?.dob || "7/17/2001"}</span>
+                    <span className="text-gray-700">{user?.dateOfBirth ? new Date(user.dateOfBirth).toLocaleDateString() : "—"}</span>
                   </div>
                   
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="font-semibold text-gray-800">Gender:</span>
-                    <span className="text-gray-700">{user?.gender || "Male"}</span>
+                    <span className="text-gray-700">{user?.gender || "—"}</span>
                   </div>
                   
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="font-semibold text-gray-800">Organisation:</span>
-                    <span className="text-gray-700">{user?.organisation || "N/A, N/A"}</span>
+                    <span className="text-gray-700">{user?.organisation?.name || "—"}, {user?.organisation?.address || "—"}</span>
                   </div>
                   
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="font-semibold text-gray-800">Role:</span>
                     <span className="text-gray-700">{user?.role || "admin"}</span>
-                  </div>
-                  
-                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="font-semibold text-gray-800">Roll Number:</span>
-                    <span className="text-gray-700">{user?.rollNumber || "13"}</span>
-                  </div>
-                  
-                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="font-semibold text-gray-800">Grade Level:</span>
-                    <span className="text-gray-700">{user?.gradeLevel || "N/A"}</span>
-                  </div>
-                  
-                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="font-semibold text-gray-800">Department:</span>
-                    <span className="text-gray-700">{user?.department || "CP"}</span>
-                  </div>
-                  
-                  <div className="flex justify-between items-center py-2">
-                    <span className="font-semibold text-gray-800">Guardian:</span>
-                    <span className="text-gray-700">{user?.guardian || "Ramesh Pal (9998823213)"}</span>
                   </div>
                 </div>
 
