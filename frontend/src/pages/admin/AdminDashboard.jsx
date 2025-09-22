@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
-  Bell, Sun, Moon, User, Users, FileText, TrendingUp, Clock, CheckCircle, XCircle, Trash2, BarChart3, Mail, CreditCard, Plus, MessageCircle, Activity, Loader2, RefreshCw,
+  Bell, Sun, Moon, User, Users, FileText, TrendingUp, Clock, CheckCircle, XCircle, Trash2, BarChart3, Mail, CreditCard, Plus, MessageCircle, Activity, Loader2, RefreshCw, Home, Settings, LogOut, Search, Filter, Calendar, ArrowUpDown, Edit,
 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom"
 import { useAuthStore } from "../../store/authStore";
@@ -31,7 +31,7 @@ const activities = [
 ];
 
 export default function AdminDashboard() {
-  const [theme, setTheme] = useState("dark");
+  const [theme, setTheme] = useState("light");
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [showAnnounceModal, setShowAnnounceModal] = useState(false);
@@ -41,6 +41,12 @@ export default function AdminDashboard() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState({});
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All Status");
+  const [categoryFilter, setCategoryFilter] = useState("All Categories");
+  const [dateFilter, setDateFilter] = useState("Date");
+  const [sortOrder, setSortOrder] = useState("Ascending");
   const { logout, user, token } = useAuthStore()
   const navigate = useNavigate()
   const handleLogout = () => {
@@ -195,308 +201,557 @@ export default function AdminDashboard() {
     return unsubscribe;
   }, []);
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#151e2e] to-[#1a2236] relative overflow-x-hidden">
-      {/* Top Nav */}
-      <nav className="flex items-center justify-between px-6 py-4 backdrop-blur-lg bg-white/10 border-b border-white/10 sticky top-0 z-20">
-        <div className="flex items-center gap-3">
-          <span className="font-extrabold text-2xl text-white tracking-tight">ExamVolt <span className="text-blue-400">Admin Panel</span></span>
-        </div>
-        <div className="flex items-center gap-4">
-          {/* Notifications */}
-          <div className="relative">
-            <button onClick={() => setNotifOpen((o) => !o)} className="relative p-2 rounded-full hover:bg-white/20 transition">
-              <Bell className="w-6 h-6 text-blue-300" />
-              <span className="absolute -top-1 -right-1 bg-red-500 text-xs text-white rounded-full px-1">
-                {notificationService.getUnreadCount()}
-              </span>
-            </button>
-            {notifOpen && (
-              <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute right-0 mt-2 w-80 bg-[#181f2e] rounded-xl shadow-xl border border-[#232f4b] z-30 max-h-96 overflow-y-auto">
-                <div className="p-3 text-blue-100 font-semibold border-b border-[#232f4b] flex justify-between items-center">
-                  <span>Notifications</span>
-                  <button
-                    onClick={() => notificationService.clearAll()}
-                    className="text-xs text-blue-300 hover:text-blue-100"
-                  >
-                    Clear All
-                  </button>
-                </div>
-                <ul>
-                  {notifications.length === 0 ? (
-                    <li className="px-4 py-4 text-sm text-blue-300 text-center">No notifications</li>
-                  ) : (
-                    notifications.map((n) => (
-                      <li
-                        key={n.id}
-                        className={`px-4 py-3 text-sm border-b border-[#232f4b] last:border-b-0 hover:bg-white/5 cursor-pointer ${n.read ? 'text-blue-300' : 'text-blue-100 bg-blue-500/10'
-                          }`}
-                        onClick={() => notificationService.markAsRead(n.id)}
-                      >
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-start gap-2">
-                            <div className={`w-2 h-2 rounded-full mt-2 ${n.type === 'success' ? 'bg-green-400' :
-                                n.type === 'warning' ? 'bg-yellow-400' :
-                                  n.type === 'error' ? 'bg-red-400' :
-                                    'bg-blue-400'
-                              }`} />
-                            <span>{n.message}</span>
-                          </div>
-                          <span className="text-xs text-blue-400 ml-2">
-                            {n.timestamp ? new Date(n.timestamp).toLocaleTimeString() : ''}
-                          </span>
-                        </div>
-                      </li>
-                    ))
-                  )}
-                </ul>
-              </motion.div>
-            )}
+    <div className="min-h-screen bg-gray-50 relative overflow-x-hidden">
+      {/* Left Sidebar */}
+      <div className="fixed left-0 top-0 w-64 h-full bg-white shadow-lg z-30">
+        <div className="p-6">
+          {/* Logo */}
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold text-gray-800">ExamVolt</h1>
           </div>
-          {/* Theme Toggle */}
-          <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="p-2 rounded-full hover:bg-white/20 transition">
-            {theme === "dark" ? <Sun className="w-6 h-6 text-yellow-300" /> : <Moon className="w-6 h-6 text-blue-400" />}
-          </button>
-          {/* Profile Dropdown */}
-          <div className="relative">
-            <button onClick={() => setProfileOpen((o) => !o)} className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center border-2 border-blue-300">
-              <User className="w-5 h-5 text-white" />
-            </button>
-            {profileOpen && (
-              <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute right-0 mt-2 w-40 bg-[#181f2e] rounded-xl shadow-xl border border-[#232f4b] z-30">
-                <div className="p-4 text-blue-100 font-semibold">Admin</div>
-                <Link to='/profile'>
-                  <button className="w-full text-left px-4 py-2 text-blue-200 hover:bg-[#232f4b]">Profile</button>
-                </Link>
-                <button className="w-full text-left px-4 py-2 text-blue-200 hover:bg-[#232f4b]" onClick={handleLogout}>Logout</button>
-              </motion.div>
-            )}
-          </div>
-        </div>
-      </nav>
-
-      {/* Animated BG Elements */}
-      <motion.div animate={{ x: [0, 40, 0] }} transition={{ repeat: Infinity, duration: 10 }} className="absolute top-10 left-10 w-32 h-32 bg-gradient-to-br from-blue-500/30 to-violet-500/20 rounded-full blur-2xl z-0" />
-      <motion.div animate={{ y: [0, 30, 0] }} transition={{ repeat: Infinity, duration: 12 }} className="absolute bottom-10 right-10 w-40 h-40 bg-gradient-to-br from-green-400/20 to-blue-400/10 rounded-full blur-2xl z-0" />
-
-      {/* Main Content */}
-      <div className="relative z-10 px-4 py-8 max-w-7xl mx-auto">
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {quickStats.map((stat, i) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-              className={`backdrop-blur-lg bg-white/10 border-l-4 border-blue-400/40 rounded-2xl p-6 flex items-center gap-4 shadow-xl relative overflow-hidden`}
+          
+          {/* Navigation */}
+          <nav className="space-y-2">
+            <button
+              onClick={() => setActiveTab("dashboard")}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                activeTab === "dashboard" 
+                  ? "bg-orange-600 text-white" 
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
             >
-              <div className={`p-3 rounded-xl bg-gradient-to-br ${stat.color} text-white shadow-lg animate-pulse`}>
-                {stat.icon}
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-white">
-                  {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : (stats[stat.key] || 0)}
-                </div>
-                <div className="text-blue-200 text-xs font-semibold">{stat.label}</div>
-                <div className="text-green-400 text-xs font-bold mt-1">{stat.change}</div>
-              </div>
-            </motion.div>
-          ))}
+              <Home className="w-5 h-5" />
+              Dashboard
+            </button>
+            <button
+              onClick={() => setActiveTab("users")}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                activeTab === "users" 
+                  ? "bg-orange-600 text-white" 
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              <Users className="w-5 h-5" />
+              Users
+            </button>
+            <button
+              onClick={() => setActiveTab("questions")}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                activeTab === "questions" 
+                  ? "bg-orange-600 text-white" 
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              <FileText className="w-5 h-5" />
+              Questions
+            </button>
+            <button
+              onClick={() => setActiveTab("results")}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                activeTab === "results" 
+                  ? "bg-orange-600 text-white" 
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              <BarChart3 className="w-5 h-5" />
+              Results
+            </button>
+            <button
+              onClick={() => setActiveTab("analytics")}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                activeTab === "analytics" 
+                  ? "bg-orange-600 text-white" 
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              <TrendingUp className="w-5 h-5" />
+              Analytics
+            </button>
+            <button
+              onClick={() => setActiveTab("profile")}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                activeTab === "profile" 
+                  ? "bg-orange-600 text-white" 
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              <User className="w-5 h-5" />
+              Profile
+            </button>
+          </nav>
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Panels */}
-          <div className="lg:col-span-2 flex flex-col gap-6">
-            {/* User Management Table */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-              className="backdrop-blur-lg bg-white/10 rounded-2xl p-6 border border-blue-400/20 shadow-xl">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-lg text-white flex items-center gap-2">
-                  <Users className="w-5 h-5" /> Manage Users
-                </h3>
-                <button
-                  onClick={refreshData}
-                  disabled={loading}
-                  className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white px-3 py-1 rounded text-sm transition"
-                >
-                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                  Refresh
-                </button>
-              </div>
-
-              {loading ? (
-                <div className="flex justify-center items-center py-8">
-                  <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-blue-100 text-sm">
-                    <thead>
-                      <tr className="border-b border-[#232f4b]">
-                        <th className="py-2 font-semibold">Name</th>
-                        <th className="py-2 font-semibold">Email</th>
-                        <th className="py-2 font-semibold">Role</th>
-                        <th className="py-2 font-semibold">Status</th>
-                        <th className="py-2 font-semibold">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {users.map((u, idx) => (
-                        <tr key={u._id} className="border-b border-[#232f4b] hover:bg-white/5">
-                          <td className="py-3 flex items-center gap-2">
-                            <User className="w-4 h-4 text-blue-300" />
-                            {u.firstName} {u.lastName}
-                          </td>
-                          <td className="py-3">{u.email}</td>
-                          <td className="py-3 capitalize">{u.role}</td>
-                          <td className={`py-3 font-semibold capitalize ${u.status === "active" ? "text-green-400" :
-                              u.status === "blocked" ? "text-red-400" :
-                                "text-yellow-300"
-                            }`}>
-                            {u.status}
-                          </td>
-                          <td className="py-3">
-                            <div className="flex gap-2">
-                              {u.status !== 'active' && (
-                                <button
-                                  onClick={() => updateUserStatus(u._id, 'active')}
-                                  disabled={actionLoading[u._id]}
-                                  className="bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white px-2 py-1 rounded text-xs flex items-center gap-1 transition"
-                                >
-                                  {actionLoading[u._id] ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
-                                  Approve
-                                </button>
-                              )}
-                              {u.status !== 'blocked' && (
-                                <button
-                                  onClick={() => updateUserStatus(u._id, 'blocked')}
-                                  disabled={actionLoading[u._id]}
-                                  className="bg-yellow-500 hover:bg-yellow-600 disabled:bg-yellow-300 text-white px-2 py-1 rounded text-xs flex items-center gap-1 transition"
-                                >
-                                  {actionLoading[u._id] ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
-                                  Block
-                                </button>
-                              )}
-                              {u.status === 'blocked' && (
-                                <button
-                                  onClick={() => updateUserStatus(u._id, 'active')}
-                                  disabled={actionLoading[u._id]}
-                                  className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white px-2 py-1 rounded text-xs flex items-center gap-1 transition"
-                                >
-                                  {actionLoading[u._id] ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
-                                  Unblock
-                                </button>
-                              )}
-                              <button
-                                onClick={() => deleteUser(u._id)}
-                                disabled={actionLoading[u._id] || u._id === user._id}
-                                className="bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white px-2 py-1 rounded text-xs flex items-center gap-1 transition"
-                              >
-                                {actionLoading[u._id] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-                                Delete
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-
-                  {users.length === 0 && (
-                    <div className="text-center py-8 text-blue-300">
-                      No users found
-                    </div>
-                  )}
-                </div>
-              )}
-            </motion.div>
-
-            {/* Platform Analytics */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-              className="backdrop-blur-lg bg-white/10 rounded-2xl p-6 border border-blue-400/20 shadow-xl">
-              <h3 className="font-bold text-lg mb-2 text-white flex items-center gap-2"><BarChart3 className="w-5 h-5" /> Platform Analytics</h3>
-              <div className="h-32 flex items-center justify-center text-blue-300 text-xs">[User Growth, Test Activity, Revenue Trends Charts]</div>
-            </motion.div>
-
-            {/* Announcements */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-              className="backdrop-blur-lg bg-white/10 rounded-2xl p-6 border border-blue-400/20 shadow-xl">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="font-bold text-lg text-white flex items-center gap-2"><Mail className="w-5 h-5" /> Announcements</h3>
-                <button onClick={() => setShowAnnounceModal(true)} className="flex items-center gap-1 bg-gradient-to-br from-violet-500 to-blue-500 hover:from-violet-600 hover:to-blue-600 text-white px-4 py-2 rounded-md font-semibold transition"><Plus className="w-4 h-4" /> Add New</button>
-              </div>
-              <ul className="space-y-2">
-                {announcements.map((a) => (
-                  <li key={a.id} className="bg-white/10 border border-blue-400/10 rounded px-4 py-2 text-blue-100">{a.text}</li>
-                ))}
-              </ul>
-            </motion.div>
-          </div>
-
-          {/* Right Sidebar */}
-          <div className="flex flex-col gap-6">
-            {/* Feedback Inbox */}
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}
-              className="backdrop-blur-lg bg-white/10 rounded-2xl p-6 border border-blue-400/20 shadow-xl max-h-56 overflow-y-auto">
-              <h3 className="font-bold text-lg mb-2 text-white flex items-center gap-2"><MessageCircle className="w-5 h-5" /> Feedback Inbox</h3>
-              <ul className="space-y-2">
-                {feedbacks.map((f) => (
-                  <li key={f.id} className="flex items-center gap-2 bg-white/10 border border-blue-400/10 rounded px-3 py-2 text-blue-100">
-                    <span className={`px-2 py-1 rounded text-xs font-bold ${f.tag === "Bug Report" ? "bg-red-500/30 text-red-300" : "bg-green-500/30 text-green-300"}`}>{f.tag}</span>
-                    <span>{f.msg}</span>
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
-
-            {/* Subscription Management */}
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }}
-              className="backdrop-blur-lg bg-white/10 rounded-2xl p-6 border border-blue-400/20 shadow-xl">
-              <h3 className="font-bold text-lg mb-2 text-white flex items-center gap-2"><CreditCard className="w-5 h-5" /> Subscription Management</h3>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-blue-200 text-sm">Current Plan: <span className="font-bold text-white">Pro</span></span>
-                <button className="bg-gradient-to-br from-blue-500 to-violet-500 hover:from-blue-600 hover:to-violet-600 text-white px-4 py-2 rounded-md font-semibold transition">Manage Plans</button>
-              </div>
-              <p className="text-blue-200 text-xs">Renewal: 2025-12-31</p>
-            </motion.div>
-
-            {/* Recent Activity Timeline */}
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }}
-              className="backdrop-blur-lg bg-white/10 rounded-2xl p-6 border border-blue-400/20 shadow-xl">
-              <h3 className="font-bold text-lg mb-2 text-white flex items-center gap-2"><Activity className="w-5 h-5" /> Recent Activity</h3>
-              <ul className="space-y-2">
-                {activities.map((a) => (
-                  <li key={a.id} className="flex items-center gap-2 text-blue-100">
-                    <span>{a.icon}</span>
-                    <span>{a.text}</span>
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
-          </div>
+        
+        {/* Logout Button */}
+        <div className="absolute bottom-6 left-6 right-6">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-white bg-red-500 hover:bg-red-600 transition-colors"
+          >
+            <LogOut className="w-5 h-5" />
+            Logout
+          </button>
         </div>
       </div>
 
-      {/* Announcement Modal */}
-      {showAnnounceModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-[#181f2e] rounded-2xl p-8 w-full max-w-md shadow-2xl border border-blue-400/30">
-            <h3 className="font-bold text-lg mb-4 text-white flex items-center gap-2"><Mail className="w-5 h-5" /> New Announcement</h3>
-            <textarea
-              className="w-full bg-[#151e2e] border border-[#232f4b] rounded-md px-3 py-2 text-white mb-4"
-              placeholder="Enter announcement..."
-              value={announceText}
-              onChange={e => setAnnounceText(e.target.value)}
-              rows={3}
-            />
-            <div className="flex gap-3 justify-end">
-              <button onClick={() => setShowAnnounceModal(false)} className="bg-transparent border border-blue-200 text-blue-200 px-4 py-2 rounded-md font-semibold">Cancel</button>
-              <button onClick={() => { setShowAnnounceModal(false); setAnnounceText(""); }} className="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-md font-semibold">Add</button>
-            </div>
-          </motion.div>
+      {/* Main Content */}
+      <div className="ml-64 min-h-screen">
+        {/* Background Image */}
+        <div className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-10" 
+             style={{ backgroundImage: "url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwMCIgaGVpZ2h0PSI4MDAiIHZpZXdCb3g9IjAgMCAxMjAwIDgwMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjEyMDAiIGhlaWdodD0iODAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxyZWN0IHg9IjUwMCIgeT0iMzAwIiB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEyMCIgcng9IjEwIiBmaWxsPSIjRTVFN0VCIi8+CjxyZWN0IHg9IjU1MCIgeT0iMzUwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjIwIiByeD0iMTAiIGZpbGw9IiNEMUQ1REIiLz4KPHJlY3QgeD0iNTUwIiB5PSIzODAiIHdpZHRoPSI4MCIgaGVpZ2h0PSIyMCIgcng9IjEwIiBmaWxsPSIjRDFENURCIi8+CjxyZWN0IHg9IjU1MCIgeT0iNDEwIiB3aWR0aD0iNjAiIGhlaWdodD0iMjAiIHJ4PSIxMCIgZmlsbD0iI0QxRDVEQiIvPgo8L3N2Zz4K')" }}>
         </div>
-      )}
+
+        {/* Content Area */}
+        <div className="relative z-10 p-8">
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">
+              {activeTab === "dashboard" && "Dashboard"}
+              {activeTab === "users" && "User Management"}
+              {activeTab === "questions" && "Question Management"}
+              {activeTab === "results" && "Results & Reports"}
+              {activeTab === "analytics" && "Analytics"}
+              {activeTab === "settings" && "Settings"}
+            </h1>
+            <p className="text-gray-600">
+              {activeTab === "dashboard" && "Overview of your examination system"}
+              {activeTab === "users" && "Manage users, roles, and permissions"}
+              {activeTab === "questions" && "Create and manage examination questions"}
+              {activeTab === "results" && "View and analyze examination results"}
+              {activeTab === "analytics" && "System performance and insights"}
+              {activeTab === "settings" && "Configure system settings"}
+            </p>
+          </div>
+
+          {/* Dashboard Content */}
+          {activeTab === "dashboard" && (
+            <div className="space-y-8">
+              {/* My Exams Section */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-blue-100 rounded-xl p-6 shadow-lg"
+                >
+                  <div className="text-center">
+                    <h3 className="text-lg font-semibold text-blue-800 mb-2">Upcoming</h3>
+                    <div className="text-4xl font-bold text-blue-900">
+                      {loading ? <Loader2 className="w-8 h-8 animate-spin mx-auto" /> : (stats.upcomingTests || 1)}
+                    </div>
+                  </div>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="bg-green-100 rounded-xl p-6 shadow-lg"
+                >
+                  <div className="text-center">
+                    <h3 className="text-lg font-semibold text-green-800 mb-2">Ongoing</h3>
+                    <div className="text-4xl font-bold text-green-900">
+                      {loading ? <Loader2 className="w-8 h-8 animate-spin mx-auto" /> : (stats.ongoingTests || 0)}
+                    </div>
+                  </div>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="bg-purple-100 rounded-xl p-6 shadow-lg"
+                >
+                  <div className="text-center">
+                    <h3 className="text-lg font-semibold text-purple-800 mb-2">Completed</h3>
+                    <div className="text-4xl font-bold text-purple-900">
+                      {loading ? <Loader2 className="w-8 h-8 animate-spin mx-auto" /> : (stats.completedTests || 0)}
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+
+              {/* Active / Upcoming Tests Section */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="bg-white rounded-xl p-6 shadow-lg"
+              >
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Active / Upcoming Tests</h3>
+                <div className="space-y-3">
+                  <div className="bg-orange-600 text-white rounded-lg p-4 flex justify-between items-center">
+                    <div>
+                      <h4 className="font-semibold">Dhyey</h4>
+                      <p className="text-sm opacity-90">MCQ</p>
+                    </div>
+                    <span className="text-sm opacity-90">upcoming</span>
+                  </div>
+                  <div className="bg-gray-100 rounded-lg p-4 flex justify-between items-center">
+                    <div>
+                      <h4 className="font-semibold text-gray-800">Sample Test 2</h4>
+                      <p className="text-sm text-gray-600">Programming</p>
+                    </div>
+                    <span className="text-sm text-gray-600">scheduled</span>
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* System Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="bg-white rounded-xl p-6 shadow-lg border-l-4 border-blue-500"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Total Users</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : (stats.totalUsers || 0)}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-blue-100 rounded-full">
+                      <Users className="w-6 h-6 text-blue-600" />
+                    </div>
+                  </div>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  className="bg-white rounded-xl p-6 shadow-lg border-l-4 border-green-500"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Active Users</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : (stats.activeUsers || 0)}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-green-100 rounded-full">
+                      <CheckCircle className="w-6 h-6 text-green-600" />
+                    </div>
+                  </div>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6 }}
+                  className="bg-white rounded-xl p-6 shadow-lg border-l-4 border-orange-500"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Pending Users</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : (stats.pendingUsers || 0)}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-orange-100 rounded-full">
+                      <Clock className="w-6 h-6 text-orange-600" />
+                    </div>
+                  </div>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.7 }}
+                  className="bg-white rounded-xl p-6 shadow-lg border-l-4 border-red-500"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Blocked Users</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : (stats.blockedUsers || 0)}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-red-100 rounded-full">
+                      <XCircle className="w-6 h-6 text-red-600" />
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            </div>
+          )}
+
+          {/* Users Management Content */}
+          {activeTab === "users" && (
+            <div className="space-y-6">
+              {/* Search and Filters */}
+              <div className="bg-white rounded-xl p-6 shadow-lg">
+                <div className="flex flex-wrap gap-4 items-center">
+                  <div className="flex-1 min-w-64">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <input
+                        type="text"
+                        placeholder="Search by name or email..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  >
+                    <option>All Status</option>
+                    <option>Active</option>
+                    <option>Pending</option>
+                    <option>Blocked</option>
+                  </select>
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  >
+                    <option>All Categories</option>
+                    <option>Students</option>
+                    <option>Teachers</option>
+                    <option>Admins</option>
+                  </select>
+                  <select
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  >
+                    <option>Date</option>
+                    <option>Today</option>
+                    <option>This Week</option>
+                    <option>This Month</option>
+                  </select>
+                  <select
+                    value={sortOrder}
+                    onChange={(e) => setSortOrder(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  >
+                    <option>Ascending</option>
+                    <option>Descending</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Users Table */}
+              <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {loading ? (
+                        <tr>
+                          <td colSpan="5" className="px-6 py-8 text-center">
+                            <Loader2 className="w-8 h-8 animate-spin text-orange-500 mx-auto" />
+                          </td>
+                        </tr>
+                      ) : users.length === 0 ? (
+                        <tr>
+                          <td colSpan="5" className="px-6 py-8 text-center text-gray-500">
+                            No users found
+                          </td>
+                        </tr>
+                      ) : (
+                        users.map((user) => (
+                          <tr key={user._id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                                  <User className="w-4 h-4 text-orange-600" />
+                                </div>
+                                <div className="ml-3">
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {user.firstName} {user.lastName}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {user.email}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full capitalize">
+                                {user.role}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                user.status === 'active' 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : user.status === 'blocked' 
+                                  ? 'bg-red-100 text-red-800' 
+                                  : 'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {user.status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <div className="flex space-x-2">
+                                {user.status !== 'active' && (
+                                  <button
+                                    onClick={() => updateUserStatus(user._id, 'active')}
+                                    disabled={actionLoading[user._id]}
+                                    className="text-green-600 hover:text-green-900 disabled:opacity-50"
+                                  >
+                                    <CheckCircle className="w-4 h-4" />
+                                  </button>
+                                )}
+                                {user.status !== 'blocked' && (
+                                  <button
+                                    onClick={() => updateUserStatus(user._id, 'blocked')}
+                                    disabled={actionLoading[user._id]}
+                                    className="text-yellow-600 hover:text-yellow-900 disabled:opacity-50"
+                                  >
+                                    <XCircle className="w-4 h-4" />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => deleteUser(user._id)}
+                                  disabled={actionLoading[user._id] || user._id === user._id}
+                                  className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Other tabs content */}
+          {activeTab === "questions" && (
+            <div className="bg-white rounded-xl p-6 shadow-lg">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Question Management</h3>
+              <p className="text-gray-600">Question management features will be implemented here.</p>
+            </div>
+          )}
+
+          {activeTab === "results" && (
+            <div className="bg-white rounded-xl p-6 shadow-lg">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Results & Reports</h3>
+              <p className="text-gray-600">Results and reports features will be implemented here.</p>
+            </div>
+          )}
+
+          {activeTab === "analytics" && (
+            <div className="bg-white rounded-xl p-6 shadow-lg">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Analytics</h3>
+              <p className="text-gray-600">Analytics features will be implemented here.</p>
+            </div>
+          )}
+
+          {activeTab === "profile" && (
+            <div className="space-y-8">
+              {/* Profile Card */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white rounded-xl shadow-lg p-8 max-w-2xl mx-auto relative"
+              >
+                {/* Decorative Element */}
+                <div className="absolute top-4 right-4 w-16 h-16 bg-gray-100 rounded-full opacity-50"></div>
+                
+                {/* Profile Header */}
+                <div className="text-center mb-8">
+                  <h2 className="text-2xl font-bold text-gray-800 mb-2">My Profile</h2>
+                </div>
+
+                {/* Profile Details */}
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="font-semibold text-gray-800">Name:</span>
+                    <span className="text-gray-700">{user?.firstName} {user?.lastName}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="font-semibold text-gray-800">Email:</span>
+                    <span className="text-gray-700">{user?.email}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="font-semibold text-gray-800">Phone:</span>
+                    <span className="text-gray-700">{user?.phone || "987654321"}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="font-semibold text-gray-800">Section:</span>
+                    <span className="text-gray-700">{user?.section || "A"}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="font-semibold text-gray-800">Class:</span>
+                    <span className="text-gray-700">{user?.class || "10"}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="font-semibold text-gray-800">DOB:</span>
+                    <span className="text-gray-700">{user?.dob || "7/17/2001"}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="font-semibold text-gray-800">Gender:</span>
+                    <span className="text-gray-700">{user?.gender || "Male"}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="font-semibold text-gray-800">Organisation:</span>
+                    <span className="text-gray-700">{user?.organisation || "N/A, N/A"}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="font-semibold text-gray-800">Role:</span>
+                    <span className="text-gray-700">{user?.role || "admin"}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="font-semibold text-gray-800">Roll Number:</span>
+                    <span className="text-gray-700">{user?.rollNumber || "13"}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="font-semibold text-gray-800">Grade Level:</span>
+                    <span className="text-gray-700">{user?.gradeLevel || "N/A"}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="font-semibold text-gray-800">Department:</span>
+                    <span className="text-gray-700">{user?.department || "CP"}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center py-2">
+                    <span className="font-semibold text-gray-800">Guardian:</span>
+                    <span className="text-gray-700">{user?.guardian || "Ramesh Pal (9998823213)"}</span>
+                  </div>
+                </div>
+
+                {/* Edit Profile Button */}
+                <div className="text-center mt-8">
+                  <button className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-6 py-3 rounded-lg transition-colors mx-auto">
+                    <Edit className="w-4 h-4" />
+                    Edit Profile
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
