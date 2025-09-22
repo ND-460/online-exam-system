@@ -1117,4 +1117,305 @@ router.get("/admin/reports/student/:studentId", auth, async (req, res) => {
   }
 });
 
+/**
+ * @method - GET
+ * @param - /admin/students
+ * @description - Get all students for admin panel
+ */
+router.get("/admin/students", auth, async (req, res) => {
+  try {
+    // Check if user is admin
+    const adminUser = await User.findById(req.user.id);
+    if (!adminUser || adminUser.role !== 'admin') {
+      return res.status(403).json({ message: "Access denied. Admin role required." });
+    }
+
+    const students = await User.find({ role: 'student' }, { password: 0 })
+      .populate('organisation', 'name address')
+      .sort({ createdAt: -1 });
+
+    // Get additional student data
+    const studentsWithData = await Promise.all(students.map(async (student) => {
+      const studentData = await Student.findOne({ profileInfo: student._id });
+      const Result = require("../model/Result");
+      const results = await Result.find({ studentId: student._id });
+      
+      const testsTaken = results.length;
+      const averageScore = results.length > 0 
+        ? (results.reduce((sum, r) => sum + r.score, 0) / results.length).toFixed(1)
+        : 0;
+
+      return {
+        _id: student._id,
+        name: `${student.firstName} ${student.lastName}`,
+        email: student.email,
+        organization: student.organisation?.name || 'N/A',
+        testsTaken,
+        averageScore: `${averageScore}%`,
+        status: student.status || 'active',
+        createdAt: student.createdAt
+      };
+    }));
+
+    res.status(200).json({ students: studentsWithData });
+  } catch (err) {
+    console.log(err.message);
+    res.status(500).json({ message: "Error fetching students" });
+  }
+});
+
+/**
+ * @method - GET
+ * @param - /admin/teachers
+ * @description - Get all teachers for admin panel
+ */
+router.get("/admin/teachers", auth, async (req, res) => {
+  try {
+    // Check if user is admin
+    const adminUser = await User.findById(req.user.id);
+    if (!adminUser || adminUser.role !== 'admin') {
+      return res.status(403).json({ message: "Access denied. Admin role required." });
+    }
+
+    const teachers = await User.find({ role: 'teacher' }, { password: 0 })
+      .populate('organisation', 'name address')
+      .sort({ createdAt: -1 });
+
+    // Get additional teacher data
+    const teachersWithData = await Promise.all(teachers.map(async (teacher) => {
+      const teacherData = await Teacher.findOne({ profileInfo: teacher._id });
+      const Test = require("../model/Test");
+      const tests = await Test.find({ teacherId: teacher._id });
+      
+      const testsCreated = tests.length;
+      const studentsTaught = new Set(tests.flatMap(test => test.students || [])).size;
+
+      return {
+        _id: teacher._id,
+        name: `${teacher.firstName} ${teacher.lastName}`,
+        email: teacher.email,
+        organization: teacher.organisation?.name || 'N/A',
+        testsCreated,
+        studentsTaught,
+        status: teacher.status || 'active',
+        createdAt: teacher.createdAt
+      };
+    }));
+
+    res.status(200).json({ teachers: teachersWithData });
+  } catch (err) {
+    console.log(err.message);
+    res.status(500).json({ message: "Error fetching teachers" });
+  }
+});
+
+/**
+ * @method - GET
+ * @param - /admin/organizations
+ * @description - Get all organizations for admin panel
+ */
+router.get("/admin/organizations", auth, async (req, res) => {
+  try {
+    // Check if user is admin
+    const adminUser = await User.findById(req.user.id);
+    if (!adminUser || adminUser.role !== 'admin') {
+      return res.status(403).json({ message: "Access denied. Admin role required." });
+    }
+
+    // Get unique organizations from users
+    const organizations = await User.aggregate([
+      { $match: { organisation: { $exists: true, $ne: null } } },
+      {
+        $group: {
+          _id: '$organisation.name',
+          address: { $first: '$organisation.address' },
+          studentCount: {
+            $sum: { $cond: [{ $eq: ['$role', 'student'] }, 1, 0] }
+          },
+          teacherCount: {
+            $sum: { $cond: [{ $eq: ['$role', 'teacher'] }, 1, 0] }
+          },
+          users: { $push: '$_id' }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    // Get test count for each organization
+    const organizationsWithData = await Promise.all(organizations.map(async (org) => {
+      const Test = require("../model/Test");
+      const testCount = await Test.countDocuments({
+        teacherId: { $in: org.users }
+      });
+
+      return {
+        _id: org._id,
+        name: org._id,
+        address: org.address,
+        studentCount: org.studentCount,
+        teacherCount: org.teacherCount,
+        testCount,
+        status: 'active'
+      };
+    }));
+
+    res.status(200).json({ organizations: organizationsWithData });
+  } catch (err) {
+    console.log(err.message);
+    res.status(500).json({ message: "Error fetching organizations" });
+  }
+});
+
+/**
+ * @method - GET
+ * @param - /admin/analytics
+ * @description - Get analytics data for admin panel
+ */
+router.get("/admin/analytics", auth, async (req, res) => {
+  try {
+    // Check if user is admin
+    const adminUser = await User.findById(req.user.id);
+    if (!adminUser || adminUser.role !== 'admin') {
+      return res.status(403).json({ message: "Access denied. Admin role required." });
+    }
+
+    const Test = require("../model/Test");
+    const Result = require("../model/Result");
+
+    // Get basic counts
+    const totalUsers = await User.countDocuments();
+    const activeUsers = await User.countDocuments({ status: 'active' });
+    const totalTests = await Test.countDocuments();
+    const totalResults = await Result.countDocuments();
+
+    // Get tests created in the last 7 days
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const testsThisWeek = await Test.countDocuments({ createdAt: { $gte: sevenDaysAgo } });
+
+    // Get average scores
+    const avgScoreResult = await Result.aggregate([
+      { $group: { _id: null, averageScore: { $avg: '$score' } } }
+    ]);
+    const averageScore = avgScoreResult.length > 0 ? avgScoreResult[0].averageScore : 0;
+
+    // Get success rate
+    const passedResults = await Result.countDocuments({ status: 'passed' });
+    const successRate = totalResults > 0 ? (passedResults / totalResults * 100).toFixed(1) : 0;
+
+    res.status(200).json({
+      systemHealth: 98,
+      activeUsers,
+      testsToday: testsThisWeek,
+      successRate: parseFloat(successRate),
+      totalUsers,
+      totalTests,
+      averageScore: Math.round(averageScore),
+      systemOverview: {
+        users: totalUsers,
+        tests: totalTests,
+        results: totalResults
+      }
+    });
+  } catch (err) {
+    console.log(err.message);
+    res.status(500).json({ message: "Error fetching analytics" });
+  }
+});
+
+/**
+ * @method - GET
+ * @param - /admin/chart-data
+ * @description - Get chart data for admin panel
+ */
+router.get("/admin/chart-data", auth, async (req, res) => {
+  try {
+    // Check if user is admin
+    const adminUser = await User.findById(req.user.id);
+    if (!adminUser || adminUser.role !== 'admin') {
+      return res.status(403).json({ message: "Access denied. Admin role required." });
+    }
+
+    const Test = require("../model/Test");
+    const Result = require("../model/Result");
+
+    // Tests created per week (last 4 weeks)
+    const fourWeeksAgo = new Date();
+    fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
+    
+    const testsPerWeek = await Test.aggregate([
+      { $match: { createdAt: { $gte: fourWeeksAgo } } },
+      {
+        $group: {
+          _id: {
+            week: { $week: '$createdAt' },
+            year: { $year: '$createdAt' }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.week': 1 } }
+    ]);
+
+    // Students by organization
+    const studentsByOrg = await User.aggregate([
+      { $match: { role: 'student', organisation: { $exists: true } } },
+      {
+        $group: {
+          _id: '$organisation.name',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+
+    // Teachers by organization
+    const teachersByOrg = await User.aggregate([
+      { $match: { role: 'teacher', organisation: { $exists: true } } },
+      {
+        $group: {
+          _id: '$organisation.name',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+
+    // Test performance trend (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const performanceTrend = await Result.aggregate([
+      { $match: { submittedAt: { $gte: thirtyDaysAgo } } },
+      {
+        $group: {
+          _id: {
+            day: { $dayOfMonth: '$submittedAt' },
+            month: { $month: '$submittedAt' }
+          },
+          averageScore: { $avg: '$score' }
+        }
+      },
+      { $sort: { '_id.month': 1, '_id.day': 1 } }
+    ]);
+
+    res.status(200).json({
+      testsPerWeek,
+      studentsByOrg,
+      teachersByOrg,
+      performanceTrend,
+      marksDistribution: {
+        '0-20': await Result.countDocuments({ score: { $gte: 0, $lt: 20 } }),
+        '20-40': await Result.countDocuments({ score: { $gte: 20, $lt: 40 } }),
+        '40-60': await Result.countDocuments({ score: { $gte: 40, $lt: 60 } }),
+        '60-80': await Result.countDocuments({ score: { $gte: 60, $lt: 80 } }),
+        '80-100': await Result.countDocuments({ score: { $gte: 80, $lte: 100 } })
+      }
+    });
+  } catch (err) {
+    console.log(err.message);
+    res.status(500).json({ message: "Error fetching chart data" });
+  }
+});
+
 module.exports = router;
