@@ -63,12 +63,9 @@ const ProfilePage = () => {
   return (
     <div
       className="min-h-screen flex items-center justify-center px-4"
-      style={{
-        backgroundImage: `url("/images/profile-back.png")`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-      }}
+
+      
+
     >
       <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-8 overflow-hidden">
         {/* Decorative Circle */}
@@ -117,14 +114,16 @@ const ProfilePage = () => {
                     <option value="Other">Other</option>
                   </select>
                 ) : (
-                <input
+
+                  <input
                     type="text"
-                  name={field}
-                  value={form[field] || ""}
-                  onChange={handleChange}
+                    name={field}
+                    value={form[field] || ""}
+                    onChange={handleChange}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-700 focus:border-yellow-700 outline-none"
-                  placeholder={field}
-                />
+                    placeholder={field}
+                  />
+
                 )}
               </div>
             ))}
@@ -140,15 +139,17 @@ const ProfilePage = () => {
                     <label className="text-sm font-medium text-gray-700 mb-1">
                       Organisation {sub.charAt(0).toUpperCase() + sub.slice(1)}
                     </label>
-                <input
-                  name={`organisation.${sub}`}
-                  value={form.organisation?.[sub] || ""}
-                  onChange={handleChange}
+
+                    <input
+                      name={`organisation.${sub}`}
+                      value={form.organisation?.[sub] || ""}
+                      onChange={handleChange}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-700 focus:border-yellow-700 outline-none"
-                />
+                    />
+                  </div>
+                ))}
               </div>
-            ))}
-              </div>
+
             </div>
 
             {/* Role-specific */}

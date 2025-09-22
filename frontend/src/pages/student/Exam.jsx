@@ -7,8 +7,9 @@ import { useAuthStore } from "../../store/authStore";
 import axios from "axios";
 import { toast } from "react-toastify";
 import "react-toastify/ReactToastify.css";
+import "./Exam.css"
 const paletteColors = {
-  notVisited: "bg-gray-500",
+  notVisited: "bg-yellow-200",
   answered: "bg-green-500",
   review: "bg-purple-500",
   notAnswered: "bg-red-500",
@@ -253,17 +254,17 @@ export default function Exam() {
     if (q.type === "mcq") {
       return (
         <div>
-          <div className="mb-4 text-lg font-semibold text-white">
+          <div className="mb-4 text-lg font-semibold text-yellow-800">
             {q.question}
           </div>
-          <div className="flex items-center gap-4 mb-4 text-sm text-gray-300">
+          <div className="flex items-center gap-4 mb-4 text-sm text-yellow-800">
             <span>
               Marks:{" "}
-              <span className="font-semibold text-blue-400">{q.marks}</span>
+              <span className="font-semibold text-yellow-600">{q.marks}</span>
             </span>
             <span>
               Difficulty:{" "}
-              <span className="font-semibold capitalize text-green-400">
+              <span className="font-semibold capitalize text-yellow-600">
                 {q.difficulty}
               </span>
             </span>
@@ -272,14 +273,14 @@ export default function Exam() {
             {q.options.map((opt, i) => (
               <label
                 key={i}
-                className="flex items-center gap-2 cursor-pointer text-white"
+                className="flex items-center gap-2 cursor-pointer text-yellow-800"
               >
                 <input
                   type="radio"
                   name={`mcq-${q.id}`}
                   checked={answers[current] === i}
                   onChange={() => saveAnswer(i)}
-                  className="accent-blue-500 w-5 h-5"
+                  className="accent-yellow-600 w-5 h-5"
                 />
                 <span>{opt}</span>
               </label>
@@ -413,20 +414,20 @@ export default function Exam() {
   }
   if (!started) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#151e2e]">
-        <div className="p-8 bg-[#232f4b] rounded-2xl text-center text-white max-w-lg">
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="p-8 bg-yellow-900 rounded-2xl text-center text-white max-w-lg shadow-lg">
           <h1 className="text-2xl font-bold mb-4">{examInfo.title}</h1>
-          <p className="mb-4 text-blue-200">
+          <p className="mb-4 text-white">
             You have {Math.floor(examInfo.timeLimit / 60)} minutes. Once
             started, the timer cannot be paused.
           </p>
-          <ul className="list-disc text-left text-sm text-blue-300 mb-6 ml-6">
+          <ul className="list-disc text-left text-sm text-white mb-6 ml-6">
             {examInfo.instructions.map((ins, i) => (
               <li key={i}>{ins}</li>
             ))}
           </ul>
           <button
-            className="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-md font-semibold"
+            className="bg-yellow-600 hover:bg-yellow-700 px-6 py-3 rounded-md font-semibold text-white"
             onClick={() => {
               setStarted(true);
               setFullscreen(true);
@@ -440,15 +441,15 @@ export default function Exam() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#151e2e] to-[#1a2236] flex flex-col">
+    <div className="min-h-screen bg-white flex flex-col">
       {/* Exam Info Top Bar */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center px-6 py-4 border-b border-blue-900 bg-[#181f2e] sticky top-0 z-20">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center px-6 py-4 border-b border-yellow-300 sticky top-0 z-20 bg-white">
         <div>
-          <div className="text-2xl font-bold text-white mb-1">
+          <div className="text-2xl font-bold text-yellow-800 mb-1">
             {examInfo.title}
           </div>
-          <div className="text-blue-300 text-sm mb-2">{examInfo.subject}</div>
-          <div className="flex gap-6 text-blue-200 text-xs">
+          <div className="text-yellow-800 text-sm mb-2">{examInfo.subject}</div>
+          <div className="flex gap-6 text-yellow-800 text-xs">
             <span>Total Questions: {examInfo.totalQuestions}</span>
             <span>Total Marks: {examInfo.totalMarks}</span>
             <span>Time Limit: {Math.floor(examInfo.timeLimit / 60)} min</span>
@@ -457,19 +458,20 @@ export default function Exam() {
         <div className="flex flex-col items-end gap-2 ml-auto">
           <div
             className={`text-lg font-bold ${
-              timer < 300 ? "text-red-400 animate-pulse" : "text-blue-400"
+              timer < 300 ? "text-red-400 animate-pulse" : "text-yellow-800"
             }`}
           >
             {formatTime(timer)}
           </div>
           <button
-            className="text-xs text-blue-300 underline"
+            className="text-xs text-yellow-800 underline"
             onClick={() => setShowInstructions((v) => !v)}
           >
             {showInstructions ? "Hide Instructions" : "Show Instructions"}
           </button>
         </div>
       </div>
+
       {/* Collapsible Instructions */}
       <AnimatePresence>
         {showInstructions && (
@@ -477,7 +479,7 @@ export default function Exam() {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden bg-[#232f4b] text-blue-100 px-6 py-4 border-b border-blue-900"
+            className="overflow-hidden bg-white text-yellow-800 px-6 py-4 border-b border-yellow-300"
           >
             <ul className="list-disc ml-6">
               {examInfo.instructions.map((ins, i) => (
@@ -489,108 +491,92 @@ export default function Exam() {
       </AnimatePresence>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col md:flex-row">
-        {/* Main Question Panel */}
-        <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={current}
-              initial={{ opacity: 0, x: 40 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -40 }}
-              transition={{ duration: 0.3 }}
-              className="w-full max-w-2xl bg-gradient-to-br from-black via-[#181f2e] to-[#232f4b] rounded-3xl p-8 border-2 border-[#232f4b] shadow-2xl min-h-[260px] flex flex-col"
-            >
-              {renderQuestion()}
-              {/* Navigation Buttons */}
-              <div className="flex flex-wrap gap-4 mt-8 justify-between">
-                <button
-                  className="bg-blue-700 hover:bg-blue-800 text-white px-6 py-2 rounded-md font-semibold"
-                  onClick={() => setCurrent((c) => Math.max(0, c - 1))}
-                  disabled={current === 0}
-                >
-                  Previous
-                </button>
-                <div className="flex gap-2 flex-wrap">
-                  <button
-                    className="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-md font-semibold"
-                    onClick={markForReview}
-                  >
-                    Mark for Review
-                  </button>
-                  <button
-                    className="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-md font-semibold"
-                    onClick={clearAnswer}
-                  >
-                    Clear Answer
-                  </button>
-                </div>
-                <button
-                  className="bg-blue-700 hover:bg-blue-800 text-white px-6 py-2 rounded-md font-semibold"
-                  onClick={() =>
-                    setCurrent((c) => Math.min(questions.length - 1, c + 1))
-                  }
-                  disabled={current === questions.length - 1}
-                >
-                  Next
-                </button>
-              </div>
-            </motion.div>
-          </AnimatePresence>
-        </div>
-        {/* Sidebar / Palette */}
-        <div className="w-full md:w-64 bg-[#181f2e] border-l border-blue-900 flex flex-col items-center py-8 px-2 md:sticky md:top-0">
-          <div className="font-bold text-blue-200 mb-4">Question Palette</div>
-          <div className="grid grid-cols-5 md:grid-cols-3 gap-2">
-            {questions.map((_, idx) => (
-              <button
-                key={idx}
-                className={`w-10 h-10 rounded-full text-white font-bold focus:outline-none focus:ring-2 focus:ring-blue-400 ${getPaletteColor(
-                  idx
-                )} transition-all duration-150`}
-                onClick={() => goTo(idx)}
-              >
-                {idx + 1}
-              </button>
-            ))}
+<div className="main-content">
+  {/* Main Question Panel */}
+  <div className="question-panel">
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={current}
+        initial={{ opacity: 0, x: 40 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -40 }}
+        transition={{ duration: 0.3 }}
+        className="question-box"
+      >
+        {renderQuestion()}
+
+        {/* Navigation Buttons */}
+        <div className="nav-buttons">
+          <button
+            className="btn prev"
+            onClick={() => setCurrent((c) => Math.max(0, c - 1))}
+            disabled={current === 0}
+          >
+            Previous
+          </button>
+          <div className="middle-buttons">
+            <button className="btn action" onClick={markForReview}>
+              Mark for Review
+            </button>
+            <button className="btn action" onClick={clearAnswer}>
+              Clear Answer
+            </button>
           </div>
-          <div className="mt-6 flex flex-col gap-2 text-xs text-blue-300">
-            <div>
-              <span className="inline-block w-3 h-3 rounded-full bg-gray-500 mr-2"></span>
-              Not Visited
-            </div>
-            <div>
-              <span className="inline-block w-3 h-3 rounded-full bg-green-500 mr-2"></span>
-              Answered
-            </div>
-            <div>
-              <span className="inline-block w-3 h-3 rounded-full bg-purple-500 mr-2"></span>
-              Marked for Review
-            </div>
-            <div>
-              <span className="inline-block w-3 h-3 rounded-full bg-red-500 mr-2"></span>
-              Not Answered
-            </div>
-          </div>
+          <button
+            className="btn next"
+            onClick={() =>
+              setCurrent((c) => Math.min(questions.length - 1, c + 1))
+            }
+            disabled={current === questions.length - 1}
+          >
+            Next
+          </button>
         </div>
-      </div>
+      </motion.div>
+    </AnimatePresence>
+  </div>
+
+  {/* Sidebar / Palette */}
+  <div className="sidebar">
+    <div className="sidebar-title">Question Palette</div>
+
+    <div className="palette">
+      {questions.map((_, idx) => (
+        <button
+          key={idx}
+          className={`palette-btn ${getPaletteColor(idx)}`}
+          onClick={() => goTo(idx)}
+        >
+          {idx + 1}
+        </button>
+      ))}
+    </div>
+
+    <div className="legend">
+      <div><span className="dot not-visited"></span> Not Visited</div>
+      <div><span className="dot answered"></span> Answered</div>
+      <div><span className="dot review"></span> Marked for Review</div>
+      <div><span className="dot not-answered"></span> Not Answered</div>
+    </div>
+  </div>
+</div>
+
       {/* Footer Controls */}
-      <div className="sticky bottom-0 left-0 w-full bg-[#181f2e] border-t border-blue-900 flex flex-col md:flex-row items-center justify-between px-6 py-4 z-30">
-        <button
-          className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-md font-bold text-lg mb-2 md:mb-0"
-          onClick={() =>
-            setCurrent((c) => Math.min(questions.length - 1, c + 1))
-          }
-        >
-          Save & Next
-        </button>
-        <button
-          className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-md font-bold text-lg"
-          onClick={() => setShowSubmit(true)}
-        >
-          Submit Test
-        </button>
-      </div>
+<div className="footer-controls">
+  <button
+    className="btn save-next"
+    onClick={() =>
+      setCurrent((c) => Math.min(questions.length - 1, c + 1))
+    }
+  >
+    Save & Next
+  </button>
+  <button className="btn submit-test" onClick={() => setShowSubmit(true)}>
+    Submit Test
+  </button>
+</div>
+
+
       {/* Submit Modal */}
       <AnimatePresence>
         {showSubmit && (
@@ -600,17 +586,17 @@ export default function Exam() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
           >
-            <div className="bg-[#232f4b] rounded-2xl p-8 max-w-md w-full text-center border-2 border-blue-400">
-              <div className="text-xl font-bold text-white mb-4">
+            <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center border-2 border-yellow-300">
+              <div className="text-xl font-bold text-yellow-800 mb-4">
                 Submit Test?
               </div>
-              <div className="text-blue-200 mb-6">
+              <div className="text-yellow-800 mb-6">
                 Are you sure you want to submit? You cannot change your answers
                 after this.
               </div>
               <div className="flex gap-4 justify-center">
                 <button
-                  className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-md font-semibold"
+                  className="bg-yellow-600 hover:bg-yellow-500 text-white px-6 py-2 rounded-md font-semibold"
                   onClick={() => setShowSubmit(false)}
                 >
                   Cancel
