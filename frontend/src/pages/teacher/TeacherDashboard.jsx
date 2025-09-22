@@ -11,6 +11,7 @@ import ViewSubmissions from "./ViewSubmissions";
 import Analytics from "./Analytics";
 import ImportQuestionsModal from "./ImportQuestionsModal";
 import ProfilePage from "../ProfilePage";
+import { useDebounce } from "use-debounce";
 
 export default function TeacherDashboard() {
   const [tests, setTests] = useState([]);
@@ -32,6 +33,9 @@ export default function TeacherDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [errors, setErrors] = useState({});
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery] = useDebounce(searchQuery, 900);
+
   const navigate = useNavigate();
 
   const validateForm = () => {
@@ -98,6 +102,13 @@ export default function TeacherDashboard() {
   useEffect(() => {
     if (user?._id) refreshTests();
   }, [user]);
+
+  const getFilteredTests = () => {
+    if (!debouncedSearchQuery.trim()) return teacherTests;
+    return teacherTests.filter((t) =>
+      t.testName.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+    );
+  };
 
   const handleDeleteTest = async (test) => {
     if (!window.confirm(`Are you sure you want to delete "${test.testName}"?`))
@@ -402,6 +413,18 @@ export default function TeacherDashboard() {
                 <h3 className="text-2xl font-bold mb-4 text-yellow-900">
                   Manage Tests
                 </h3>
+
+                {/* 🔍 Debounced Search */}
+                <div className="mb-4">
+                  <input
+                    type="text"
+                    placeholder="Search by test name..."
+                    className="bg-gray-50 border border-gray-300 text-gray-900 px-3 py-2 rounded w-full max-w-sm"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-gray-900">
                     <thead>
@@ -413,8 +436,8 @@ export default function TeacherDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {tests.length ? (
-                        tests.map((t) => (
+                      {getFilteredTests().length ? (
+                        getFilteredTests().map((t) => (
                           <tr key={t._id} className="hover:bg-gray-50">
                             <td>{t.testName}</td>
                             <td>{t.category}</td>
