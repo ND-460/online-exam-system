@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
-  Bell, Sun, Moon, User, Users, FileText, TrendingUp, Clock, CheckCircle, XCircle, Trash2, BarChart3, Mail, CreditCard, Plus, MessageCircle, Activity, Loader2, RefreshCw, Home, Settings, LogOut, Search, Filter, Calendar, ArrowUpDown, Edit, BookOpen, GraduationCap, PieChart, Download, Eye, MoreHorizontal
+  Bell, Sun, Moon, User, Users, FileText, TrendingUp, Clock, CheckCircle, XCircle, Trash2, BarChart3, Mail, CreditCard, Plus, MessageCircle, Activity, Loader2, RefreshCw, Home, Settings, LogOut, Search, Filter, Calendar, ArrowUpDown, Edit, BookOpen, GraduationCap, PieChart, Download, Eye, MoreHorizontal, Save, X
 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom"
 import { useAuthStore } from "../../store/authStore";
@@ -34,12 +34,175 @@ export default function AdminDashboardNew() {
   const [categoryFilter, setCategoryFilter] = useState("All Categories");
   const [dateFilter, setDateFilter] = useState("Date");
   const [sortOrder, setSortOrder] = useState("Ascending");
-  const { logout, user, token } = useAuthStore()
+  
+  // Profile-related state
+  const [editing, setEditing] = useState(false);
+  const [profileForm, setProfileForm] = useState({});
+  const [profileLoading, setProfileLoading] = useState(true);
+
+  // Sorting state for lists
+  const [studentSortBy, setStudentSortBy] = useState("name");
+  const [studentSortDir, setStudentSortDir] = useState("asc");
+  const [teacherSortBy, setTeacherSortBy] = useState("name");
+  const [teacherSortDir, setTeacherSortDir] = useState("asc");
+  
+  const { logout, user, token, updateUser } = useAuthStore()
   const navigate = useNavigate()
 
   const handleLogout = () => {
     logout();
     navigate("/");
+  };
+
+  // Centralized tab change to reset filters and ensure fetching
+  const handleTabChange = (tab) => {
+    if (tab === 'students') {
+      setSearchTerm("");
+      setCategoryFilter("");
+      setStatusFilter("");
+      setStudentSortBy("name");
+      setStudentSortDir("asc");
+    } else if (tab === 'teachers') {
+      setSearchTerm("");
+      setCategoryFilter("");
+      setTeacherSortBy("name");
+      setTeacherSortDir("asc");
+    }
+    setActiveTab(tab);
+  };
+
+  // Profile functions
+  const fetchProfile = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_URL}/api/user/profile/${user._id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setProfileForm(res.data.obj || {});
+    } catch (err) {
+      console.error("Error fetching profile:", err);
+      toast.error("Failed to fetch profile data");
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  const handleProfileChange = (e) => {
+    const { name, value } = e.target;
+    if (name.includes(".")) {
+      const [parent, child] = name.split(".");
+      setProfileForm({ ...profileForm, [parent]: { ...profileForm[parent], [child]: value } });
+    } else {
+      setProfileForm({ ...profileForm, [name]: value });
+    }
+  };
+
+  const handleProfileSave = async () => {
+    try {
+      const res = await axios.put(
+        `${import.meta.env.VITE_API_URL}/api/user/profile/${user._id}`,
+        profileForm,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setProfileForm(res.data.obj || {});
+      updateUser(res.data.obj || {});
+      setEditing(false);
+      toast.success("Profile updated successfully");
+    } catch (err) {
+      console.error("Error updating profile:", err);
+      toast.error("Failed to update profile");
+    }
+  };
+
+  // Download functions
+  const downloadStudentsReport = () => {
+    if (students.length === 0) {
+      toast.error("No student data available for download");
+      return;
+    }
+    
+    const csvContent = [
+      ['Name', 'Email', 'Organization', 'Tests Taken', 'Average Score', 'Status'],
+      ...students.map(student => [
+        student.name || 'N/A',
+        student.email || 'N/A',
+        student.organization || 'N/A',
+        student.testsTaken || 0,
+        student.averageScore || 'N/A',
+        student.status || 'inactive'
+      ])
+    ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `students-report-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Students report downloaded successfully");
+  };
+
+  const downloadTeachersReport = () => {
+    if (teachers.length === 0) {
+      toast.error("No teacher data available for download");
+      return;
+    }
+    
+    const csvContent = [
+      ['Name', 'Email', 'Organization', 'Tests Created', 'Students Taught', 'Status'],
+      ...teachers.map(teacher => [
+        teacher.name || 'N/A',
+        teacher.email || 'N/A',
+        teacher.organization || 'N/A',
+        teacher.testsCreated || 0,
+        teacher.studentsTaught || 0,
+        teacher.status || 'inactive'
+      ])
+    ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `teachers-report-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Teachers report downloaded successfully");
+  };
+
+  const downloadOrganizationsReport = () => {
+    if (organizations.length === 0) {
+      toast.error("No organization data available for download");
+      return;
+    }
+    
+    const csvContent = [
+      ['Name', 'Email', 'Students', 'Teachers', 'Tests', 'Status'],
+      ...organizations.map(org => [
+        org.name || 'N/A',
+        org.email || 'N/A',
+        org.studentCount || 0,
+        org.teacherCount || 0,
+        org.testCount || 0,
+        org.status || 'inactive'
+      ])
+    ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `organizations-report-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Organizations report downloaded successfully");
   };
 
   // API functions
@@ -62,33 +225,32 @@ export default function AdminDashboardNew() {
             });
       // Map backend response to frontend expected format
       setStats({
-        totalUsers: response.data.totalUsers || 1250,
-        totalStudents: response.data.students || 980,
-        totalTeachers: response.data.teachers || 85,
-        totalTests: response.data.totalTests || 45,
-        organizations: response.data.organizations || 12,
-        upcomingTests: response.data.upcomingTests || 8,
-        ongoingTests: response.data.ongoingTests || 3,
-        completedTests: response.data.completedTests || 38,
-        activeUsers: response.data.activeUsers || 1100,
-        pendingUsers: response.data.pendingUsers || 12
+        totalUsers: response.data.totalUsers || 0,
+        totalStudents: response.data.students || 0,
+        totalTeachers: response.data.teachers || 0,
+        totalTests: response.data.totalTests || 0,
+        organizations: response.data.organizations || 0,
+        upcomingTests: response.data.upcomingTests || 0,
+        ongoingTests: response.data.ongoingTests || 0,
+        completedTests: response.data.completedTests || 0,
+        activeUsers: response.data.activeUsers || 0,
+        pendingUsers: response.data.pendingUsers || 0
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
-      // Set default sample data when API fails
+      toast.error('Failed to fetch statistics');
       setStats({
-        totalUsers: 1250,
-        totalStudents: 980,
-        totalTeachers: 85,
-        totalTests: 45,
-        organizations: 12,
-        upcomingTests: 8,
-        ongoingTests: 3,
-        completedTests: 38,
-        activeUsers: 1100,
-        pendingUsers: 12
+        totalUsers: 0,
+        totalStudents: 0,
+        totalTeachers: 0,
+        totalTests: 0,
+        organizations: 0,
+        upcomingTests: 0,
+        ongoingTests: 0,
+        completedTests: 0,
+        activeUsers: 0,
+        pendingUsers: 0
       });
-      toast.error('Using sample data - API connection failed');
     }
   };
 
@@ -101,15 +263,8 @@ export default function AdminDashboardNew() {
       setStudents(response.data.students || []);
     } catch (error) {
       console.error('Error fetching students:', error);
-      // Set sample student data when API fails
-      setStudents([
-        { _id: '1', name: 'John Doe', email: 'john@university.edu', organization: 'University A', testsTaken: 5, averageScore: '85%', status: 'active' },
-        { _id: '2', name: 'Jane Smith', email: 'jane@university.edu', organization: 'University B', testsTaken: 3, averageScore: '92%', status: 'active' },
-        { _id: '3', name: 'Mike Johnson', email: 'mike@university.edu', organization: 'University C', testsTaken: 7, averageScore: '78%', status: 'active' },
-        { _id: '4', name: 'Sarah Wilson', email: 'sarah@university.edu', organization: 'University A', testsTaken: 4, averageScore: '88%', status: 'active' },
-        { _id: '5', name: 'David Brown', email: 'david@university.edu', organization: 'University D', testsTaken: 6, averageScore: '91%', status: 'active' }
-      ]);
-      toast.error('Using sample student data - API connection failed');
+      toast.error('Failed to fetch students data');
+      setStudents([]);
     }
   };
 
@@ -122,14 +277,8 @@ export default function AdminDashboardNew() {
       setTeachers(response.data.teachers || []);
     } catch (error) {
       console.error('Error fetching teachers:', error);
-      // Set sample teacher data when API fails
-      setTeachers([
-        { _id: '1', name: 'Dr. Smith', email: 'smith@university.edu', organization: 'University A', testsCreated: 12, studentsTaught: 45, status: 'active' },
-        { _id: '2', name: 'Prof. Johnson', email: 'johnson@university.edu', organization: 'University B', testsCreated: 8, studentsTaught: 32, status: 'active' },
-        { _id: '3', name: 'Dr. Williams', email: 'williams@university.edu', organization: 'University C', testsCreated: 15, studentsTaught: 58, status: 'active' },
-        { _id: '4', name: 'Prof. Davis', email: 'davis@university.edu', organization: 'University A', testsCreated: 6, studentsTaught: 28, status: 'active' }
-      ]);
-      toast.error('Using sample teacher data - API connection failed');
+      toast.error('Failed to fetch teachers data');
+      setTeachers([]);
     }
   };
 
@@ -142,14 +291,8 @@ export default function AdminDashboardNew() {
       setOrganizations(response.data.organizations || []);
     } catch (error) {
       console.error('Error fetching organizations:', error);
-      // Set sample organization data when API fails
-      setOrganizations([
-        { _id: '1', name: 'University A', email: 'admin@university-a.edu', studentCount: 245, teacherCount: 32, testCount: 18, status: 'active' },
-        { _id: '2', name: 'University B', email: 'admin@university-b.edu', studentCount: 180, teacherCount: 28, testCount: 12, status: 'active' },
-        { _id: '3', name: 'University C', email: 'admin@university-c.edu', studentCount: 156, teacherCount: 18, testCount: 15, status: 'active' },
-        { _id: '4', name: 'University D', email: 'admin@university-d.edu', studentCount: 95, teacherCount: 12, testCount: 8, status: 'active' }
-      ]);
-      toast.error('Using sample organization data - API connection failed');
+      toast.error('Failed to fetch organizations data');
+      setOrganizations([]);
     }
   };
 
@@ -160,31 +303,30 @@ export default function AdminDashboardNew() {
         headers: { Authorization: `Bearer ${token}` }
       });
       setAnalytics({
-        systemHealth: response.data.systemHealth || 98,
-        activeUsers: response.data.activeUsers || 1100,
-        testsToday: response.data.testsToday || 8,
-        successRate: response.data.successRate || 87,
-        totalUsers: response.data.totalUsers || 1250,
-        totalTests: response.data.totalTests || 45,
-        totalStudents: response.data.totalStudents || 980,
-        totalTeachers: response.data.totalTeachers || 85,
+        systemHealth: response.data.systemHealth || 0,
+        activeUsers: response.data.activeUsers || 0,
+        testsToday: response.data.testsToday || 0,
+        successRate: response.data.successRate || 0,
+        totalUsers: response.data.totalUsers || 0,
+        totalTests: response.data.totalTests || 0,
+        totalStudents: response.data.totalStudents || 0,
+        totalTeachers: response.data.totalTeachers || 0,
         systemOverview: response.data.systemOverview || {}
       });
     } catch (error) {
       console.error('Error fetching analytics:', error);
-      // Set default sample analytics data when API fails
+      toast.error('Failed to fetch analytics data');
       setAnalytics({
-        systemHealth: 98,
-        activeUsers: 1100,
-        testsToday: 8,
-        successRate: 87,
-        totalUsers: 1250,
-        totalTests: 45,
-        totalStudents: 980,
-        totalTeachers: 85,
+        systemHealth: 0,
+        activeUsers: 0,
+        testsToday: 0,
+        successRate: 0,
+        totalUsers: 0,
+        totalTests: 0,
+        totalStudents: 0,
+        totalTeachers: 0,
         systemOverview: {}
       });
-      toast.error('Using sample analytics data - API connection failed');
     }
   };
 
@@ -197,44 +339,14 @@ export default function AdminDashboardNew() {
       setChartData(response.data);
     } catch (error) {
       console.error('Error fetching chart data:', error);
-      // Set default sample chart data when API fails
+      toast.error('Failed to fetch chart data');
       setChartData({
-        testsPerWeek: [
-          { week: 'Week 1', count: 12 },
-          { week: 'Week 2', count: 18 },
-          { week: 'Week 3', count: 24 },
-          { week: 'Week 4', count: 15 }
-        ],
-        studentsByOrg: [
-          { name: 'University A', count: 245 },
-          { name: 'University B', count: 180 },
-          { name: 'University C', count: 156 },
-          { name: 'University D', count: 95 }
-        ],
-        teachersByOrg: [
-          { name: 'University A', count: 32 },
-          { name: 'University B', count: 28 },
-          { name: 'University C', count: 18 },
-          { name: 'University D', count: 12 }
-        ],
-        performanceTrend: [
-          { day: '1', averageScore: 75 },
-          { day: '5', averageScore: 78 },
-          { day: '10', averageScore: 82 },
-          { day: '15', averageScore: 79 },
-          { day: '20', averageScore: 85 },
-          { day: '25', averageScore: 88 },
-          { day: '30', averageScore: 90 }
-        ],
-        marksDistribution: [
-          { range: '0-20', count: 15 },
-          { range: '20-40', count: 28 },
-          { range: '40-60', count: 45 },
-          { range: '60-80', count: 65 },
-          { range: '80-100', count: 42 }
-        ]
+        testsPerWeek: [],
+        studentsByOrg: [],
+        teachersByOrg: [],
+        performanceTrend: [],
+        marksDistribution: {}
       });
-      toast.error('Using sample chart data - API connection failed');
     }
   };
 
@@ -316,22 +428,23 @@ export default function AdminDashboardNew() {
 
   // Fetch section-specific data when activeTab changes
   useEffect(() => {
-    switch (activeTab) {
-      case 'students':
-        fetchStudents();
-        break;
-      case 'teachers':
-        fetchTeachers();
-        break;
-      case 'organizations':
-        fetchOrganizations();
-        break;
-      case 'analytics':
-        fetchAnalytics();
-        break;
-      default:
-        break;
-    }
+    let cancelled = false;
+    const run = async () => {
+      if (activeTab === 'students') {
+        await fetchStudents();
+      } else if (activeTab === 'teachers') {
+        await fetchTeachers();
+      } else if (activeTab === 'organizations') {
+        await fetchOrganizations();
+      } else if (activeTab === 'analytics') {
+        await fetchAnalytics();
+      } else if (activeTab === 'profile') {
+        await fetchProfile();
+      }
+      if (cancelled) return;
+    };
+    run();
+    return () => { cancelled = true; };
   }, [activeTab]);
 
     useEffect(() => {
@@ -349,13 +462,9 @@ export default function AdminDashboardNew() {
         }
     }, [user, navigate, token]);
 
-  // Sample notifications
+  // Initialize notifications
   useEffect(() => {
-    setNotifications([
-      { id: 1, text: "Welcome to the Admin Panel! You can now manage users and view system statistics.", type: 'info', time: '2 min ago' },
-      { id: 2, text: "System is running smoothly. All services are operational.", type: 'success', time: '5 min ago' },
-      { id: 3, text: "New user registration pending approval.", type: 'warning', time: '10 min ago' }
-    ]);
+    setNotifications([]);
   }, []);
 
   return (
@@ -391,7 +500,7 @@ export default function AdminDashboardNew() {
               Dashboard
                         </button>
             <button
-              onClick={() => setActiveTab("teachers")}
+              onClick={() => handleTabChange("teachers")}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
                 activeTab === "teachers" 
                   ? "bg-orange-700 text-white" 
@@ -402,7 +511,7 @@ export default function AdminDashboardNew() {
               Teacher
                                 </button>
             <button
-              onClick={() => setActiveTab("students")}
+              onClick={() => handleTabChange("students")}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
                 activeTab === "students" 
                   ? "bg-orange-700 text-white" 
@@ -558,10 +667,26 @@ export default function AdminDashboardNew() {
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                   </select>
-                  <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
-                    <Download className="w-4 h-4" />
-                    Export
-                  </button>
+                  <select
+                    value={studentSortBy}
+                    onChange={(e) => setStudentSortBy(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="name">Sort: Name</option>
+                    <option value="email">Sort: Email</option>
+                    <option value="organization">Sort: Organization</option>
+                    <option value="testsTaken">Sort: Tests Taken</option>
+                    <option value="averageScore">Sort: Avg Score</option>
+                    <option value="status">Sort: Status</option>
+                  </select>
+                  <select
+                    value={studentSortDir}
+                    onChange={(e) => setStudentSortDir(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="asc">Asc</option>
+                    <option value="desc">Desc</option>
+                  </select>
                 </div>
 
                 {/* Students Table */}
@@ -599,6 +724,22 @@ export default function AdminDashboardNew() {
                             const matchesOrg = !categoryFilter || student.organization === categoryFilter;
                             const matchesStatus = !statusFilter || student.status === statusFilter;
                             return matchesSearch && matchesOrg && matchesStatus;
+                          })
+                          .sort((a,b) => {
+                            const key = studentSortBy;
+                            const dir = studentSortDir === 'asc' ? 1 : -1;
+                            let av = a[key];
+                            let bv = b[key];
+                            if (key === 'testsTaken') { av = Number(av||0); bv = Number(bv||0);} 
+                            if (key === 'averageScore') {
+                              const num = (v) => typeof v === 'string' && v.endsWith('%') ? Number(v.replace('%','')) : Number(v||0);
+                              av = num(av); bv = num(bv);
+                            }
+                            if (typeof av === 'string') av = av.toLowerCase();
+                            if (typeof bv === 'string') bv = bv.toLowerCase();
+                            if (av < bv) return -1*dir;
+                            if (av > bv) return 1*dir;
+                            return 0;
                           })
                           .map((student) => (
                             <tr key={student._id} className="border-b border-gray-100 hover:bg-gray-50">
@@ -680,10 +821,26 @@ export default function AdminDashboardNew() {
                       <option key={org._id} value={org.name}>{org.name}</option>
                     ))}
                   </select>
-                  <button className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center gap-2">
-                    <Download className="w-4 h-4" />
-                    Export
-                  </button>
+                  <select
+                    value={teacherSortBy}
+                    onChange={(e) => setTeacherSortBy(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="name">Sort: Name</option>
+                    <option value="email">Sort: Email</option>
+                    <option value="organization">Sort: Organization</option>
+                    <option value="testsCreated">Sort: Tests Created</option>
+                    <option value="studentsTaught">Sort: Students Taught</option>
+                    <option value="status">Sort: Status</option>
+                  </select>
+                  <select
+                    value={teacherSortDir}
+                    onChange={(e) => setTeacherSortDir(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="asc">Asc</option>
+                    <option value="desc">Desc</option>
+                  </select>
                 </div>
 
                 {/* Teachers Table */}
@@ -720,6 +877,18 @@ export default function AdminDashboardNew() {
                                                 teacher.email?.toLowerCase().includes(searchTerm.toLowerCase());
                             const matchesOrg = !categoryFilter || teacher.organization === categoryFilter;
                             return matchesSearch && matchesOrg;
+                          })
+                          .sort((a,b) => {
+                            const key = teacherSortBy;
+                            const dir = teacherSortDir === 'asc' ? 1 : -1;
+                            let av = a[key];
+                            let bv = b[key];
+                            if (key === 'testsCreated' || key === 'studentsTaught') { av = Number(av||0); bv = Number(bv||0);} 
+                            if (typeof av === 'string') av = av.toLowerCase();
+                            if (typeof bv === 'string') bv = bv.toLowerCase();
+                            if (av < bv) return -1*dir;
+                            if (av > bv) return 1*dir;
+                            return 0;
                           })
                           .map((teacher) => (
                             <tr key={teacher._id} className="border-b border-gray-100 hover:bg-gray-50">
@@ -791,7 +960,10 @@ export default function AdminDashboardNew() {
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     />
                   </div>
-                  <button className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 flex items-center gap-2">
+                  <button 
+                    onClick={downloadOrganizationsReport}
+                    className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 flex items-center gap-2"
+                  >
                     <Download className="w-4 h-4" />
                     Export
                   </button>
@@ -924,41 +1096,234 @@ export default function AdminDashboardNew() {
             </div>
           )}
 
-          {/* Profile Content - Light theme like student dashboard */}
+          {/* Profile Content - Integrated from ProfilePage.jsx */}
           {activeTab === "profile" && (
             <div className="space-y-8">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded-xl shadow-lg p-8 max-w-2xl mx-auto relative"
+                className="bg-white rounded-xl shadow-lg p-8 max-w-4xl mx-auto relative"
               >
                 <div className="text-center mb-8">
                   <h2 className="text-2xl font-bold text-gray-800 mb-2">My Profile</h2>
                                     </div>
 
+                {profileLoading ? (
+                  <div className="flex justify-center items-center py-8">
+                    <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+                  </div>
+                ) : editing ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Common Fields */}
+                    {(profileForm.role === 'admin' 
+                      ? [
+                          "firstName",
+                          "lastName",
+                          "email",
+                          "phone",
+                          "dateOfBirth",
+                          "gender",
+                        ]
+                      : [
+                          "firstName",
+                          "lastName",
+                          "email",
+                          "phone",
+                          "section",
+                          "className",
+                          "dateOfBirth",
+                          "gender",
+                        ]
+                    ).map((field) => (
+                      <div key={field} className="flex flex-col">
+                        <label className="text-sm font-medium text-gray-700 mb-1">
+                          {field.replace(/([A-Z])/g, " $1")}
+                        </label>
+
+                        {field === "dateOfBirth" ? (
+                          <input
+                            type="date"
+                            name={field}
+                            value={profileForm[field] ? profileForm[field].slice(0, 10) : ""}
+                            onChange={handleProfileChange}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                          />
+                        ) : field === "gender" ? (
+                          <select
+                            name={field}
+                            value={profileForm[field] || ""}
+                            onChange={handleProfileChange}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                          >
+                            <option value="">Select Gender</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            name={field}
+                            value={profileForm[field] || ""}
+                            onChange={handleProfileChange}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                            placeholder={field}
+                          />
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Organisation Section (hide for admin) */}
+                    {profileForm.role !== 'admin' && (
+                      <div className="md:col-span-2 bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 shadow-sm">
+                        <h3 className="text-md font-semibold text-gray-800 mb-3">
+                          Organisation Details
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {["name", "address"].map((sub) => (
+                            <div key={sub} className="flex flex-col">
+                              <label className="text-sm font-medium text-gray-700 mb-1">
+                                Organisation {sub.charAt(0).toUpperCase() + sub.slice(1)}
+                              </label>
+                              <input
+                                name={`organisation.${sub}`}
+                                value={profileForm.organisation?.[sub] || ""}
+                                onChange={handleProfileChange}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Admin specific fields */}
+                    <div className="md:col-span-2 bg-blue-50 border border-blue-200 rounded-xl p-4 mt-4 shadow-sm">
+                      <h3 className="text-md font-semibold text-gray-800 mb-3">
+                        Admin Details
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {["employeeId", "department", "designation", "experienceYears"].map((f) => (
+                          <div key={f} className="flex flex-col">
+                            <label className="text-sm font-medium text-gray-700 mb-1">
+                              {f}
+                            </label>
+                            <input
+                              name={f}
+                              value={profileForm[f] || ""}
+                              onChange={handleProfileChange}
+                              type={f === "experienceYears" ? "number" : "text"}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Buttons */}
+                    <div className="md:col-span-2 flex gap-3 mt-6">
+                      <button
+                        onClick={handleProfileSave}
+                        className="flex-1 flex items-center justify-center gap-2 py-2 rounded-md bg-orange-600 hover:bg-orange-700 text-white font-semibold shadow"
+                      >
+                        <Save className="w-4 h-4" /> Save
+                      </button>
+                      <button
+                        onClick={() => setEditing(false)}
+                        className="flex-1 flex items-center justify-center gap-2 py-2 rounded-md bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold"
+                      >
+                        <X className="w-4 h-4" /> Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center py-2 border-b border-gray-200">
                     <span className="font-semibold text-gray-800">Name:</span>
-                    <span className="text-gray-700">{user?.firstName} {user?.lastName}</span>
+                      <span className="text-gray-700">{profileForm.firstName} {profileForm.lastName}</span>
                                 </div>
                   
                   <div className="flex justify-between items-center py-2 border-b border-gray-200">
                     <span className="font-semibold text-gray-800">Email:</span>
-                    <span className="text-gray-700">{user?.email}</span>
+                      <span className="text-gray-700">{profileForm.email}</span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                      <span className="font-semibold text-gray-800">Phone:</span>
+                      <span className="text-gray-700">{profileForm.phone || "—"}</span>
+                    </div>
+                    
+                    {profileForm.role !== 'admin' && (
+                      <>
+                        <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                          <span className="font-semibold text-gray-800">Section:</span>
+                          <span className="text-gray-700">{profileForm.section || "—"}</span>
                         </div>
+                        <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                          <span className="font-semibold text-gray-800">Class:</span>
+                          <span className="text-gray-700">{profileForm.className || "—"}</span>
+                        </div>
+                      </>
+                    )}
+                    
+                    <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                      <span className="font-semibold text-gray-800">DOB:</span>
+                      <span className="text-gray-700">
+                        {profileForm.dateOfBirth
+                          ? new Date(profileForm.dateOfBirth).toLocaleDateString()
+                          : "—"}
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                      <span className="font-semibold text-gray-800">Gender:</span>
+                      <span className="text-gray-700">{profileForm.gender || "—"}</span>
+                    </div>
+                    
+                    {profileForm.role !== 'admin' && (
+                      <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                        <span className="font-semibold text-gray-800">Organisation:</span>
+                        <span className="text-gray-700">{profileForm.organisation?.name || "—"},{" "}
+                        {profileForm.organisation?.address || "—"}</span>
+                      </div>
+                    )}
                   
                   <div className="flex justify-between items-center py-2 border-b border-gray-200">
                     <span className="font-semibold text-gray-800">Role:</span>
-                    <span className="text-gray-700">{user?.role || "admin"}</span>
+                      <span className="text-gray-700">{profileForm.role}</span>
                         </div>
+
+                    <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                      <span className="font-semibold text-gray-800">Employee ID:</span>
+                      <span className="text-gray-700">{profileForm.employeeId || "—"}</span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                      <span className="font-semibold text-gray-800">Department:</span>
+                      <span className="text-gray-700">{profileForm.department || "—"}</span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                      <span className="font-semibold text-gray-800">Designation:</span>
+                      <span className="text-gray-700">{profileForm.designation || "—"}</span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center py-2">
+                      <span className="font-semibold text-gray-800">Experience:</span>
+                      <span className="text-gray-700">{profileForm.experienceYears || 0} years</span>
                     </div>
 
                 <div className="text-center mt-8">
-                  <button className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-6 py-3 rounded-lg transition-colors mx-auto">
+                      <button 
+                        onClick={() => setEditing(true)}
+                        className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-6 py-3 rounded-lg transition-colors mx-auto"
+                      >
                     <Edit className="w-4 h-4" />
                     Edit Profile
                   </button>
                         </div>
+                  </div>
+                )}
               </motion.div>
                                     </div>
                             )}
