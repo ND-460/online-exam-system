@@ -7,6 +7,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import Editor from "@monaco-editor/react";
 import ProfilePage from "../ProfilePage";
+import PracticeArena from "./PracticeArena";
 
 export default function StudentDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -436,32 +437,8 @@ export default function StudentDashboard() {
         )}
 
         {/* Practice */}
-        {activeTab === "practice" && (
-          <div className="bg-white p-6 rounded-3xl shadow-xl border border-gray-200">
-            <h3 className="text-xl font-bold mb-4 text-gray-800">
-              Code Practice Arena
-            </h3>
-            <select
-              className="bg-gray-100 border border-gray-300 rounded-lg px-4 py-2 text-gray-800 mb-4"
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-            >
-              <option>JavaScript</option>
-              <option>Python</option>
-              <option>C++</option>
-              <option>Java</option>
-            </select>
-            <div className="h-[400px] rounded-xl overflow-hidden border border-gray-200">
-              <Editor
-                height="100%"
-                language={languageMap[language]}
-                value={code}
-                theme="vs-light"
-                onChange={(v) => setCode(v || "")}
-              />
-            </div>
-          </div>
-        )}
+        {activeTab === "practice" && <PracticeArena />}
+
 
         {/* Reports */}
         {activeTab === "reports" && (
