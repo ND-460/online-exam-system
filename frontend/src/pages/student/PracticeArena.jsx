@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import Editor from "@monaco-editor/react";
 
+
 export default function PracticeArena() {
   const [language, setLanguage] = useState("JavaScript");
   const [code, setCode] = useState("// Start coding here...");
@@ -104,19 +105,23 @@ class RunTests {
   };
 
   const generateTemplate = (q, lang) => {
-    if (!q) return "// Start coding here...";
+  if (!q) return "// Start coding here...";
 
-    switch (lang) {
-      case "Python":
-        return `# ${q.title}
+  // Use AI template if present
+  if (q.template) return q.template;
+
+  // Otherwise, fallback to existing templates
+  switch (lang) {
+    case "Python":
+      return `# ${q.title}
 # ${q.description}
 
 def solve(n):
     # Write your code here
     return 0
 `;
-      case "JavaScript":
-        return `// ${q.title}
+    case "JavaScript":
+      return `// ${q.title}
 // ${q.description}
 
 function solve(n) {
@@ -124,8 +129,8 @@ function solve(n) {
   return 0;
 }
 `;
-      case "C++":
-        return `// ${q.title}
+    case "C++":
+      return `// ${q.title}
 // ${q.description}
 #include <iostream>
 using namespace std;
@@ -135,8 +140,8 @@ int solve(int n) {
     return 0;
 }
 `;
-      case "Java":
-        return `// ${q.title}
+    case "Java":
+      return `// ${q.title}
 // ${q.description}
 public class Main {
     static int solve(int n) {
@@ -145,36 +150,72 @@ public class Main {
     }
 }
 `;
-      default:
-        return "// Start coding here...";
-    }
-  };
+    default:
+      return "// Start coding here...";
+  }
+};
+
 
   // Mock random question generator
-  const generateQuestion = () => {
-    const mockQuestion = {
-      title: "Find Factorial",
-      description:
-        "Write a function that takes an integer n and returns its factorial.",
-      constraints: "n <= 12 (n is positive integer)",
-      samples: [
-        { input: "5", output: "120" },
-        { input: "0", output: "1" },
-      ],
-      hiddenTests: [
-        { input: "7", output: "5040" },
-        { input: "10", output: "3628800" },
-      ],
-    };
-    setQuestion(mockQuestion);
-    setResults([]);
-    setOutput("");
+  // const generateQuestion = () => {
+  //   const mockQuestion = {
+  //     title: "Find Factorial",
+  //     description:
+  //       "Write a function that takes an integer n and returns its factorial.",
+  //     constraints: "n <= 12 (n is positive integer)",
+  //     samples: [
+  //       { input: "5", output: "120" },
+  //       { input: "0", output: "1" },
+  //     ],
+  //     hiddenTests: [
+  //       { input: "7", output: "5040" },
+  //       { input: "10", output: "3628800" },
+  //     ],
+  //   };
+  //   setQuestion(mockQuestion);
+  //   setResults([]);
+  //   setOutput("");
 
-    // also reset code to template for current language
-    const tmpl = generateTemplate(mockQuestion, language);
-    setCode(tmpl);
-    localStorage.setItem("practiceCode", tmpl);
+  //   // also reset code to template for current language
+  //   const tmpl = generateTemplate(mockQuestion, language);
+  //   setCode(tmpl);
+  //   localStorage.setItem("practiceCode", tmpl);
+  // };
+  const generateAIQuestion = async () => {
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/code/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        prompt: "Generate a beginner-friendly coding problem with sample input/output", 
+        options: { numQuestions: 1, difficulty: "easy" }
+      }),
+    });
+    const data = await res.json();
+    if (data.questions && data.questions.length > 0) {
+  const q = data.questions[0];
+
+  const normalizedQuestion = {
+    title: q.title || "Untitled Problem",
+    description: q.description || "No description provided",
+    constraints: q.constraints || "No constraints",
+    samples: q.samples || [],
+    hiddenTests: q.hiddenTests || [],
+    template: q.template || null,
   };
+
+  setQuestion(normalizedQuestion);
+  setCode(generateTemplate(normalizedQuestion, language));
+  setResults([]);
+  setOutput("");
+}
+
+  } catch (err) {
+    console.error("Failed to generate AI question:", err);
+    alert("Failed to generate AI question. Check backend logs.");
+  }
+};
+
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -317,11 +358,12 @@ public class Main {
         <h3 className="text-xl font-bold text-gray-800">Code Practice Arena</h3>
         <div className="flex gap-2">
           <button
-            onClick={generateQuestion}
+            onClick={generateAIQuestion} // Previously generateQuestion
             className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow text-sm font-medium transition"
           >
             New Question
           </button>
+
           <button
             onClick={handleRun}
             disabled={isRunning}

@@ -18,6 +18,7 @@
   },
   "homepage": "https://github.com/ND-460/online-exam-system#readme",
   "dependencies": {
+    "@google/genai": "^1.21.0",
     "@google/generative-ai": "^0.7.1",
     "@huggingface/inference": "^2.6.4",
     "axios": "^1.12.2",

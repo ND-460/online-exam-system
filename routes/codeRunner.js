@@ -1,6 +1,6 @@
 const express = require("express");
 const axios =  require("axios");
-
+const AIService = require("../utils/aiService");
 const router = express.Router();
 
 // Judge0 API base
@@ -46,4 +46,21 @@ router.post("/run", async (req, res) => {
     res.status(500).json({ error: "Code execution failed" });
   }
 });
+
+router.post('/generate', async (req, res) => {
+  try {
+    const { prompt, options } = req.body;
+
+    if (!prompt) {
+      return res.status(400).json({ error: "Prompt is required" });
+    }
+
+    const questions = await AIService.generateQuestionsFromPrompt(prompt, options || {});
+    res.json({ questions });
+  } catch (err) {
+    console.error("AI generation error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
