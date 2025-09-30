@@ -1,0 +1,287 @@
+/* Container */
+
+.register-container {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+
+  /* Background image */
+  background-image: url('/images/back-image-min.jpg'); 
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  position: relative;
+
+  
+  overflow-y: auto;
+}
+
+
+
+
+/* Card */
+.register-card {
+  position: relative;
+  z-index: 1; /* put above overlay */
+  width: 100%;
+  max-width: 800px;
+  background: #fff;
+  border-radius: 1.5rem;
+  padding: 2rem;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.1);
+  overflow: hidden;
+  max-height: 90vh; /* prevent overflowing the viewport */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Optional: make card scrollable if content overflows */
+/* Card */
+.register-card {
+  position: relative;
+  z-index: 1; /* above overlay */
+  width: 100%;
+  max-width: 800px;
+  background: #fff;
+  border-radius: 1.5rem;
+  padding: 2rem;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.1);
+  max-height: 90vh; /* prevent overflowing viewport */
+  display: flex;
+  flex-direction: column;
+
+  overflow-y: auto; /* enable scrolling */
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.register-card::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+
+.register-card::-webkit-scrollbar-thumb {
+  background-color: rgba(0,0,0,0.2);
+  border-radius: 3px;
+}
+
+
+.decorative-circle {
+  position: absolute;
+  top: -8rem;
+  right: -8rem;
+  width: 16rem;
+  height: 16rem;
+  background: #b45309;
+  border-radius: 50%;
+  opacity: 0.2;
+}
+
+/* Logo */
+.logo {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.logo-text {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #1f2937;
+  margin-left: 0.5rem;
+}
+
+.logo-highlight {
+  color: #2563eb;
+}
+
+/* Titles */
+.register-title {
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.25rem;
+}
+
+.register-subtitle {
+  text-align: center;
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-bottom: 1.5rem;
+}
+
+/* Role Buttons */
+.role-selection {
+  display: flex;
+  margin-bottom: 1.5rem;
+  background: #f3f4f6;
+  border-radius: 0.5rem;
+  padding: 0.25rem;
+}
+
+.role-button {
+  flex: 1;
+  padding: 0.5rem 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 0.375rem;
+  background: transparent;
+  color: #4b5563;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.role-button.active {
+  background: #b45309;
+  color: white;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.role-button:hover {
+  background: #e5e7eb;
+}
+
+/* Google button */
+.google-login {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.google-button {
+  text-align: center;
+  background: #b45309;
+  color: white;
+  padding: 0.5rem 0;
+  border-radius: 0.375rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.google-button:hover {
+  background: #c2410b;
+}
+
+.or-text {
+  text-align: center;
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+/* Form */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media(min-width: 768px) {
+  .form-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.form-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Field */
+.field-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.field-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #4b5563;
+  margin-bottom: 0.25rem;
+}
+
+.field-input {
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.field-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.3);
+}
+
+.field-error {
+  font-size: 0.75rem;
+  color: #dc2626;
+  margin-top: 0.25rem;
+}
+
+/* Submit & Feedback */
+.form-feedback {
+  grid-column: 1 / -1;
+}
+
+.error-message {
+  background: #fef2f2;
+  color: #b91c1c;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  border: 1px solid #fca5a5;
+  font-size: 0.75rem;
+}
+
+.success-message {
+  background: #ecfdf5;
+  color: #166534;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  border: 1px solid #a7f3d0;
+  font-size: 0.75rem;
+}
+
+.form-submit button {
+  width: 100%;
+  padding: 0.5rem 0;
+  border-radius: 0.375rem;
+  font-weight: 600;
+  color: white;
+  background: #b45309;
+  cursor: pointer;
+  border: none;
+}
+
+.form-submit button:hover {
+  background: #c2410b;
+}
+
+.form-submit button:disabled {
+  background: #fbbf24;
+  cursor: not-allowed;
+}
+
+/* Footer */
+.register-footer {
+  text-align: center;
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 1.25rem;
+}
+
+.register-footer a {
+  color: #2563eb;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.register-footer a:hover {
+  text-decoration: underline;
+}
