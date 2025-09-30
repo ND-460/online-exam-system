@@ -695,12 +695,12 @@ IMPORTANT: Respond ONLY with valid JSON array. No additional text or markdown.`;
       answer: randomOptions[0],
     };
   }
-   async generateCodingQuestion() {
-    if (!this.gemini) {
-      throw new Error("Gemini client not initialized");
-    }
+ async generateCodingQuestion() {
+  if (!this.gemini) {
+    throw new Error("Gemini client not initialized");
+  }
 
-    const finalPrompt = `
+  const finalPrompt = `
 You are a strict coding question generator.
 
 Generate ONE programming problem ONLY.
@@ -729,40 +729,56 @@ Rules:
 - Do not generate syntax that is specific to one language unless explicitly asked.
 `;
 
-    try {
-      // Call the new SDK method
-      const response = await this.gemini.models.generateContent({
-        model: "gemini-2.0-flash",
-        contents: finalPrompt,
-        // Optional config
-        // config: { temperature: 0.7, maxOutputTokens: 1000 },
-      });
+  try {
+    // Call the Gemini model
+    const response = await this.gemini.models.generateContent({
+      model: "gemini-2.0-flash",
+      contents: finalPrompt,
+      // config: { temperature: 0.7, maxOutputTokens: 1000 },
+    });
 
-      // The new SDK returns text directly
-      const generatedText = response?.text;
-
-      if (!generatedText) {
-        console.error("No valid text found in Gemini response:", response);
-        throw new Error("Empty Gemini response");
-      }
-
-      console.log("AI Raw Text:", generatedText);
-
-      // Parse JSON safely
-      let parsed;
-      try {
-        parsed = JSON.parse(generatedText);
-      } catch (err) {
-        console.error("Failed parsing AI JSON:", generatedText);
-        throw err;
-      }
-
-      return parsed;
-    } catch (err) {
-      console.error("AI JSON parse failed:", err);
-      return null;
+    // Raw text from Gemini
+    const rawText = response?.text;
+    if (!rawText) {
+      console.error("No valid text found in Gemini response:", response);
+      throw new Error("Empty Gemini response");
     }
+
+    console.log("AI Raw Text:", rawText);
+
+    // Remove Markdown fences if present
+    const cleanedText = rawText
+      .replace(/^```(?:json)?\s*/, '')
+      .replace(/```$/, '')
+      .trim();
+
+    // Parse JSON safely
+    let question;
+    try {
+      question = JSON.parse(cleanedText);
+    } catch (err) {
+      console.error("Failed parsing AI JSON:", cleanedText);
+      throw err;
+    }
+
+    // Validate expected fields
+    const requiredFields = ["title", "description", "constraints", "samples", "hiddenTests", "template"];
+    for (const field of requiredFields) {
+      if (!(field in question)) {
+        throw new Error(`Missing field in AI response: ${field}`);
+      }
+    }
+
+    console.log("Generated Question Title:", question.title);
+    return question;
+
+  } catch (err) {
+    console.error("AI question generation failed:", err);
+    return null;
   }
+}
+
+
 }
 
 module.exports = new AIService();

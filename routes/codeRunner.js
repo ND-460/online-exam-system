@@ -49,19 +49,17 @@ router.post("/run", async (req, res) => {
 router.post("/generate", async (req, res) => {
   try {
     const { prompt, options } = req.body;
-    const questions = await AIService.generateCodingQuestion(prompt, options);
+    const q = await AIService.generateCodingQuestion(prompt, options);
 
-    if (!questions || questions.length === 0) {
+    if (!q) {
       return res.status(500).json({ error: "No questions generated" });
     }
 
-    // Normalize AI response
-    const q = questions[0]; // Only take the first question
     const normalized = {
-      title: q.title || q.question || "Untitled Problem",
+      title: q.title || "Untitled Problem",
       description: q.description || "No description provided",
       constraints: q.constraints || "No constraints",
-      samples: q.samples || q.examples || [],
+      samples: q.samples || [],
       hiddenTests: q.hiddenTests || [],
       template: q.template || null,
     };
