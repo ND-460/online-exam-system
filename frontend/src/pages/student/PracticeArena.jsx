@@ -192,29 +192,19 @@ public class Main {
       }),
     });
     const data = await res.json();
-    if (data.questions && data.questions.length > 0) {
-  const q = data.questions[0];
 
-  const normalizedQuestion = {
-    title: q.title || "Untitled Problem",
-    description: q.description || "No description provided",
-    constraints: q.constraints || "No constraints",
-    samples: q.samples || [],
-    hiddenTests: q.hiddenTests || [],
-    template: q.template || null,
-  };
-
-  setQuestion(normalizedQuestion);
-  setCode(generateTemplate(normalizedQuestion, language));
-  setResults([]);
-  setOutput("");
-}
-
+    if (data.question) {
+      setQuestion(data.question);
+      setCode(generateTemplate(data.question, language));
+      setResults([]);
+      setOutput("");
+    }
   } catch (err) {
     console.error("Failed to generate AI question:", err);
     alert("Failed to generate AI question. Check backend logs.");
   }
 };
+  
 
 
   // Load from localStorage on mount

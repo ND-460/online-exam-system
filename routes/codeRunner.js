@@ -2,7 +2,6 @@ const express = require("express");
 const axios =  require("axios");
 const AIService = require("../utils/aiService");
 const router = express.Router();
-
 // Judge0 API base
 const JUDGE0_API = "https://judge0-ce.p.rapidapi.com/submissions";
 
@@ -47,19 +46,30 @@ router.post("/run", async (req, res) => {
   }
 });
 
-router.post('/generate', async (req, res) => {
+router.post("/generate", async (req, res) => {
   try {
     const { prompt, options } = req.body;
+    const questions = await AIService.generateCodingQuestion(prompt, options);
 
-    if (!prompt) {
-      return res.status(400).json({ error: "Prompt is required" });
+    if (!questions || questions.length === 0) {
+      return res.status(500).json({ error: "No questions generated" });
     }
 
-    const questions = await AIService.generateQuestionsFromPrompt(prompt, options || {});
-    res.json({ questions });
-  } catch (err) {
-    console.error("AI generation error:", err);
-    res.status(500).json({ error: err.message });
+    // Normalize AI response
+    const q = questions[0]; // Only take the first question
+    const normalized = {
+      title: q.title || q.question || "Untitled Problem",
+      description: q.description || "No description provided",
+      constraints: q.constraints || "No constraints",
+      samples: q.samples || q.examples || [],
+      hiddenTests: q.hiddenTests || [],
+      template: q.template || null,
+    };
+
+    res.json({ question: normalized });
+  } catch (error) {
+    console.error("Question generation failed:", error);
+    res.status(500).json({ error: "Failed to generate question" });
   }
 });
 

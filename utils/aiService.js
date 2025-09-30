@@ -1,4 +1,4 @@
-const { GoogleGenAI, createUserContent, createPartFromUri } = require("@google/genai");
+const { GoogleGenAI } = require("@google/genai");
 
 const { HfInference } = require("@huggingface/inference");
 const OpenAI = require("openai");
@@ -15,7 +15,6 @@ class AIService {
         });
       } else if (this.provider === "gemini" && process.env.GEMINI_API_KEY) {
         this.gemini = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
       } else if (
         this.provider === "huggingface" &&
         process.env.HUGGINGFACE_API_KEY
@@ -270,26 +269,25 @@ IMPORTANT: Respond ONLY with valid JSON array. No additional text, explanations,
 
   // Google Gemini implementation (FREE with API key)
   async generateWithGemini(prompt) {
-  try {
-    const enhancedPrompt = `${prompt}
+    try {
+      const enhancedPrompt = `${prompt}
 
 IMPORTANT: Respond ONLY with valid JSON array. No additional text or markdown.`;
 
-    const response = await this.gemini.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: enhancedPrompt,
-    });
+      const response = await this.gemini.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: enhancedPrompt,
+      });
 
-    const text = response.text.trim().replace(/```json|```/g, "");
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (jsonMatch) return JSON.parse(jsonMatch[0]);
-    return JSON.parse(text);
-  } catch (error) {
-    console.error("Gemini API error:", error);
-    throw error;
+      const text = response.text.trim().replace(/```json|```/g, "");
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      if (jsonMatch) return JSON.parse(jsonMatch[0]);
+      return JSON.parse(text);
+    } catch (error) {
+      console.error("Gemini API error:", error);
+      throw error;
+    }
   }
-}
-
 
   // Hugging Face implementation (FREE with API key)
   async generateWithHuggingFace(prompt) {
@@ -697,57 +695,74 @@ IMPORTANT: Respond ONLY with valid JSON array. No additional text or markdown.`;
       answer: randomOptions[0],
     };
   }
-  async generateCodingProblem(prompt, language = "JavaScript") {
-  // Construct a coding-specific prompt
-  const codingPrompt = `
-  Generate a programming problem in ${language} with:
-  1. Problem statement
-  2. Starter code template for ${language}
-  3. 2-3 example test cases
-
-  Format the response as JSON:
-  {
-    "problem": "Problem statement here",
-    "template": "Starter code here",
-    "testCases": [
-      { "input": "input1", "output": "output1" },
-      { "input": "input2", "output": "output2" }
-    ]
-  }
-`;
-
-  try {
-    if (this.provider === "openai" && this.openai) {
-      const result = await this.generateWithOpenAI(codingPrompt);
-      return result[0] || result; // Ensure we get JSON object
-    } else if (this.provider === "gemini" && this.model) {
-      return await this.generateWithGemini(codingPrompt);
-    } else if (this.provider === "huggingface" && this.hf) {
-      return await this.generateWithHuggingFace(codingPrompt);
-    } else {
-      throw new Error("No AI provider available, use local fallback");
+   async generateCodingQuestion() {
+    if (!this.gemini) {
+      throw new Error("Gemini client not initialized");
     }
-  } catch (err) {
-    console.warn("AI generation failed, falling back to local coding problem:", err);
-    // Local fallback: simple mock problem
-    return {
-      problem: `Write a function to reverse a string in ${language}`,
-      template:
-        language === "Python"
-          ? "def reverse_string(s):\n    # Write your code here\n    return ''"
-          : language === "JavaScript"
-          ? "function reverseString(s) {\n  // Write your code here\n  return '';\n}"
-          : language === "C++"
-          ? 'std::string reverseString(std::string s) {\n    // Write your code here\n    return "";\n}'
-          : "public class Solution {\n    public static void main(String[] args) {\n        // Write your code here\n    }\n}",
-      testCases: [
-        { input: "hello", output: "olleh" },
-        { input: "world", output: "dlrow" },
-      ],
-    };
-  }
+
+    const finalPrompt = `
+You are a strict coding question generator.
+
+Generate ONE programming problem ONLY.
+The problem MUST require the student to write code, not predict output.
+Do NOT generate multiple-choice or "What will be the output" type questions.
+
+The response must be valid JSON (and nothing else) following this schema:
+
+{
+  "title": "string",
+  "description": "Full problem statement (clear instructions to write a program)",
+  "constraints": "string",
+  "samples": [
+    { "input": "string", "output": "string" }
+  ],
+  "hiddenTests": [
+    { "input": "string", "output": "string" }
+  ],
+  "template": "starter code in a generic pseudocode or default language"
 }
 
+Rules:
+- Always give at least one sample input/output and one hidden test case.
+- The template should include function/method definition as a starting point.
+- Focus on algorithmic or problem-solving tasks (strings, arrays, math, searching, etc).
+- Do not generate syntax that is specific to one language unless explicitly asked.
+`;
+
+    try {
+      // Call the new SDK method
+      const response = await this.gemini.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: finalPrompt,
+        // Optional config
+        // config: { temperature: 0.7, maxOutputTokens: 1000 },
+      });
+
+      // The new SDK returns text directly
+      const generatedText = response?.text;
+
+      if (!generatedText) {
+        console.error("No valid text found in Gemini response:", response);
+        throw new Error("Empty Gemini response");
+      }
+
+      console.log("AI Raw Text:", generatedText);
+
+      // Parse JSON safely
+      let parsed;
+      try {
+        parsed = JSON.parse(generatedText);
+      } catch (err) {
+        console.error("Failed parsing AI JSON:", generatedText);
+        throw err;
+      }
+
+      return parsed;
+    } catch (err) {
+      console.error("AI JSON parse failed:", err);
+      return null;
+    }
+  }
 }
 
 module.exports = new AIService();
