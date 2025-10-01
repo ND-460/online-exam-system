@@ -695,12 +695,12 @@ IMPORTANT: Respond ONLY with valid JSON array. No additional text or markdown.`;
       answer: randomOptions[0],
     };
   }
- async generateCodingQuestion() {
-  if (!this.gemini) {
-    throw new Error("Gemini client not initialized");
-  }
+  async generateCodingQuestion() {
+    if (!this.gemini) {
+      throw new Error("Gemini client not initialized");
+    }
 
-  const finalPrompt = `
+    const finalPrompt = `
 You are a strict coding question generator.
 
 Generate ONE programming problem ONLY.
@@ -719,66 +719,75 @@ The response must be valid JSON (and nothing else) following this schema:
   "hiddenTests": [
     { "input": "string", "output": "string" }
   ],
-  "template": "starter code in a generic pseudocode or default language"
+  "templates": {
+    "JavaScript": "function solve(n) { ... }",
+    "Python": "def solve(n): ...",
+    "C++": "int solve(int n) { ... }",
+    "Java": "public class Main { static int solve(int n) { ... } }"
+  }
 }
 
 Rules:
 - Always give at least one sample input/output and one hidden test case.
-- The template should include function/method definition as a starting point.
-- Focus on algorithmic or problem-solving tasks (strings, arrays, math, searching, etc).
-- Do not generate syntax that is specific to one language unless explicitly asked.
+- Templates MUST exist for all 4 languages (JavaScript, Python, C++, Java).
+- Templates should contain a "solve" function with the correct signature.
+- Keep templates minimal — only skeleton code with comments.
 `;
 
-  try {
-    // Call the Gemini model
-    const response = await this.gemini.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: finalPrompt,
-      // config: { temperature: 0.7, maxOutputTokens: 1000 },
-    });
-
-    // Raw text from Gemini
-    const rawText = response?.text;
-    if (!rawText) {
-      console.error("No valid text found in Gemini response:", response);
-      throw new Error("Empty Gemini response");
-    }
-
-    console.log("AI Raw Text:", rawText);
-
-    // Remove Markdown fences if present
-    const cleanedText = rawText
-      .replace(/^```(?:json)?\s*/, '')
-      .replace(/```$/, '')
-      .trim();
-
-    // Parse JSON safely
-    let question;
     try {
-      question = JSON.parse(cleanedText);
-    } catch (err) {
-      console.error("Failed parsing AI JSON:", cleanedText);
-      throw err;
-    }
+      // Call the Gemini model
+      const response = await this.gemini.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: finalPrompt,
+        // config: { temperature: 0.7, maxOutputTokens: 1000 },
+      });
 
-    // Validate expected fields
-    const requiredFields = ["title", "description", "constraints", "samples", "hiddenTests", "template"];
-    for (const field of requiredFields) {
-      if (!(field in question)) {
-        throw new Error(`Missing field in AI response: ${field}`);
+      // Raw text from Gemini
+      const rawText = response?.text;
+      if (!rawText) {
+        console.error("No valid text found in Gemini response:", response);
+        throw new Error("Empty Gemini response");
       }
+
+      console.log("AI Raw Text:", rawText);
+
+      // Remove Markdown fences if present
+      const cleanedText = rawText
+        .replace(/^```(?:json)?\s*/, "")
+        .replace(/```$/, "")
+        .trim();
+
+      // Parse JSON safely
+      let question;
+      try {
+        question = JSON.parse(cleanedText);
+      } catch (err) {
+        console.error("Failed parsing AI JSON:", cleanedText);
+        throw err;
+      }
+
+      // Validate expected fields
+      const requiredFields = [
+        "title",
+        "description",
+        "constraints",
+        "samples",
+        "hiddenTests",
+        "templates",
+      ];
+      for (const field of requiredFields) {
+        if (!(field in question)) {
+          throw new Error(`Missing field in AI response: ${field}`);
+        }
+      }
+
+      console.log("Generated Question Title:", question.title);
+      return question;
+    } catch (err) {
+      console.error("AI question generation failed:", err);
+      return null;
     }
-
-    console.log("Generated Question Title:", question.title);
-    return question;
-
-  } catch (err) {
-    console.error("AI question generation failed:", err);
-    return null;
   }
-}
-
-
 }
 
 module.exports = new AIService();

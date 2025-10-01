@@ -1,5 +1,5 @@
 const express = require("express");
-const axios =  require("axios");
+const axios = require("axios");
 const AIService = require("../utils/aiService");
 const router = express.Router();
 // Judge0 API base
@@ -15,9 +15,9 @@ const JUDGE0_HEADERS = {
 // Language IDs (Judge0 specific)
 const languageIds = {
   JavaScript: 63, // Node.js 18
-  Python: 71,     // Python 3.11
-  "C++": 54,      // C++ (GCC 9.2)
-  Java: 62,       // Java (OpenJDK 13)
+  Python: 71, // Python 3.11
+  "C++": 54, // C++ (GCC 9.2)
+  Java: 62, // Java (OpenJDK 13)
 };
 
 router.post("/run", async (req, res) => {
@@ -61,7 +61,7 @@ router.post("/generate", async (req, res) => {
       constraints: q.constraints || "No constraints",
       samples: q.samples || [],
       hiddenTests: q.hiddenTests || [],
-      template: q.template || null,
+      templates: q.templates || {}, 
     };
 
     res.json({ question: normalized });

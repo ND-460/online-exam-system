@@ -107,80 +107,26 @@ class RunTests {
   const generateTemplate = (q, lang) => {
   if (!q) return "// Start coding here...";
 
-  // Use AI template if present
-  if (q.template) return q.template;
+  // Use AI template for selected language if present
+  if (q.templates && q.templates[lang]) {
+    return q.templates[lang];
+  }
 
-  // Otherwise, fallback to existing templates
+  // fallback skeletons
   switch (lang) {
     case "Python":
-      return `# ${q.title}
-# ${q.description}
-
-def solve(n):
-    # Write your code here
-    return 0
-`;
+      return `def solve(n):\n    # Write your code here\n    return 0`;
     case "JavaScript":
-      return `// ${q.title}
-// ${q.description}
-
-function solve(n) {
-  // Write your code here
-  return 0;
-}
-`;
+      return `function solve(n) {\n  // Write your code here\n  return 0;\n}`;
     case "C++":
-      return `// ${q.title}
-// ${q.description}
-#include <iostream>
-using namespace std;
-
-int solve(int n) {
-    // Write your code here
-    return 0;
-}
-`;
+      return `int solve(int n) {\n    // Write your code here\n    return 0;\n}`;
     case "Java":
-      return `// ${q.title}
-// ${q.description}
-public class Main {
-    static int solve(int n) {
-        // Write your code here
-        return 0;
-    }
-}
-`;
+      return `public class Main {\n    static int solve(int n) {\n        // Write your code here\n        return 0;\n    }\n}`;
     default:
       return "// Start coding here...";
   }
 };
 
-
-  // Mock random question generator
-  // const generateQuestion = () => {
-  //   const mockQuestion = {
-  //     title: "Find Factorial",
-  //     description:
-  //       "Write a function that takes an integer n and returns its factorial.",
-  //     constraints: "n <= 12 (n is positive integer)",
-  //     samples: [
-  //       { input: "5", output: "120" },
-  //       { input: "0", output: "1" },
-  //     ],
-  //     hiddenTests: [
-  //       { input: "7", output: "5040" },
-  //       { input: "10", output: "3628800" },
-  //     ],
-  //   };
-  //   setQuestion(mockQuestion);
-  //   setResults([]);
-  //   setOutput("");
-
-  //   // also reset code to template for current language
-  //   const tmpl = generateTemplate(mockQuestion, language);
-  //   setCode(tmpl);
-  //   localStorage.setItem("practiceCode", tmpl);
-  // };
   const generateAIQuestion = async () => {
   try {
     const res = await fetch(`${import.meta.env.VITE_API_URL}/api/code/generate`, {
@@ -240,13 +186,23 @@ public class Main {
   }, [code]);
 
   // Reset handler
-  const handleReset = () => {
-    const defaultCode = templates[language] || "// Start coding here...";
-    setCode(defaultCode);
-    localStorage.setItem("practiceCode", defaultCode);
-    setOutput("");
-    setResults([]);
-  };
+const handleReset = () => {
+  let defaultCode;
+
+  if (question) {
+    // Reset to AI template for current language
+    defaultCode = generateTemplate(question, language);
+  } else {
+    // Reset to Hello World template
+    defaultCode = templates[language] || "// Start coding here...";
+  }
+
+  setCode(defaultCode);
+  localStorage.setItem("practiceCode", defaultCode);
+  setOutput("");
+  setResults([]);
+};
+
 
   // Run code handler
   // Run code handler
