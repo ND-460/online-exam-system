@@ -85,6 +85,8 @@ export default function StudentDashboard() {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
+      console.log("Assigned tests response:", res.data);
+
       setMyTests(Array.isArray(res.data.tests) ? res.data.tests : []);
     } catch (err) {
       console.error("Error fetching my tests:", err);
@@ -99,44 +101,51 @@ export default function StudentDashboard() {
   }, [activeTab]);
 
   const getFilteredSortedTests = () => {
-    let filtered = [...myTests];
-    const now = new Date();
+  let filtered = [...myTests];
 
-    filtered = filtered.map((t) => {
-      const startTime = new Date(t.scheduledAt);
-      const endTime = new Date(startTime.getTime() + t.minutes * 60000);
-      let status = "upcoming";
-      if (t.submitBy.includes(user._id)) status = "completed";
-      else if (now >= startTime && now <= endTime) status = "ongoing";
-      else if (now < startTime) status = "upcoming";
-      else status = "expired";
-      return { ...t, status };
-    });
+  // Apply status filter
+  if (filterStatus !== "all") {
+    filtered = filtered.filter((t) => t.status === filterStatus);
+  }
 
-    if (filterStatus !== "all")
-      filtered = filtered.filter((t) => t.status === filterStatus);
-    else filtered = filtered.filter((t) => t.status !== "expired");
+  // Apply category filter
+  if (filterCategory !== "all") {
+    filtered = filtered.filter((t) => t.category === filterCategory);
+  }
 
-    if (filterCategory !== "all")
-      filtered = filtered.filter((t) => t.category === filterCategory);
+  // Apply search
+  if (debouncedSearchQuery.trim() !== "") {
+    filtered = filtered.filter((t) =>
+      t.testName.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+    );
+  }
 
-    if (debouncedSearchQuery.trim() !== "")
-      filtered = filtered.filter((t) =>
-        t.testName.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
-      );
+  // Sorting
+  // Sorting
+filtered.sort((a, b) => {
+  let aValue, bValue;
 
-    filtered.sort((a, b) => {
-      let aValue =
-        sortBy === "name" ? a.testName.toLowerCase() : new Date(a.scheduledAt);
-      let bValue =
-        sortBy === "name" ? b.testName.toLowerCase() : new Date(b.scheduledAt);
-      if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
-      if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
-      return 0;
-    });
+  if (sortBy === "name") {
+    aValue = a.testName.toLowerCase();
+    bValue = b.testName.toLowerCase();
+  } else if (sortBy === "scheduledAt") {
+    aValue = new Date(a.scheduledAt);
+    bValue = new Date(b.scheduledAt);
+  } else if (sortBy === "status") {
+    const order = { ongoing: 1, upcoming: 2, completed: 3, expired: 4 };
+    aValue = order[a.status] || 5;
+    bValue = order[b.status] || 5;
+  }
 
-    return filtered;
-  };
+  if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
+  if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
+  return 0;
+});
+
+
+  return filtered;
+};
+
 
   const languageMap = {
     JavaScript: "javascript",
@@ -335,6 +344,7 @@ export default function StudentDashboard() {
                 <option value="upcoming">Upcoming</option>
                 <option value="ongoing">Ongoing</option>
                 <option value="completed">Completed</option>
+                <option value="expired">Expired</option>
               </select>
               <select
                 className="bg-white border border-gray-300 text-gray-800 px-3 py-2 rounded"
