@@ -162,17 +162,26 @@ export default function StudentDashboard() {
         backgroundPosition: "center",
       }}
     >
-      {/* Sidebar */}
-      <aside className="w-64 bg-white/90 backdrop-blur-md border-r border-gray-200 shadow-lg flex flex-col">
+      <aside className="w-64 h-screen bg-white/90 backdrop-blur-md border-r border-gray-200 shadow-lg flex flex-col fixed left-0 top-0">
         <div className="p-6 text-2xl font-bold tracking-tight text-yellow-800">
           ExamVolt
         </div>
-        <nav className="flex-1 px-3 space-y-2">
-          {tabs.map((tab) => (
+        <nav className="flex-1 flex flex-col gap-2 overflow-y-auto px-3">
+          {[
+            { id: "dashboard", label: "Dashboard", icon: "🏠" },
+            { id: "tests", label: "My Tests", icon: "📝" },
+            { id: "practice", label: "Practice", icon: "💻" },
+            { id: "reports", label: "Reports", icon: "📊" },
+            { id: "profile", label: "Profile", icon: "👤" },
+            { id: "logout", label: "Logout", icon: "🚪" }, // 👈 logout as tab
+          ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-3 w-full px-4 py-3 rounded-xl font-medium transition ${
+              onClick={() =>
+                tab.id === "logout" ? handleLogout() : setActiveTab(tab.id)
+              }
+              className={`flex items-center gap-3 w-full px-4 py-3 rounded-xl font-medium transition
+              ${
                 activeTab === tab.id
                   ? "bg-yellow-700 text-white shadow"
                   : "text-gray-700 hover:bg-gray-100"
@@ -182,24 +191,24 @@ export default function StudentDashboard() {
             </button>
           ))}
         </nav>
-        <div className="p-4">
-          <button
-            onClick={handleLogout}
-            className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 px-4 py-2 rounded-lg text-white font-semibold shadow"
-          >
-            Logout
-          </button>
-        </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-8 overflow-y-auto">
+      <main
+        className="flex-1 ml-64 p-8 overflow-y-auto"
+        style={{
+          backgroundImage: `url("/images/back-image-min.jpg")`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+      >
         <header className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-extrabold text-white">
-            {tabs.find((t) => t.id === activeTab)?.label}
+            {["logout"].includes(activeTab)
+              ? "Logging out..."
+              : tabs.find((t) => t.id === activeTab)?.label}
           </h1>
         </header>
-
         {/* Dashboard */}
         {activeTab === "dashboard" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -291,7 +300,9 @@ export default function StudentDashboard() {
                           Join
                         </button>
                       ) : (
-                        <span className="text-yellow-500 text-sm font-medium">{test.status}</span>
+                        <span className="text-yellow-500 text-sm font-medium">
+                          {test.status}
+                        </span>
                       )}
                     </li>
                   ))}
@@ -438,7 +449,6 @@ export default function StudentDashboard() {
 
         {/* Practice */}
         {activeTab === "practice" && <PracticeArena />}
-
 
         {/* Reports */}
         {activeTab === "reports" && (
