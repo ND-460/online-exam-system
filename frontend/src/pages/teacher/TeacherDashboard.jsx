@@ -202,59 +202,53 @@ export default function TeacherDashboard() {
   };
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-r from-blue-50 via-blue-100 to-white text-gray-900">
-      {/* Sidebar */}
-      <aside className="w-64 bg-white/90 backdrop-blur-md border-r border-gray-200 shadow-lg flex flex-col">
-        <div className="p-6 text-2xl font-bold tracking-tight text-yellow-800">
-          ExamVolt
-        </div>
-        <nav className="flex-1 flex flex-col gap-3">
-          {[
-            { id: "dashboard", label: "Dashboard", emoji: "🏠" },
-            { id: "manage", label: "Manage Tests", emoji: "📝" },
-            { id: "submissions", label: "Submissions", emoji: "📂" },
-            { id: "analytics", label: "Analytics", emoji: "📊" },
-            { id: "profile", label: "Profile", emoji: "👤" },
-            { id: "invite", label: "Invite Students", emoji: "✉️" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`w-full text-left px-4 py-2 rounded-xl font-medium transition
-              ${
-                activeTab === tab.id
-                  ? "bg-yellow-700 text-white shadow"
-                  : "text-gray-700 hover:bg-gray-100"
-              }`}
-            >
-              <span>{tab.emoji}</span> {tab.label}
-            </button>
-          ))}
-        </nav>
-        <div className="mt-auto flex flex-col gap-2">
-          {/* <Link to="/profile">
-          <button className="w-full bg-yellow-200 hover:bg-yellow-300 px-4 py-2 rounded-md text-yellow-800 font-semibold">
-            Profile
-          </button>
-        </Link> */}
-          <button
-            onClick={handleLogout}
-            className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 px-4 py-2 rounded-md font-semibold text-white"
-          >
-            Logout
-          </button>
-        </div>
-      </aside>
+    <div className="flex h-screen bg-gradient-to-r from-blue-50 via-blue-100 to-white text-gray-900">
+  {/* Sidebar */}
+  <aside className="w-64 h-screen bg-white/90 backdrop-blur-md border-r border-gray-200 shadow-lg flex flex-col fixed left-0 top-0">
+    <div className="p-6 text-2xl font-bold tracking-tight text-yellow-800">
+      ExamVolt
+    </div>
+    <nav className="flex-1 flex flex-col gap-3 overflow-y-auto">
+      {[
+        { id: "dashboard", label: "Dashboard", emoji: "🏠" },
+        { id: "manage", label: "Manage Tests", emoji: "📝" },
+        { id: "submissions", label: "Submissions", emoji: "📂" },
+        { id: "analytics", label: "Analytics", emoji: "📊" },
+        { id: "profile", label: "Profile", emoji: "👤" },
+        { id: "invite", label: "Invite Students", emoji: "✉️" },
+        { id: "logout", label: "Logout", emoji: "🚪" },
+      ].map((tab) => (
+        <button
+          key={tab.id}
+          onClick={() => {
+            if (tab.id === "logout") {
+              handleLogout();
+            } else {
+              setActiveTab(tab.id);
+            }
+          }}
+          className={`w-full text-left px-4 py-2 rounded-xl font-medium transition
+            ${
+              activeTab === tab.id
+                ? "bg-yellow-700 text-white shadow"
+                : "text-gray-700 hover:bg-gray-100"
+            }`}
+        >
+          <span>{tab.emoji}</span> {tab.label}
+        </button>
+      ))}
+    </nav>
+  </aside>
 
-      {/* Main Content */}
-      <main
-        className="flex-1 p-8 overflow-y-auto space-y-8"
-        style={{
-          backgroundImage: `url("/images/back-image-min.jpg")`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
-      >
+  {/* Main Content */}
+  <main
+    className="flex-1 ml-64 p-8 overflow-y-auto space-y-8"
+    style={{
+      backgroundImage: `url("/images/back-image-min.jpg")`,
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+    }}
+  >
         {showAIGenerator ? (
           <AIQuestionGenerator
             onQuestionsGenerated={handleAIQuestionsGenerated}
