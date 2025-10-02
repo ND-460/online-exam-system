@@ -26,11 +26,11 @@
       google.accounts.id.initialize({
         client_id: CLIENT_ID,
         callback: (response) => {
-          log("✅ One Tap token received: " + response.credential.substring(0, 30) + "...");
+          log("  One Tap token received: " + response.credential.substring(0, 30) + "...");
         }
       });
       google.accounts.id.prompt((notification) => {
-        if (notification.isNotDisplayed()) log("❌ One Tap not displayed: " + notification.getNotDisplayedReason());
+        if (notification.isNotDisplayed()) log("  One Tap not displayed: " + notification.getNotDisplayedReason());
         if (notification.isSkippedMoment()) log("⚠ One Tap skipped: " + notification.getSkippedReason());
       });
     });

@@ -1,38 +1,50 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { HfInference } = require('@huggingface/inference');
-const OpenAI = require('openai');
-require('dotenv').config();
+const { GoogleGenAI } = require("@google/genai");
+
+const { HfInference } = require("@huggingface/inference");
+const OpenAI = require("openai");
+require("dotenv").config();
 
 class AIService {
   constructor() {
-    this.provider = process.env.AI_PROVIDER || 'local'; // Default to local if no provider set
-    
+    this.provider = process.env.AI_PROVIDER || "local"; // Default to local if no provider set
+
     try {
-      if (this.provider === 'openai' && process.env.OPENAI_API_KEY) {
+      if (this.provider === "openai" && process.env.OPENAI_API_KEY) {
         this.openai = new OpenAI({
           apiKey: process.env.OPENAI_API_KEY,
         });
-      } else if (this.provider === 'gemini' && process.env.GEMINI_API_KEY) {
-        this.gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        this.model = this.gemini.getGenerativeModel({ model: "gemini-1.5-flash" });
-      } else if (this.provider === 'huggingface' && process.env.HUGGINGFACE_API_KEY) {
+      } else if (this.provider === "gemini" && process.env.GEMINI_API_KEY) {
+        this.gemini = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      } else if (
+        this.provider === "huggingface" &&
+        process.env.HUGGINGFACE_API_KEY
+      ) {
         this.hf = new HfInference(process.env.HUGGINGFACE_API_KEY);
       } else {
-        console.log('No AI API key found, using local mode');
-        this.provider = 'local';
+        console.log("No AI API key found, using local mode");
+        this.provider = "local";
       }
     } catch (error) {
-      console.log('AI service initialization failed, falling back to local mode');
-      this.provider = 'local';
+      console.log(
+        "AI service initialization failed, falling back to local mode"
+      );
+      this.provider = "local";
     }
   }
 
   async generateQuestionsFromKeywords(keywords, options = {}) {
-    const { numQuestions = 5, difficulty = 'medium', questionType = 'multiple-choice', subject = 'general' } = options;
-    
+    const {
+      numQuestions = 5,
+      difficulty = "medium",
+      questionType = "multiple-choice",
+      subject = "general",
+    } = options;
+
     let prompt;
-    if (questionType === 'descriptive') {
-      prompt = `Generate ${numQuestions} ${difficulty} difficulty descriptive questions based on these keywords: ${keywords.join(', ')}.
+    if (questionType === "descriptive") {
+      prompt = `Generate ${numQuestions} ${difficulty} difficulty descriptive questions based on these keywords: ${keywords.join(
+        ", "
+      )}.
       
       For each question, provide:
       1. A clear, well-structured descriptive question that requires detailed explanation
@@ -50,7 +62,9 @@ class AIService {
       Subject context: ${subject}
       Ensure questions are educational, thought-provoking, and require comprehensive answers.`;
     } else {
-      prompt = `Generate ${numQuestions} ${difficulty} difficulty multiple-choice questions based on these keywords: ${keywords.join(', ')}.
+      prompt = `Generate ${numQuestions} ${difficulty} difficulty multiple-choice questions based on these keywords: ${keywords.join(
+        ", "
+      )}.
       
       For each question, provide:
       1. A clear, well-structured question
@@ -75,35 +89,39 @@ class AIService {
       console.log(`Using AI provider: ${this.provider}`);
       console.log(`Keywords received:`, keywords);
       console.log(`Options received:`, options);
-      
-      if (this.provider === 'openai' && this.openai) {
+
+      if (this.provider === "openai" && this.openai) {
         return await this.generateWithOpenAI(prompt);
-      } else if (this.provider === 'gemini' && this.model) {
+      } else if (this.provider === "gemini" && this.gemini) {
         return await this.generateWithGemini(prompt);
-      } else if (this.provider === 'huggingface' && this.hf) {
+      } else if (this.provider === "huggingface" && this.hf) {
         return await this.generateWithHuggingFace(prompt);
       } else {
-        console.log('Falling back to local generation');
+        console.log("Falling back to local generation");
         return await this.generateWithLocal(keywords, options);
       }
     } catch (error) {
-      console.error('Error generating questions from keywords:', error);
+      console.error("Error generating questions from keywords:", error);
       // Always fallback to local generation if AI fails
-      console.log('Attempting local fallback generation');
+      console.log("Attempting local fallback generation");
       try {
         return await this.generateWithLocal(keywords, options);
       } catch (localError) {
-        console.error('Local generation also failed:', localError);
-        throw new Error('All question generation methods failed');
+        console.error("Local generation also failed:", localError);
+        throw new Error("All question generation methods failed");
       }
     }
   }
 
   async generateQuestionsFromPrompt(prompt, options = {}) {
-    const { numQuestions = 5, difficulty = 'medium', questionType = 'multiple-choice' } = options;
-    
+    const {
+      numQuestions = 5,
+      difficulty = "medium",
+      questionType = "multiple-choice",
+    } = options;
+
     let fullPrompt;
-    if (questionType === 'descriptive') {
+    if (questionType === "descriptive") {
       fullPrompt = `Generate ${numQuestions} ${difficulty} difficulty descriptive questions based on this prompt: "${prompt}".
       
       For each question, provide:
@@ -145,34 +163,34 @@ class AIService {
       console.log(`Using AI provider: ${this.provider}`);
       console.log(`Prompt received:`, prompt);
       console.log(`Options received:`, options);
-      
-      if (this.provider === 'openai' && this.openai) {
+
+      if (this.provider === "openai" && this.openai) {
         return await this.generateWithOpenAI(fullPrompt);
-      } else if (this.provider === 'gemini' && this.model) {
+      } else if (this.provider === "gemini" && this.gemini) {
         return await this.generateWithGemini(fullPrompt);
-      } else if (this.provider === 'huggingface' && this.hf) {
+      } else if (this.provider === "huggingface" && this.hf) {
         return await this.generateWithHuggingFace(fullPrompt);
       } else {
-        console.log('Falling back to local generation');
+        console.log("Falling back to local generation");
         // For local generation, extract keywords from prompt
-        const keywords = prompt.split(' ').filter(word => word.length > 3);
+        const keywords = prompt.split(" ").filter((word) => word.length > 3);
         return await this.generateWithLocal(keywords, options);
       }
     } catch (error) {
-      console.error('Error generating questions from prompt:', error);
+      console.error("Error generating questions from prompt:", error);
       // Always fallback to local generation if AI fails
-      console.log('Attempting local fallback generation');
+      console.log("Attempting local fallback generation");
       try {
-        const keywords = prompt.split(' ').filter(word => word.length > 3);
+        const keywords = prompt.split(" ").filter((word) => word.length > 3);
         return await this.generateWithLocal(keywords, options);
       } catch (localError) {
-        console.error('Local generation also failed:', localError);
-        throw new Error('All question generation methods failed');
+        console.error("Local generation also failed:", localError);
+        throw new Error("All question generation methods failed");
       }
     }
   }
 
-  async enhanceQuestions(questions, context = '') {
+  async enhanceQuestions(questions, context = "") {
     const prompt = `Improve and enhance these exam questions while maintaining their educational value:
 
 ${JSON.stringify(questions, null, 2)}
@@ -189,17 +207,17 @@ Requirements:
 Return the enhanced questions in the same JSON format.`;
 
     try {
-      if (this.provider === 'openai' && this.openai) {
+      if (this.provider === "openai" && this.openai) {
         return await this.generateWithOpenAI(prompt);
-      } else if (this.provider === 'gemini') {
+      } else if (this.provider === "gemini") {
         return await this.generateWithGemini(prompt);
-      } else if (this.provider === 'huggingface') {
+      } else if (this.provider === "huggingface") {
         return await this.generateWithHuggingFace(prompt);
       } else {
         return questions; // Return original if no AI provider
       }
     } catch (error) {
-      console.error('Error enhancing questions:', error);
+      console.error("Error enhancing questions:", error);
       return questions; // Return original questions if enhancement fails
     }
   }
@@ -216,20 +234,21 @@ IMPORTANT: Respond ONLY with valid JSON array. No additional text, explanations,
         messages: [
           {
             role: "system",
-            content: "You are an expert question generator. Always respond with valid JSON arrays containing educational questions."
+            content:
+              "You are an expert question generator. Always respond with valid JSON arrays containing educational questions.",
           },
           {
             role: "user",
-            content: enhancedPrompt
-          }
+            content: enhancedPrompt,
+          },
         ],
         temperature: 0.7,
-        max_tokens: 1500
+        max_tokens: 1500,
       });
 
       const response = completion.choices[0].message.content;
-      const cleanText = response.trim().replace(/```json|```/g, '');
-      
+      const cleanText = response.trim().replace(/```json|```/g, "");
+
       // Extract JSON from response
       const jsonMatch = cleanText.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
@@ -238,12 +257,12 @@ IMPORTANT: Respond ONLY with valid JSON array. No additional text, explanations,
         try {
           return JSON.parse(cleanText);
         } catch (parseError) {
-          console.error('Failed to parse OpenAI response:', cleanText);
-          throw new Error('Invalid response format from OpenAI');
+          console.error("Failed to parse OpenAI response:", cleanText);
+          throw new Error("Invalid response format from OpenAI");
         }
       }
     } catch (error) {
-      console.error('OpenAI API error:', error);
+      console.error("OpenAI API error:", error);
       throw error;
     }
   }
@@ -251,34 +270,21 @@ IMPORTANT: Respond ONLY with valid JSON array. No additional text, explanations,
   // Google Gemini implementation (FREE with API key)
   async generateWithGemini(prompt) {
     try {
-      // Add explicit JSON formatting instruction
       const enhancedPrompt = `${prompt}
 
-IMPORTANT: Respond ONLY with valid JSON array. No additional text, explanations, or markdown formatting.`;
+IMPORTANT: Respond ONLY with valid JSON array. No additional text or markdown.`;
 
-      const result = await this.model.generateContent(enhancedPrompt);
-      const response = await result.response;
-      const text = response.text();
-      
-      // Clean the response text
-      const cleanText = text.trim().replace(/```json|```/g, '');
-      
-      // Extract JSON from response
-      const jsonMatch = cleanText.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      } else {
-        // If no JSON array found, try parsing the entire clean text
-        try {
-          return JSON.parse(cleanText);
-        } catch (parseError) {
-          console.error('Failed to parse Gemini response:', cleanText);
-          throw new Error('Invalid response format from Gemini');
-        }
-      }
+      const response = await this.gemini.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: enhancedPrompt,
+      });
+
+      const text = response.text.trim().replace(/```json|```/g, "");
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      if (jsonMatch) return JSON.parse(jsonMatch[0]);
+      return JSON.parse(text);
     } catch (error) {
-      console.error('Gemini API error:', error);
-      // Don't throw error, let it fall back to local generation
+      console.error("Gemini API error:", error);
       throw error;
     }
   }
@@ -288,13 +294,13 @@ IMPORTANT: Respond ONLY with valid JSON array. No additional text, explanations,
     try {
       // Use a better model for question generation
       const response = await this.hf.textGeneration({
-        model: 'google/flan-t5-base',
+        model: "google/flan-t5-base",
         inputs: prompt,
         parameters: {
           max_new_tokens: 500,
           temperature: 0.7,
-          return_full_text: false
-        }
+          return_full_text: false,
+        },
       });
 
       // Parse the response and extract JSON
@@ -303,10 +309,10 @@ IMPORTANT: Respond ONLY with valid JSON array. No additional text, explanations,
       if (jsonMatch) {
         return JSON.parse(jsonMatch[0]);
       } else {
-        throw new Error('No valid JSON found in HuggingFace response');
+        throw new Error("No valid JSON found in HuggingFace response");
       }
     } catch (error) {
-      console.error('Hugging Face API error:', error);
+      console.error("Hugging Face API error:", error);
       throw error; // Let the main function handle fallback
     }
   }
@@ -315,24 +321,24 @@ IMPORTANT: Respond ONLY with valid JSON array. No additional text, explanations,
   async generateWithLocal(keywords, options = {}) {
     const {
       numQuestions = 5,
-      difficulty = 'medium',
-      subject = 'general',
-      questionType = 'multiple-choice'
+      difficulty = "medium",
+      subject = "general",
+      questionType = "multiple-choice",
     } = options;
 
     // Handle case where keywords might be a string or array
     let keywordArray = Array.isArray(keywords) ? keywords : [keywords];
-    
+
     // If no keywords provided, generate generic questions
     if (!keywordArray || keywordArray.length === 0) {
-      keywordArray = [subject, 'concept', 'theory', 'principle', 'method'];
+      keywordArray = [subject, "concept", "theory", "principle", "method"];
     }
 
     const questions = [];
 
-    if (questionType === 'descriptive') {
+    if (questionType === "descriptive") {
       return this.generateDescriptiveQuestions(keywordArray, options);
-    } else if (questionType === 'mixed') {
+    } else if (questionType === "mixed") {
       return this.generateMixedQuestions(keywordArray, options);
     } else {
       return this.generateMCQQuestions(keywordArray, options);
@@ -340,43 +346,50 @@ IMPORTANT: Respond ONLY with valid JSON array. No additional text, explanations,
   }
 
   generateDescriptiveQuestions(keywords, options) {
-    const { numQuestions = 5, difficulty = 'medium', subject = 'general' } = options;
-    
+    const {
+      numQuestions = 5,
+      difficulty = "medium",
+      subject = "general",
+    } = options;
+
     const descriptiveTemplates = {
       easy: [
         "Explain what {keyword} means in simple terms.",
         "Describe the basic concept of {keyword}.",
         "What is {keyword} and why is it important?",
         "Define {keyword} and give an example.",
-        "How would you explain {keyword} to a beginner?"
+        "How would you explain {keyword} to a beginner?",
       ],
       medium: [
         "Discuss the role of {keyword} in {subject}.",
         "Explain how {keyword} works and its applications.",
         "Describe the advantages and disadvantages of {keyword}.",
         "How does {keyword} impact modern {subject}?",
-        "Analyze the importance of {keyword} in today's context."
+        "Analyze the importance of {keyword} in today's context.",
       ],
       hard: [
         "Critically evaluate the effectiveness of {keyword} in {subject}.",
         "Compare and contrast {keyword} with alternative approaches.",
         "Discuss the future implications of {keyword} in {subject}.",
         "Analyze the challenges and solutions related to {keyword}.",
-        "How would you improve or modify {keyword} for better outcomes?"
-      ]
+        "How would you improve or modify {keyword} for better outcomes?",
+      ],
     };
 
-    const templates = descriptiveTemplates[difficulty] || descriptiveTemplates.medium;
+    const templates =
+      descriptiveTemplates[difficulty] || descriptiveTemplates.medium;
     const questions = [];
 
     for (let i = 0; i < numQuestions; i++) {
       const keyword = keywords[i % keywords.length];
       const template = templates[i % templates.length];
-      const question = template.replace(/{keyword}/g, keyword).replace(/{subject}/g, subject);
+      const question = template
+        .replace(/{keyword}/g, keyword)
+        .replace(/{subject}/g, subject);
 
       questions.push({
-        type: 'Subjective',
-        question: question
+        type: "Subjective",
+        question: question,
       });
     }
 
@@ -384,27 +397,36 @@ IMPORTANT: Respond ONLY with valid JSON array. No additional text, explanations,
   }
 
   generateMCQQuestions(keywords, options) {
-    const { numQuestions = 5, difficulty = 'medium', subject = 'general' } = options;
+    const {
+      numQuestions = 5,
+      difficulty = "medium",
+      subject = "general",
+    } = options;
 
     // Subject-specific question templates and options
-    const subjectQuestions = this.getSubjectSpecificQuestions(subject, difficulty);
-    
+    const subjectQuestions = this.getSubjectSpecificQuestions(
+      subject,
+      difficulty
+    );
+
     const questions = [];
 
     for (let i = 0; i < numQuestions; i++) {
       const keyword = keywords[i % keywords.length];
-      
+
       // Use subject-specific templates if available
       if (subjectQuestions.length > 0) {
         const template = subjectQuestions[i % subjectQuestions.length];
         const question = template.question.replace(/{keyword}/g, keyword);
-        const options = template.options.map(opt => opt.replace(/{keyword}/g, keyword));
-        
+        const options = template.options.map((opt) =>
+          opt.replace(/{keyword}/g, keyword)
+        );
+
         questions.push({
-          type: 'MCQ',
+          type: "MCQ",
           question: question,
           options: options,
-          answer: options[template.correctAnswer || 0]
+          answer: options[template.correctAnswer || 0],
         });
       } else {
         // Fallback to generic questions
@@ -417,102 +439,168 @@ IMPORTANT: Respond ONLY with valid JSON array. No additional text, explanations,
 
   getSubjectSpecificQuestions(subject, difficulty) {
     const subjectLower = subject.toLowerCase();
-    
-    if (subjectLower.includes('programming') || subjectLower.includes('computer') || subjectLower.includes('software')) {
+
+    if (
+      subjectLower.includes("programming") ||
+      subjectLower.includes("computer") ||
+      subjectLower.includes("software")
+    ) {
       return this.getProgrammingQuestions(difficulty);
-    } else if (subjectLower.includes('math') || subjectLower.includes('calculus') || subjectLower.includes('algebra')) {
+    } else if (
+      subjectLower.includes("math") ||
+      subjectLower.includes("calculus") ||
+      subjectLower.includes("algebra")
+    ) {
       return this.getMathQuestions(difficulty);
-    } else if (subjectLower.includes('science') || subjectLower.includes('physics') || subjectLower.includes('chemistry')) {
+    } else if (
+      subjectLower.includes("science") ||
+      subjectLower.includes("physics") ||
+      subjectLower.includes("chemistry")
+    ) {
       return this.getScienceQuestions(difficulty);
-    } else if (subjectLower.includes('history') || subjectLower.includes('social')) {
+    } else if (
+      subjectLower.includes("history") ||
+      subjectLower.includes("social")
+    ) {
       return this.getHistoryQuestions(difficulty);
     }
-    
+
     return [];
   }
 
   getProgrammingQuestions(difficulty) {
-    if (difficulty === 'easy') {
+    if (difficulty === "easy") {
       return [
         {
           question: "What is {keyword} used for in programming?",
-          options: ["Data storage and manipulation", "Only for decoration", "Hardware control only", "Network protocols only"],
-          correctAnswer: 0
+          options: [
+            "Data storage and manipulation",
+            "Only for decoration",
+            "Hardware control only",
+            "Network protocols only",
+          ],
+          correctAnswer: 0,
         },
         {
           question: "Which statement about {keyword} is correct?",
-          options: ["It's a fundamental programming concept", "It's only used in web development", "It's deprecated in modern programming", "It's hardware-specific"],
-          correctAnswer: 0
-        }
+          options: [
+            "It's a fundamental programming concept",
+            "It's only used in web development",
+            "It's deprecated in modern programming",
+            "It's hardware-specific",
+          ],
+          correctAnswer: 0,
+        },
       ];
-    } else if (difficulty === 'medium') {
+    } else if (difficulty === "medium") {
       return [
         {
           question: "How does {keyword} improve code efficiency?",
-          options: ["By optimizing memory usage and execution speed", "By making code longer", "By adding more complexity", "By removing all functions"],
-          correctAnswer: 0
+          options: [
+            "By optimizing memory usage and execution speed",
+            "By making code longer",
+            "By adding more complexity",
+            "By removing all functions",
+          ],
+          correctAnswer: 0,
         },
         {
           question: "What is the main advantage of using {keyword}?",
-          options: ["Better code organization and reusability", "Slower execution", "More memory consumption", "Increased complexity"],
-          correctAnswer: 0
-        }
+          options: [
+            "Better code organization and reusability",
+            "Slower execution",
+            "More memory consumption",
+            "Increased complexity",
+          ],
+          correctAnswer: 0,
+        },
       ];
     } else {
       return [
         {
           question: "In what scenarios would {keyword} be most beneficial?",
-          options: ["Large-scale applications requiring optimization", "Simple hello world programs", "Only in legacy systems", "Never in modern development"],
-          correctAnswer: 0
-        }
+          options: [
+            "Large-scale applications requiring optimization",
+            "Simple hello world programs",
+            "Only in legacy systems",
+            "Never in modern development",
+          ],
+          correctAnswer: 0,
+        },
       ];
     }
   }
 
   getMathQuestions(difficulty) {
-    if (difficulty === 'easy') {
+    if (difficulty === "easy") {
       return [
         {
           question: "What does {keyword} represent in mathematics?",
-          options: ["A mathematical concept or operation", "A type of calculator", "A measurement unit", "A geometric shape only"],
-          correctAnswer: 0
-        }
+          options: [
+            "A mathematical concept or operation",
+            "A type of calculator",
+            "A measurement unit",
+            "A geometric shape only",
+          ],
+          correctAnswer: 0,
+        },
       ];
-    } else if (difficulty === 'medium') {
+    } else if (difficulty === "medium") {
       return [
         {
           question: "How is {keyword} applied in problem-solving?",
-          options: ["As a method to find solutions systematically", "Only for basic arithmetic", "Just for memorization", "Only in geometry"],
-          correctAnswer: 0
-        }
+          options: [
+            "As a method to find solutions systematically",
+            "Only for basic arithmetic",
+            "Just for memorization",
+            "Only in geometry",
+          ],
+          correctAnswer: 0,
+        },
       ];
     } else {
       return [
         {
           question: "What are the advanced applications of {keyword}?",
-          options: ["Complex mathematical modeling and analysis", "Simple addition only", "Basic counting", "Elementary operations"],
-          correctAnswer: 0
-        }
+          options: [
+            "Complex mathematical modeling and analysis",
+            "Simple addition only",
+            "Basic counting",
+            "Elementary operations",
+          ],
+          correctAnswer: 0,
+        },
       ];
     }
   }
 
   getScienceQuestions(difficulty) {
-    if (difficulty === 'easy') {
+    if (difficulty === "easy") {
       return [
         {
           question: "What is the basic principle behind {keyword}?",
-          options: ["A natural phenomenon or scientific law", "A man-made invention only", "A fictional concept", "An outdated theory"],
-          correctAnswer: 0
-        }
+          options: [
+            "A natural phenomenon or scientific law",
+            "A man-made invention only",
+            "A fictional concept",
+            "An outdated theory",
+          ],
+          correctAnswer: 0,
+        },
       ];
     } else {
       return [
         {
-          question: "How does {keyword} contribute to scientific understanding?",
-          options: ["By explaining natural processes and phenomena", "By complicating simple concepts", "By replacing all other theories", "By contradicting established science"],
-          correctAnswer: 0
-        }
+          question:
+            "How does {keyword} contribute to scientific understanding?",
+          options: [
+            "By explaining natural processes and phenomena",
+            "By complicating simple concepts",
+            "By replacing all other theories",
+            "By contradicting established science",
+          ],
+          correctAnswer: 0,
+        },
       ];
     }
   }
@@ -521,22 +609,37 @@ IMPORTANT: Respond ONLY with valid JSON array. No additional text, explanations,
     return [
       {
         question: "What was the historical significance of {keyword}?",
-        options: ["It influenced major historical developments", "It had no impact on history", "It only affected modern times", "It was purely fictional"],
-        correctAnswer: 0
-      }
+        options: [
+          "It influenced major historical developments",
+          "It had no impact on history",
+          "It only affected modern times",
+          "It was purely fictional",
+        ],
+        correctAnswer: 0,
+      },
     ];
   }
 
   generateMixedQuestions(keywords, options) {
-    const { numQuestions = 5, difficulty = 'medium', subject = 'general' } = options;
-    
+    const {
+      numQuestions = 5,
+      difficulty = "medium",
+      subject = "general",
+    } = options;
+
     // Split questions between MCQ and Subjective (60% MCQ, 40% Subjective)
     const mcqCount = Math.ceil(numQuestions * 0.6);
     const subjectiveCount = numQuestions - mcqCount;
-    
-    const mcqQuestions = this.generateMCQQuestions(keywords, { ...options, numQuestions: mcqCount });
-    const subjectiveQuestions = this.generateDescriptiveQuestions(keywords, { ...options, numQuestions: subjectiveCount });
-    
+
+    const mcqQuestions = this.generateMCQQuestions(keywords, {
+      ...options,
+      numQuestions: mcqCount,
+    });
+    const subjectiveQuestions = this.generateDescriptiveQuestions(keywords, {
+      ...options,
+      numQuestions: subjectiveCount,
+    });
+
     // Combine and shuffle questions
     const allQuestions = [...mcqQuestions, ...subjectiveQuestions];
     return this.shuffleArray(allQuestions);
@@ -556,7 +659,7 @@ IMPORTANT: Respond ONLY with valid JSON array. No additional text, explanations,
       "What is the primary purpose of {keyword}?",
       "Which best describes {keyword}?",
       "How does {keyword} function?",
-      "What makes {keyword} important?"
+      "What makes {keyword} important?",
     ];
 
     const optionSets = [
@@ -564,31 +667,126 @@ IMPORTANT: Respond ONLY with valid JSON array. No additional text, explanations,
         `Essential component in ${subject}`,
         `Outdated concept in ${subject}`,
         `Unrelated to ${subject}`,
-        `Purely theoretical with no application`
+        `Purely theoretical with no application`,
       ],
       [
         `Fundamental principle of ${subject}`,
         `Minor detail in ${subject}`,
         `Contradicts ${subject} basics`,
-        `Only used in advanced ${subject}`
+        `Only used in advanced ${subject}`,
       ],
       [
         `Key methodology in ${subject}`,
         `Rarely used approach`,
         `Completely obsolete method`,
-        `Only for beginners in ${subject}`
-      ]
+        `Only for beginners in ${subject}`,
+      ],
     ];
 
-    const randomTemplate = templates[Math.floor(Math.random() * templates.length)];
-    const randomOptions = optionSets[Math.floor(Math.random() * optionSets.length)];
+    const randomTemplate =
+      templates[Math.floor(Math.random() * templates.length)];
+    const randomOptions =
+      optionSets[Math.floor(Math.random() * optionSets.length)];
 
     return {
-      type: 'MCQ',
+      type: "MCQ",
       question: randomTemplate.replace(/{keyword}/g, keyword),
       options: randomOptions,
-      answer: randomOptions[0]
+      answer: randomOptions[0],
     };
+  }
+  async generateCodingQuestion() {
+    if (!this.gemini) {
+      throw new Error("Gemini client not initialized");
+    }
+
+    const finalPrompt = `
+You are a strict coding question generator.
+
+Generate ONE programming problem ONLY.
+The problem MUST require the student to write code, not predict output.
+Do NOT generate multiple-choice or "What will be the output" type questions.
+
+The response must be valid JSON (and nothing else) following this schema:
+
+{
+  "title": "string",
+  "description": "Full problem statement (clear instructions to write a program)",
+  "constraints": "string",
+  "samples": [
+    { "input": "string", "output": "string" }
+  ],
+  "hiddenTests": [
+    { "input": "string", "output": "string" }
+  ],
+  "templates": {
+    "JavaScript": "function solve(n) { ... }",
+    "Python": "def solve(n): ...",
+    "C++": "int solve(int n) { ... }",
+    "Java": "public class Main { static int solve(int n) { ... } }"
+  }
+}
+
+Rules:
+- Always give at least one sample input/output and one hidden test case.
+- Templates MUST exist for all 4 languages (JavaScript, Python, C++, Java).
+- Templates should contain a "solve" function with the correct signature.
+- Keep templates minimal — only skeleton code with comments.
+`;
+
+    try {
+      // Call the Gemini model
+      const response = await this.gemini.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: finalPrompt,
+        // config: { temperature: 0.7, maxOutputTokens: 1000 },
+      });
+
+      // Raw text from Gemini
+      const rawText = response?.text;
+      if (!rawText) {
+        console.error("No valid text found in Gemini response:", response);
+        throw new Error("Empty Gemini response");
+      }
+
+      console.log("AI Raw Text:", rawText);
+
+      // Remove Markdown fences if present
+      const cleanedText = rawText
+        .replace(/^```(?:json)?\s*/, "")
+        .replace(/```$/, "")
+        .trim();
+
+      // Parse JSON safely
+      let question;
+      try {
+        question = JSON.parse(cleanedText);
+      } catch (err) {
+        console.error("Failed parsing AI JSON:", cleanedText);
+        throw err;
+      }
+
+      // Validate expected fields
+      const requiredFields = [
+        "title",
+        "description",
+        "constraints",
+        "samples",
+        "hiddenTests",
+        "templates",
+      ];
+      for (const field of requiredFields) {
+        if (!(field in question)) {
+          throw new Error(`Missing field in AI response: ${field}`);
+        }
+      }
+
+      console.log("Generated Question Title:", question.title);
+      return question;
+    } catch (err) {
+      console.error("AI question generation failed:", err);
+      return null;
+    }
   }
 }
 
