@@ -494,32 +494,32 @@ router.get("/assigned-tests/:userId?", auth, async (req, res) => {
   try {
     const userId = req.params.userId || req.user?.id;
 
-   
     const tests = await Test.find({ assignedTo: { $in: [userId] } });
-
     const now = new Date();
 
-
-    const filteredTests = tests.filter((test) => {
+    const processedTests = tests.map((test) => {
       const startTime = new Date(test.scheduledAt);
       const endTime = new Date(startTime.getTime() + test.minutes * 60000);
 
       const hasSubmitted = test.submitBy.includes(userId);
 
+      let status = "upcoming";
+
       if (hasSubmitted) {
-        return true; 
+        status = "completed";
+      } else if (now >= startTime && now <= endTime) {
+        status = "ongoing";
+      } else if (now > endTime) {
+        status = "expired";
       }
 
-      
-      if (now < endTime) {
-        return true;
-      }
-
-      
-      return false;
+      return {
+        ...test._doc, // keep original test fields
+        status,
+      };
     });
 
-    res.status(200).json({ tests: filteredTests });
+    res.status(200).json({ tests: processedTests });
   } catch (err) {
     console.error("Error fetching assigned tests:", err);
     res.status(500).send("Server error");
