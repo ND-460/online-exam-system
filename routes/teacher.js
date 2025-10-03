@@ -42,18 +42,26 @@ const aiService = require("../utils/aiService");
 // });
 router.get("/tests/:profileID", auth, async (req, res) => {
   const profileID = req.params.profileID;
-  console.log("teacher", profileID);
   try {
-    const obj = await Test.find(
-      { teacherId: profileID },
-      "submitBy testName category className minutes rules outOfMarks questions"
+    // Get the teacher's organisation first
+    const teacher = await Teacher.findById(profileID, "organisation");
+    if (!teacher) return res.status(404).send("Teacher not found");
+
+    const tests = await Test.find(
+      { 
+        teacherId: profileID,
+        organisation: teacher.organisation, // filter by organisation
+      },
+      "submitBy testName category className minutes rules outOfMarks questions organisation"
     );
-    return res.status(200).json(obj);
+
+    return res.status(200).json(tests);
   } catch (err) {
     console.log(err.message);
     res.status(500).send("Error in fetching Tests");
   }
 });
+
 
 /**
  * @method - GET
