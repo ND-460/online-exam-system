@@ -159,11 +159,12 @@ router.post("/create-test", auth, async (req, res) => {
     answers,
     questions,
     scheduledAt,
+    organisation,
   } = req.body;
 
   try {
     // Check if test already exists
-    let existingTest = await Test.findOne({ testName, className, category });
+    let existingTest = await Test.findOne({ testName, className, category,"organisation.name": organisation.name });
     if (existingTest) {
       return res.status(400).json({ msg: "Test Already Created" });
     }
@@ -171,8 +172,8 @@ router.post("/create-test", auth, async (req, res) => {
     // Get all students of the class via populate
     const students = await Student.find().populate({
       path: "profileInfo",
-      match: { className },
-      select: "_id className",
+      match: { className,"organisation.name": organisation.name, },
+      select: "_id className organisation",
     });
 
     const studentIds = students
@@ -191,6 +192,7 @@ router.post("/create-test", auth, async (req, res) => {
       outOfMarks,
       questions,
       assignedTo: studentIds,
+      organisation,
       scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
     });
 
@@ -422,7 +424,6 @@ router.delete("/delete-test/:testid", auth, async (req, res) => {
   }
 });
 
-
 router.get("/results/test/:testID", auth, async (req, res) => {
   const { testID } = req.params;
   const {
@@ -476,11 +477,11 @@ router.get("/submissions/:testId", auth, async (req, res) => {
     const submissions = await Result.find({ testId })
       // .populate("studentId", "name email")
       .populate({
-        path:"studentId",
-        populate:{
-          path:"profileInfo",
-          select:"firstName lastName email"
-        }
+        path: "studentId",
+        populate: {
+          path: "profileInfo",
+          select: "firstName lastName email",
+        },
       })
       .sort({ submittedAt: -1 });
 
@@ -544,97 +545,106 @@ router.get("/analytics/:testId", auth, async (req, res) => {
   }
 });
 
-
-
 /**
  * @method - POST
  * @param - /generate-questions-pdf
  * @description - Generate questions from uploaded PDF material
  */
-router.post('/generate-questions-pdf', auth, upload.single('pdf'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'No PDF file uploaded' });
-    }
-
-    const { numQuestions = 5, difficulty = 'medium', subject = 'general' } = req.body;
-
-    // Process PDF and extract text and keywords
-    const pdfData = await pdfProcessor.processUploadedPDF(req.file.path);
-    
-    // Generate questions using AI service
-    const questions = await aiService.generateQuestionsFromKeywords(
-      pdfData.keywords,
-      {
-        numQuestions: parseInt(numQuestions),
-        difficulty,
-        subject,
-        questionType: 'multiple-choice'
-      }
-    );
-
-    // Return questions directly for frontend integration
-    res.status(200).json({
-      success: true,
-      questions,
-      metadata: {
-        extractedKeywords: pdfData.keywords,
-        wordCount: pdfData.wordCount,
-        generatedQuestions: questions.length
-      }
-    });
-  } catch (err) {
-    console.error('PDF question generation error:', err);
-    
-    // Fallback: Generate simple questions locally if AI fails
+router.post(
+  "/generate-questions-pdf",
+  auth,
+  upload.single("pdf"),
+  async (req, res) => {
     try {
-      const fallbackQuestions = await aiService.generateWithLocal(
-        ['general', 'concept', 'theory'], 
-        { numQuestions: parseInt(numQuestions), difficulty, subject }
+      if (!req.file) {
+        return res.status(400).json({ message: "No PDF file uploaded" });
+      }
+
+      const {
+        numQuestions = 5,
+        difficulty = "medium",
+        subject = "general",
+      } = req.body;
+
+      // Process PDF and extract text and keywords
+      const pdfData = await pdfProcessor.processUploadedPDF(req.file.path);
+
+      // Generate questions using AI service
+      const questions = await aiService.generateQuestionsFromKeywords(
+        pdfData.keywords,
+        {
+          numQuestions: parseInt(numQuestions),
+          difficulty,
+          subject,
+          questionType: "multiple-choice",
+        }
       );
-      
+
+      // Return questions directly for frontend integration
       res.status(200).json({
         success: true,
-        questions: fallbackQuestions,
+        questions,
         metadata: {
-          extractedKeywords: ['fallback'],
-          wordCount: 0,
-          generatedQuestions: fallbackQuestions.length,
-          note: 'Generated using fallback method'
-        }
+          extractedKeywords: pdfData.keywords,
+          wordCount: pdfData.wordCount,
+          generatedQuestions: questions.length,
+        },
       });
-    } catch (fallbackErr) {
-      res.status(500).json({ 
-        success: false, 
-        message: 'Question generation from PDF failed',
-        error: err.message 
-      });
+    } catch (err) {
+      console.error("PDF question generation error:", err);
+
+      // Fallback: Generate simple questions locally if AI fails
+      try {
+        const fallbackQuestions = await aiService.generateWithLocal(
+          ["general", "concept", "theory"],
+          { numQuestions: parseInt(numQuestions), difficulty, subject }
+        );
+
+        res.status(200).json({
+          success: true,
+          questions: fallbackQuestions,
+          metadata: {
+            extractedKeywords: ["fallback"],
+            wordCount: 0,
+            generatedQuestions: fallbackQuestions.length,
+            note: "Generated using fallback method",
+          },
+        });
+      } catch (fallbackErr) {
+        res.status(500).json({
+          success: false,
+          message: "Question generation from PDF failed",
+          error: err.message,
+        });
+      }
     }
   }
-});
+);
 
 /**
  * @method - POST
  * @param - /generate-questions-prompt
  * @description - Generate questions from direct text prompt
  */
-router.post('/generate-questions-prompt', auth, async (req, res) => {
+router.post("/generate-questions-prompt", auth, async (req, res) => {
   try {
-    const { prompt, numQuestions = 5, difficulty = 'medium', subject = 'general' } = req.body;
+    const {
+      prompt,
+      numQuestions = 5,
+      difficulty = "medium",
+      subject = "general",
+    } = req.body;
 
     if (!prompt || prompt.trim().length === 0) {
-      return res.status(400).json({ message: 'Prompt is required' });
+      return res.status(400).json({ message: "Prompt is required" });
     }
 
     // Generate questions using AI service
-    const questions = await aiService.generateQuestionsFromPrompt(
-      prompt,
-      {
-        numQuestions: parseInt(numQuestions),
-        difficulty,
-        questionType: 'multiple-choice'
-      }
-    );
+    const questions = await aiService.generateQuestionsFromPrompt(prompt, {
+      numQuestions: parseInt(numQuestions),
+      difficulty,
+      questionType: "multiple-choice",
+    });
 
     res.status(200).json({
       success: true,
@@ -643,19 +653,19 @@ router.post('/generate-questions-prompt', auth, async (req, res) => {
         prompt,
         generatedQuestions: questions.length,
         difficulty,
-        subject
-      }
+        subject,
+      },
     });
   } catch (err) {
-    console.error('Prompt question generation error:', err);
-    
+    console.error("Prompt question generation error:", err);
+
     // Fallback: Generate simple questions locally if AI fails
     try {
       const fallbackQuestions = await aiService.generateWithLocal(
-        [prompt, subject, 'concept'], 
+        [prompt, subject, "concept"],
         { numQuestions: parseInt(numQuestions), difficulty, subject }
       );
-      
+
       res.status(200).json({
         success: true,
         questions: fallbackQuestions,
@@ -664,14 +674,14 @@ router.post('/generate-questions-prompt', auth, async (req, res) => {
           generatedQuestions: fallbackQuestions.length,
           difficulty,
           subject,
-          note: 'Generated using fallback method'
-        }
+          note: "Generated using fallback method",
+        },
       });
     } catch (fallbackErr) {
-      res.status(500).json({ 
-        success: false, 
-        message: 'Question generation from prompt failed',
-        error: err.message 
+      res.status(500).json({
+        success: false,
+        message: "Question generation from prompt failed",
+        error: err.message,
       });
     }
   }
@@ -682,31 +692,34 @@ router.post('/generate-questions-prompt', auth, async (req, res) => {
  * @param - /enhance-questions
  * @description - Enhance existing questions using AI
  */
-router.post('/enhance-questions', auth, async (req, res) => {
+router.post("/enhance-questions", auth, async (req, res) => {
   try {
-    const { questions, context = '' } = req.body;
+    const { questions, context = "" } = req.body;
 
     if (!questions || !Array.isArray(questions) || questions.length === 0) {
-      return res.status(400).json({ message: 'Questions array is required' });
+      return res.status(400).json({ message: "Questions array is required" });
     }
 
     // Enhance questions using AI service
-    const enhancedQuestions = await aiService.enhanceQuestions(questions, context);
+    const enhancedQuestions = await aiService.enhanceQuestions(
+      questions,
+      context
+    );
 
     res.status(200).json({
       success: true,
       questions: enhancedQuestions,
       metadata: {
         originalCount: questions.length,
-        enhancedCount: enhancedQuestions.length
-      }
+        enhancedCount: enhancedQuestions.length,
+      },
     });
   } catch (err) {
-    console.error('Question enhancement error:', err);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Question enhancement failed',
-      error: err.message 
+    console.error("Question enhancement error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Question enhancement failed",
+      error: err.message,
     });
   }
 });
@@ -716,18 +729,18 @@ router.post('/enhance-questions', auth, async (req, res) => {
  * @param - /publish-test/:testId
  * @description - Publish a test to make it available to students
  */
-router.put('/publish-test/:testId', auth, async (req, res) => {
+router.put("/publish-test/:testId", auth, async (req, res) => {
   try {
     const { testId } = req.params;
     const { dueDate } = req.body;
 
     const test = await Test.findById(testId);
     if (!test) {
-      return res.status(404).json({ message: 'Test not found' });
+      return res.status(404).json({ message: "Test not found" });
     }
 
     // Update test status to published
-    test.status = 'published';
+    test.status = "published";
     test.publishedAt = new Date();
     if (dueDate) {
       test.dueDate = new Date(dueDate);
@@ -737,12 +750,12 @@ router.put('/publish-test/:testId', auth, async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Test published successfully',
-      test
+      message: "Test published successfully",
+      test,
     });
   } catch (err) {
-    console.error('Error publishing test:', err);
-    res.status(500).json({ message: 'Error publishing test' });
+    console.error("Error publishing test:", err);
+    res.status(500).json({ message: "Error publishing test" });
   }
 });
 
@@ -751,29 +764,29 @@ router.put('/publish-test/:testId', auth, async (req, res) => {
  * @param - /assign-test/:testId
  * @description - Assign test to specific students
  */
-router.post('/assign-test/:testId', auth, async (req, res) => {
+router.post("/assign-test/:testId", auth, async (req, res) => {
   try {
     const { testId } = req.params;
     const { studentIds, dueDate } = req.body;
 
     const test = await Test.findById(testId);
     if (!test) {
-      return res.status(404).json({ message: 'Test not found' });
+      return res.status(404).json({ message: "Test not found" });
     }
 
     // Get student details
     const students = await User.find({ _id: { $in: studentIds } });
-    
-    const assignedStudents = students.map(student => ({
+
+    const assignedStudents = students.map((student) => ({
       studentId: student._id,
       studentName: `${student.firstName} ${student.lastName}`,
-      assignedAt: new Date()
+      assignedAt: new Date(),
     }));
 
     // Update test with assigned students
     test.assignedStudents = assignedStudents;
     test.assignedTo = studentIds;
-    test.status = 'published';
+    test.status = "published";
     test.publishedAt = new Date();
     if (dueDate) {
       test.dueDate = new Date(dueDate);
@@ -783,12 +796,12 @@ router.post('/assign-test/:testId', auth, async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Test assigned successfully',
-      assignedStudents: assignedStudents.length
+      message: "Test assigned successfully",
+      assignedStudents: assignedStudents.length,
     });
   } catch (err) {
-    console.error('Error assigning test:', err);
-    res.status(500).json({ message: 'Error assigning test' });
+    console.error("Error assigning test:", err);
+    res.status(500).json({ message: "Error assigning test" });
   }
 });
 
@@ -797,46 +810,54 @@ router.post('/assign-test/:testId', auth, async (req, res) => {
  * @param - /test-results/:testId
  * @description - Get detailed test results and analytics
  */
-router.get('/test-results/:testId', auth, async (req, res) => {
+router.get("/test-results/:testId", auth, async (req, res) => {
   try {
     const { testId } = req.params;
 
     const test = await Test.findById(testId)
-      .populate('submissions.studentId', 'firstName lastName email')
-      .populate('assignedStudents.studentId', 'firstName lastName email');
+      .populate("submissions.studentId", "firstName lastName email")
+      .populate("assignedStudents.studentId", "firstName lastName email");
 
     if (!test) {
-      return res.status(404).json({ message: 'Test not found' });
+      return res.status(404).json({ message: "Test not found" });
     }
 
     // Calculate analytics
     const totalAssigned = test.assignedStudents.length;
     const totalSubmissions = test.submissions.length;
-    const completionRate = totalAssigned > 0 ? (totalSubmissions / totalAssigned) * 100 : 0;
+    const completionRate =
+      totalAssigned > 0 ? (totalSubmissions / totalAssigned) * 100 : 0;
 
-    const scores = test.submissions.map(s => s.score);
-    const averageScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+    const scores = test.submissions.map((s) => s.score);
+    const averageScore =
+      scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
     const highestScore = scores.length > 0 ? Math.max(...scores) : 0;
     const lowestScore = scores.length > 0 ? Math.min(...scores) : 0;
 
     // Grade distribution
     const gradeDistribution = {
-      'A (90-100%)': test.submissions.filter(s => s.percentage >= 90).length,
-      'B (80-89%)': test.submissions.filter(s => s.percentage >= 80 && s.percentage < 90).length,
-      'C (70-79%)': test.submissions.filter(s => s.percentage >= 70 && s.percentage < 80).length,
-      'D (60-69%)': test.submissions.filter(s => s.percentage >= 60 && s.percentage < 70).length,
-      'F (Below 60%)': test.submissions.filter(s => s.percentage < 60).length,
+      "A (90-100%)": test.submissions.filter((s) => s.percentage >= 90).length,
+      "B (80-89%)": test.submissions.filter(
+        (s) => s.percentage >= 80 && s.percentage < 90
+      ).length,
+      "C (70-79%)": test.submissions.filter(
+        (s) => s.percentage >= 70 && s.percentage < 80
+      ).length,
+      "D (60-69%)": test.submissions.filter(
+        (s) => s.percentage >= 60 && s.percentage < 70
+      ).length,
+      "F (Below 60%)": test.submissions.filter((s) => s.percentage < 60).length,
     };
 
     // Top performers
     const topPerformers = test.submissions
       .sort((a, b) => b.score - a.score)
       .slice(0, 5)
-      .map(submission => ({
+      .map((submission) => ({
         studentName: submission.studentName,
         score: submission.score,
         percentage: submission.percentage,
-        submittedAt: submission.submittedAt
+        submittedAt: submission.submittedAt,
       }));
 
     res.status(200).json({
@@ -846,25 +867,26 @@ router.get('/test-results/:testId', auth, async (req, res) => {
         className: test.className,
         outOfMarks: test.outOfMarks,
         publishedAt: test.publishedAt,
-        dueDate: test.dueDate
+        dueDate: test.dueDate,
       },
       analytics: {
         totalAssigned,
         totalSubmissions,
         completionRate: Math.round(completionRate * 100) / 100,
         averageScore: Math.round(averageScore * 100) / 100,
-        averagePercentage: Math.round((averageScore / test.outOfMarks) * 10000) / 100,
+        averagePercentage:
+          Math.round((averageScore / test.outOfMarks) * 10000) / 100,
         highestScore,
         lowestScore,
         gradeDistribution,
-        topPerformers
+        topPerformers,
       },
       submissions: test.submissions,
-      assignedStudents: test.assignedStudents
+      assignedStudents: test.assignedStudents,
     });
   } catch (err) {
-    console.error('Error fetching test results:', err);
-    res.status(500).json({ message: 'Error fetching test results' });
+    console.error("Error fetching test results:", err);
+    res.status(500).json({ message: "Error fetching test results" });
   }
 });
 
@@ -873,7 +895,7 @@ router.get('/test-results/:testId', auth, async (req, res) => {
  * @param - /dashboard-analytics/:teacherId
  * @description - Get teacher dashboard analytics
  */
-router.get('/dashboard-analytics/:teacherId', auth, async (req, res) => {
+router.get("/dashboard-analytics/:teacherId", auth, async (req, res) => {
   try {
     const { teacherId } = req.params;
 
@@ -881,33 +903,44 @@ router.get('/dashboard-analytics/:teacherId', auth, async (req, res) => {
 
     // Overall statistics
     const totalTests = tests.length;
-    const publishedTests = tests.filter(t => t.status === 'published').length;
-    const draftTests = tests.filter(t => t.status === 'draft').length;
-    const completedTests = tests.filter(t => t.status === 'completed').length;
+    const publishedTests = tests.filter((t) => t.status === "published").length;
+    const draftTests = tests.filter((t) => t.status === "draft").length;
+    const completedTests = tests.filter((t) => t.status === "completed").length;
 
     // Student engagement
-    const totalAssignments = tests.reduce((sum, test) => sum + test.assignedStudents.length, 0);
-    const totalSubmissions = tests.reduce((sum, test) => sum + test.submissions.length, 0);
-    const overallCompletionRate = totalAssignments > 0 ? (totalSubmissions / totalAssignments) * 100 : 0;
+    const totalAssignments = tests.reduce(
+      (sum, test) => sum + test.assignedStudents.length,
+      0
+    );
+    const totalSubmissions = tests.reduce(
+      (sum, test) => sum + test.submissions.length,
+      0
+    );
+    const overallCompletionRate =
+      totalAssignments > 0 ? (totalSubmissions / totalAssignments) * 100 : 0;
 
     // Recent activity (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const recentTests = tests.filter(t => t.createdAt >= thirtyDaysAgo);
+    const recentTests = tests.filter((t) => t.createdAt >= thirtyDaysAgo);
     const recentSubmissions = tests.reduce((submissions, test) => {
-      const recent = test.submissions.filter(s => s.submittedAt >= thirtyDaysAgo);
+      const recent = test.submissions.filter(
+        (s) => s.submittedAt >= thirtyDaysAgo
+      );
       return submissions.concat(recent);
     }, []);
 
     // Performance trends
     const performanceData = tests
-      .filter(t => t.submissions.length > 0)
-      .map(test => ({
+      .filter((t) => t.submissions.length > 0)
+      .map((test) => ({
         testName: test.testName,
-        averageScore: test.submissions.reduce((sum, s) => sum + s.percentage, 0) / test.submissions.length,
+        averageScore:
+          test.submissions.reduce((sum, s) => sum + s.percentage, 0) /
+          test.submissions.length,
         submissionCount: test.submissions.length,
-        date: test.publishedAt
+        date: test.publishedAt,
       }))
       .sort((a, b) => new Date(a.date) - new Date(b.date));
 
@@ -919,17 +952,17 @@ router.get('/dashboard-analytics/:teacherId', auth, async (req, res) => {
         completedTests,
         totalAssignments,
         totalSubmissions,
-        overallCompletionRate: Math.round(overallCompletionRate * 100) / 100
+        overallCompletionRate: Math.round(overallCompletionRate * 100) / 100,
       },
       recentActivity: {
         testsCreated: recentTests.length,
-        submissionsReceived: recentSubmissions.length
+        submissionsReceived: recentSubmissions.length,
       },
-      performanceData
+      performanceData,
     });
   } catch (err) {
-    console.error('Error fetching dashboard analytics:', err);
-    res.status(500).json({ message: 'Error fetching dashboard analytics' });
+    console.error("Error fetching dashboard analytics:", err);
+    res.status(500).json({ message: "Error fetching dashboard analytics" });
   }
 });
 
@@ -938,22 +971,22 @@ router.get('/dashboard-analytics/:teacherId', auth, async (req, res) => {
  * @param - /students/:className
  * @description - Get all students in a class for assignment
  */
-router.get('/students/:className', auth, async (req, res) => {
+router.get("/students/:className", auth, async (req, res) => {
   try {
     const { className } = req.params;
 
-    const students = await User.find({ 
-      className, 
-      role: 'student' 
-    }).select('firstName lastName email _id');
+    const students = await User.find({
+      className,
+      role: "student",
+    }).select("firstName lastName email _id");
 
     res.status(200).json({
       success: true,
-      students
+      students,
     });
   } catch (err) {
-    console.error('Error fetching students:', err);
-    res.status(500).json({ message: 'Error fetching students' });
+    console.error("Error fetching students:", err);
+    res.status(500).json({ message: "Error fetching students" });
   }
 });
 
