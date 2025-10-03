@@ -7,6 +7,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import DatePicker from "react-datepicker";
 import "react-toastify/ReactToastify.css";
+import { BarChart3 } from "lucide-react";
 import ViewSubmissions from "./ViewSubmissions";
 import Analytics from "./Analytics";
 import ImportQuestionsModal from "./ImportQuestionsModal";
@@ -496,9 +497,18 @@ export default function TeacherDashboard() {
                 <Analytics testId={selectedTest} token={token} />
               ) : (
                 <div className="bg-white dark:bg-[#1f2937] p-6 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200">
-                  <p className="text-center">
-                    Select a test from "Manage Tests" to view analytics.
-                  </p>
+                  <div className="text-center">
+                    <BarChart3 className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                    <h3 className="text-lg font-semibold mb-2">No Test Selected</h3>
+                    <p className="text-sm text-gray-500 mb-4">
+                      To view test analytics, please:
+                    </p>
+                    <ol className="text-sm text-gray-500 text-left max-w-md mx-auto space-y-1">
+                      <li>1. Go to "Manage Tests" tab</li>
+                      <li>2. Click "Select" on any test</li>
+                      <li>3. Return to "Analytics" tab</li>
+                    </ol>
+                  </div>
                 </div>
               ))}
 

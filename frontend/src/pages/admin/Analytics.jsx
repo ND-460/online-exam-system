@@ -26,16 +26,17 @@ export default function Analytics() {
       setLoading(true);
       try {
         const base = import.meta.env.VITE_API_URL || '';
+        const auth = { headers: { Authorization: `Bearer ${token}` } };
         const [activityRes, performanceRes, subjectsRes, completionRes] = await Promise.all([
-          axios.get(`${base}/api/analytics/activity`, { params: { range: timeRange } }),
-          axios.get(`${base}/api/analytics/performance`, { params: { range: timeRange } }),
-          axios.get(`${base}/api/analytics/subjects`, { params: { range: timeRange } }),
-          axios.get(`${base}/api/analytics/completion`, { params: { range: timeRange } })
+          axios.get(`${base}/api/analytics/activity`, { params: { range: timeRange }, ...auth }),
+          axios.get(`${base}/api/analytics/performance`, { params: { range: timeRange }, ...auth }),
+          axios.get(`${base}/api/analytics/subjects`, { params: { range: timeRange }, ...auth }),
+          axios.get(`${base}/api/analytics/completion`, { params: { range: timeRange }, ...auth })
         ]);
 
         const data = {
-          testsPerPeriod: Array.isArray(completionRes.data) ? completionRes.data.map((r) => ({ period: r?._id || '', count: Number(r?.completed || 0), avgScore: undefined })) : [],
-          performanceMetrics: Array.isArray(subjectsRes.data) ? subjectsRes.data.map((s) => ({ subject: s?.subject || 'N/A', avgScore: Number(s?.score || 0), passRate: undefined, participation: undefined })) : [],
+          testsPerPeriod: Array.isArray(completionRes.data) ? completionRes.data.map((r) => ({ period: r?._id || '', count: Number(r?.completed || 0), avgPercentage: undefined })) : [],
+          performanceMetrics: Array.isArray(subjectsRes.data) ? subjectsRes.data.map((s) => ({ subject: s?.subject || 'N/A', avgPercentage: Number(s?.score || 0), passRate: undefined, participation: undefined })) : [],
           userActivity: Array.isArray(activityRes.data) ? activityRes.data.map((r) => ({ time: r?.date || '', active: Number(r?.students || 0) + Number(r?.teachers || 0) })) : [],
           systemOverview: {
             // You can extend this if you add a dedicated overview endpoint

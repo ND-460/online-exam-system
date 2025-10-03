@@ -57,7 +57,6 @@ const Analytics = ({ testId, token }) => {
     );
   }
 
-  const avgScore = Number(analytics.avgScore ?? 0);
   const totalStudents = analytics.totalStudents ?? 0;
   const scoreDistribution = analytics.scoreDistribution ?? [];
 
@@ -96,7 +95,6 @@ const Analytics = ({ testId, token }) => {
 
     {/* Stats */}
     <ul className="space-y-2 text-sm mb-6 text-yellow-800 dark:text-blue-200">
-      <li>Average Score: {avgScore.toFixed(2)}</li>
       <li>Average %: {Number(analytics.avgPercentage ?? 0).toFixed(2)}%</li>
       <li>Highest Score: {highestScore.toFixed(2)}</li>
       <li>Lowest Score: {lowestScore.toFixed(2)}</li>

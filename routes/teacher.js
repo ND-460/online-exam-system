@@ -415,6 +415,15 @@ router.delete("/delete-test/:testid", auth, async (req, res) => {
       return res.status(404).json({ message: "Test not found" });
     }
 
+    // Also remove related results so analytics/stats update correctly
+    try {
+      const Result = require("../model/Result");
+      await Result.deleteMany({ testId: testID });
+    } catch (innerErr) {
+      console.error("Failed to delete results for test", testID, innerErr);
+      // continue; not a hard failure for test deletion itself
+    }
+
     res.status(200).json({ message: "Successfully deleted" });
   } catch (err) {
     console.log(err.message);
@@ -512,29 +521,29 @@ router.post("/feedback/:resultId", auth, async (req, res) => {
 router.get("/analytics/:testId", auth, async (req, res) => {
   try {
     const { testId } = req.params;
+    console.log(`Fetching teacher analytics for test: ${testId}`);
+    
     const results = await Result.find({ testId });
+    console.log(`Found ${results.length} results for test ${testId}`);
 
     const totalStudents = results.length;
 
-    // Average raw score
-    const avgScore =
-      results.reduce((acc, r) => acc + r.score, 0) / (totalStudents || 1);
-
-    // Average percentage
-    const avgPercentage =
-      results.reduce((acc, r) => acc + (r.score / r.outOfMarks) * 100, 0) /
-      (totalStudents || 1);
+    // Calculate total marks obtained and maximum possible marks
+    const totalMarksObtained = results.reduce((acc, r) => acc + r.score, 0);
+    const totalMaxMarks = results.reduce((acc, r) => acc + (r.outOfMarks || 0), 0);
+    
+    // Proper average calculation: sum of all marks divided by sum of max marks
+    const avgPercentage = totalMaxMarks > 0 ? (totalMarksObtained / totalMaxMarks) * 100 : 0;
 
     const scoreDistribution = results.map((r) => ({
       student: r.studentId,
       score: r.score,
       outOfMarks: r.outOfMarks,
-      percentage: ((r.score / r.outOfMarks) * 100).toFixed(2),
+      percentage: ((r.score / (r.outOfMarks || 1)) * 100).toFixed(2),
     }));
 
     res.status(200).json({
       totalStudents,
-      avgScore: avgScore.toFixed(2),
       avgPercentage: avgPercentage.toFixed(2),
       scoreDistribution,
     });
@@ -801,43 +810,64 @@ router.get('/test-results/:testId', auth, async (req, res) => {
   try {
     const { testId } = req.params;
 
-    const test = await Test.findById(testId)
-      .populate('submissions.studentId', 'firstName lastName email')
-      .populate('assignedStudents.studentId', 'firstName lastName email');
-
+    const test = await Test.findById(testId);
     if (!test) {
       return res.status(404).json({ message: 'Test not found' });
     }
 
-    // Calculate analytics
-    const totalAssigned = test.assignedStudents.length;
-    const totalSubmissions = test.submissions.length;
+    // Pull submissions from Result collection
+    const results = await Result.find({ testId })
+      .populate({
+        path: 'studentId',
+        populate: { path: 'profileInfo', select: 'firstName lastName email' }
+      })
+      .sort({ attemptedAt: -1 });
+
+    const assignedStudents = (test.assignedStudents || []).map((s) => ({
+      studentId: s.studentId,
+      studentName: s.studentName,
+      assignedAt: s.assignedAt,
+    }));
+
+    const totalAssigned = assignedStudents.length;
+    const totalSubmissions = results.length;
     const completionRate = totalAssigned > 0 ? (totalSubmissions / totalAssigned) * 100 : 0;
 
-    const scores = test.submissions.map(s => s.score);
+    const scores = results.map(r => r.score);
     const averageScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
     const highestScore = scores.length > 0 ? Math.max(...scores) : 0;
     const lowestScore = scores.length > 0 ? Math.min(...scores) : 0;
 
-    // Grade distribution
     const gradeDistribution = {
-      'A (90-100%)': test.submissions.filter(s => s.percentage >= 90).length,
-      'B (80-89%)': test.submissions.filter(s => s.percentage >= 80 && s.percentage < 90).length,
-      'C (70-79%)': test.submissions.filter(s => s.percentage >= 70 && s.percentage < 80).length,
-      'D (60-69%)': test.submissions.filter(s => s.percentage >= 60 && s.percentage < 70).length,
-      'F (Below 60%)': test.submissions.filter(s => s.percentage < 60).length,
+      'A (90-100%)': results.filter(r => (r.score / (r.outOfMarks || 1)) * 100 >= 90).length,
+      'B (80-89%)': results.filter(r => {
+        const p = (r.score / (r.outOfMarks || 1)) * 100; return p >= 80 && p < 90; }).length,
+      'C (70-79%)': results.filter(r => {
+        const p = (r.score / (r.outOfMarks || 1)) * 100; return p >= 70 && p < 80; }).length,
+      'D (60-69%)': results.filter(r => {
+        const p = (r.score / (r.outOfMarks || 1)) * 100; return p >= 60 && p < 70; }).length,
+      'F (Below 60%)': results.filter(r => (r.score / (r.outOfMarks || 1)) * 100 < 60).length,
     };
 
-    // Top performers
-    const topPerformers = test.submissions
+    const topPerformers = results
+      .slice()
       .sort((a, b) => b.score - a.score)
       .slice(0, 5)
-      .map(submission => ({
-        studentName: submission.studentName,
-        score: submission.score,
-        percentage: submission.percentage,
-        submittedAt: submission.submittedAt
+      .map(r => ({
+        studentName: `${r.studentId?.profileInfo?.firstName || ''} ${r.studentId?.profileInfo?.lastName || ''}`.trim() || 'Student',
+        score: r.score,
+        percentage: Math.round(((r.score / (r.outOfMarks || 1)) * 100) * 100) / 100,
+        submittedAt: r.attemptedAt,
       }));
+
+    const submissions = results.map(r => ({
+      studentId: r.studentId?._id,
+      studentName: `${r.studentId?.profileInfo?.firstName || ''} ${r.studentId?.profileInfo?.lastName || ''}`.trim() || 'Student',
+      score: r.score,
+      percentage: Math.round(((r.score / (r.outOfMarks || 1)) * 100) * 100) / 100,
+      submittedAt: r.attemptedAt,
+      timeTaken: r.durationTaken || null,
+    }));
 
     res.status(200).json({
       test: {
@@ -853,14 +883,14 @@ router.get('/test-results/:testId', auth, async (req, res) => {
         totalSubmissions,
         completionRate: Math.round(completionRate * 100) / 100,
         averageScore: Math.round(averageScore * 100) / 100,
-        averagePercentage: Math.round((averageScore / test.outOfMarks) * 10000) / 100,
+        averagePercentage: Math.round(((averageScore / (test.outOfMarks || 1)) * 100) * 100) / 100,
         highestScore,
         lowestScore,
         gradeDistribution,
         topPerformers
       },
-      submissions: test.submissions,
-      assignedStudents: test.assignedStudents
+      submissions,
+      assignedStudents
     });
   } catch (err) {
     console.error('Error fetching test results:', err);
@@ -876,8 +906,18 @@ router.get('/test-results/:testId', auth, async (req, res) => {
 router.get('/dashboard-analytics/:teacherId', auth, async (req, res) => {
   try {
     const { teacherId } = req.params;
+    console.log('Dashboard Analytics Debug:', {
+      teacherId,
+      requestedBy: req.user.id,
+      role: req.user.role
+    });
 
     const tests = await Test.find({ teacherId });
+    console.log('Found tests:', tests.length, 'for teacherId:', teacherId);
+    const testIds = tests.map(t => t._id);
+    
+    // Get all results for this teacher's tests
+    const results = await Result.find({ testId: { $in: testIds } });
 
     // Overall statistics
     const totalTests = tests.length;
@@ -885,9 +925,9 @@ router.get('/dashboard-analytics/:teacherId', auth, async (req, res) => {
     const draftTests = tests.filter(t => t.status === 'draft').length;
     const completedTests = tests.filter(t => t.status === 'completed').length;
 
-    // Student engagement
-    const totalAssignments = tests.reduce((sum, test) => sum + test.assignedStudents.length, 0);
-    const totalSubmissions = tests.reduce((sum, test) => sum + test.submissions.length, 0);
+    // Student engagement - use assignedStudents and results
+    const totalAssignments = tests.reduce((sum, test) => sum + (test.assignedStudents?.length || 0), 0);
+    const totalSubmissions = results.length;
     const overallCompletionRate = totalAssignments > 0 ? (totalSubmissions / totalAssignments) * 100 : 0;
 
     // Recent activity (last 30 days)
@@ -895,23 +935,35 @@ router.get('/dashboard-analytics/:teacherId', auth, async (req, res) => {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const recentTests = tests.filter(t => t.createdAt >= thirtyDaysAgo);
-    const recentSubmissions = tests.reduce((submissions, test) => {
-      const recent = test.submissions.filter(s => s.submittedAt >= thirtyDaysAgo);
-      return submissions.concat(recent);
-    }, []);
+    const recentSubmissions = results.filter(r => r.attemptedAt >= thirtyDaysAgo);
 
-    // Performance trends
+    // Performance trends - calculate from results
+    const testResultsMap = new Map();
+    results.forEach(result => {
+      if (!testResultsMap.has(result.testId.toString())) {
+        testResultsMap.set(result.testId.toString(), []);
+      }
+      testResultsMap.get(result.testId.toString()).push(result);
+    });
+
     const performanceData = tests
-      .filter(t => t.submissions.length > 0)
-      .map(test => ({
-        testName: test.testName,
-        averageScore: test.submissions.reduce((sum, s) => sum + s.percentage, 0) / test.submissions.length,
-        submissionCount: test.submissions.length,
-        date: test.publishedAt
-      }))
+      .filter(t => testResultsMap.has(t._id.toString()))
+      .map(test => {
+        const testResults = testResultsMap.get(test._id.toString());
+        const totalMarksObtained = testResults.reduce((sum, r) => sum + r.score, 0);
+        const totalMaxMarks = testResults.reduce((sum, r) => sum + (r.outOfMarks || 0), 0);
+        const averagePercentage = totalMaxMarks > 0 ? (totalMarksObtained / totalMaxMarks) * 100 : 0;
+        
+        return {
+          testName: test.testName,
+          averagePercentage: Math.round(averagePercentage * 100) / 100,
+          submissionCount: testResults.length,
+          date: test.publishedAt || test.createdAt
+        };
+      })
       .sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    res.status(200).json({
+    const response = {
       overview: {
         totalTests,
         publishedTests,
@@ -926,10 +978,65 @@ router.get('/dashboard-analytics/:teacherId', auth, async (req, res) => {
         submissionsReceived: recentSubmissions.length
       },
       performanceData
+    };
+    
+    console.log('Analytics Response:', {
+      teacherId,
+      totalTests,
+      performanceDataLength: performanceData.length,
+      response
     });
+    
+    res.status(200).json(response);
   } catch (err) {
     console.error('Error fetching dashboard analytics:', err);
     res.status(500).json({ message: 'Error fetching dashboard analytics' });
+  }
+});
+
+/**
+ * @method - GET
+ * @param - /debug-teacher-data/:teacherId
+ * @description - Debug teacher data for analytics troubleshooting
+ */
+router.get('/debug-teacher-data/:teacherId', auth, async (req, res) => {
+  try {
+    const { teacherId } = req.params;
+    const Teacher = require("../model/Teacher");
+    const User = require("../model/User");
+    
+    // Find teacher by _id (assuming it's Teacher document ID)
+    const teacherDoc = await Teacher.findById(teacherId);
+    const userDoc = teacherDoc ? await User.findById(teacherDoc.profileInfo) : null;
+    
+    // Also try finding user first (in case teacherId is User ID)
+    const userDocDirect = await User.findById(teacherId);
+    const teacherDocFromUser = userDocDirect ? await Teacher.findOne({ profileInfo: teacherId }) : null;
+    
+    // Find tests for both scenarios
+    const testsByTeacherDoc = await Test.find({ teacherId: teacherId });
+    const testsByUserDoc = teacherDocFromUser ? await Test.find({ teacherId: teacherDocFromUser._id }) : [];
+    
+    res.json({
+      debug: {
+        providedTeacherId: teacherId,
+        scenarioA: {
+          description: "Treating teacherId as Teacher document ID",
+          teacherDoc: teacherDoc ? { _id: teacherDoc._id, profileInfo: teacherDoc.profileInfo } : null,
+          userDoc: userDoc ? { _id: userDoc._id, name: `${userDoc.firstName} ${userDoc.lastName}` } : null,
+          testsFound: testsByTeacherDoc.length
+        },
+        scenarioB: {
+          description: "Treating teacherId as User document ID",
+          userDoc: userDocDirect ? { _id: userDocDirect._id, name: `${userDocDirect.firstName} ${userDocDirect.lastName}` } : null,
+          teacherDoc: teacherDocFromUser ? { _id: teacherDocFromUser._id, profileInfo: teacherDocFromUser.profileInfo } : null,
+          testsFound: testsByUserDoc.length
+        }
+      }
+    });
+  } catch (err) {
+    console.error('Debug error:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 

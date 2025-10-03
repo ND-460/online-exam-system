@@ -8,7 +8,7 @@ import { useAuthStore } from "../../store/authStore";
 import { toast } from "react-toastify";
 import axios from "axios";
 import AdminAnalyticsCards from "../../components/AdminAnalyticsCards";
-import { downloadChartDataAsCSV, downloadCompleteReport, createDashboardPdf } from "../../utils/reportGenerator";
+import { downloadCompleteReport, createDashboardPdf, exportSelectionToPdf } from "../../utils/reportGenerator";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line } from 'recharts';
 import AdminDashboardOverview from "../../components/AdminDashboardOverview";
 
@@ -28,15 +28,85 @@ export default function AdminDashboardNew() {
   const [teachers, setTeachers] = useState([]);
   const [organizations, setOrganizations] = useState([]);
   const [analytics, setAnalytics] = useState({});
-  const [chartData, setChartData] = useState({});
+  const [chartData, setChartData] = useState({
+    testsPerWeek: [],
+    studentsByOrg: [],
+    teachersByOrg: [],
+    performanceData: [],
+    performanceTrend: [],
+    marksDistribution: {},
+    testAverageMarks: []
+  });
+  
+  // No pagination needed for daily logins chart
   const [actionLoading, setActionLoading] = useState({});
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const saved = localStorage.getItem('admin_active_tab');
+      return saved || "dashboard";
+    } catch {
+      return "dashboard";
+    }
+  });
+  const [tests, setTests] = useState([]);
   const [analyticsTeacher, setAnalyticsTeacher] = useState(null);
   const [editTeacher, setEditTeacher] = useState(null);
   const [editStatus, setEditStatus] = useState("active");
   const [analyticsStudent, setAnalyticsStudent] = useState(null);
   const [viewTeacher, setViewTeacher] = useState(null);
   const [viewStudent, setViewStudent] = useState(null);
+
+  // Persist and restore scroll positions per tab
+  const scrollPositionsRef = useRef({});
+
+  // Restore scroll on mount and on tab change; persist activeTab
+  useEffect(() => {
+    try {
+      localStorage.setItem('admin_active_tab', activeTab);
+    } catch {}
+
+    // small delay to ensure content rendered
+    const handle = setTimeout(() => {
+      try {
+        const raw = localStorage.getItem('admin_tab_scroll');
+        const map = raw ? JSON.parse(raw) : {};
+        const y = map[activeTab] || 0;
+        window.scrollTo({ top: y, behavior: 'instant' });
+      } catch {}
+    }, 0);
+
+    return () => clearTimeout(handle);
+  }, [activeTab]);
+
+  // Capture scroll positions throttled
+  useEffect(() => {
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        try {
+          const raw = localStorage.getItem('admin_tab_scroll');
+          const map = raw ? JSON.parse(raw) : {};
+          map[activeTab] = window.scrollY || document.documentElement.scrollTop || 0;
+          localStorage.setItem('admin_tab_scroll', JSON.stringify(map));
+        } catch {}
+        ticking = false;
+      });
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [activeTab]);
+
+  // Close any open modals or transient states when switching tabs
+  useEffect(() => {
+    setAnalyticsTeacher(null);
+    setAnalyticsStudent(null);
+    setViewTeacher(null);
+    setViewStudent(null);
+    setEditTeacher(null);
+  }, [activeTab]);
   const [editTeacherProfile, setEditTeacherProfile] = useState(null);
   const [editStudentProfile, setEditStudentProfile] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -55,6 +125,17 @@ export default function AdminDashboardNew() {
   const [studentSortDir, setStudentSortDir] = useState("asc");
   const [teacherSortBy, setTeacherSortBy] = useState("name");
   const [teacherSortDir, setTeacherSortDir] = useState("asc");
+
+  // Organization analytics state
+  const [orgAnalytics, setOrgAnalytics] = useState({ 
+    testPerformance: [], 
+    summary: { totalTests: 0, totalStudents: 0, totalTeachers: 0, totalResults: 0 }
+  });
+  const [timelineData, setTimelineData] = useState([]);
+  const [weeklyData, setWeeklyData] = useState([]);
+  const [yearlyData, setYearlyData] = useState([]);
+  const [performanceDistribution, setPerformanceDistribution] = useState([]);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
   
   const { logout, user, token, updateUser } = useAuthStore()
   const navigate = useNavigate()
@@ -69,74 +150,290 @@ export default function AdminDashboardNew() {
   };
 
   // Inline component: Teacher Analytics content (charts + table + download)
-  const TeacherAnalyticsContent = ({ teacher }) => {
+  const TeacherAnalyticsContent = ({ teacher, onDataLoad }) => {
     const [loadingTA, setLoadingTA] = useState(false);
-    const [dataTA, setDataTA] = useState({ overview: {}, performanceData: [] });
+    const [teacherTests, setTeacherTests] = useState([]);
+    const [testResults, setTestResults] = useState([]);
+    const [overview, setOverview] = useState({ totalTests: 0, publishedTests: 0, draftTests: 0, completedTests: 0, totalSubmissions: 0 });
 
     useEffect(() => {
       let cancelled = false;
-      const run = async () => {
+      const fetchTeacherData = async () => {
         try {
+          const teacherDocId = teacher?.profileId;
+          
+          if (!teacherDocId) {
+            console.warn('No profileId found for teacher:', teacher);
+            if (!cancelled) {
+              setTeacherTests([]);
+              setTestResults([]);
+              setOverview({ totalTests: 0, publishedTests: 0, draftTests: 0, completedTests: 0, totalSubmissions: 0 });
+            }
+            return;
+          }
+          
           setLoadingTA(true);
-          const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/teacher/dashboard-analytics/${teacher._id}`, {
+          
+          // Fetch teacher's tests directly
+          const testsRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/teacher/tests/${teacherDocId}`, {
             headers: { Authorization: `Bearer ${token}` }
           });
-          if (!cancelled) setDataTA(res.data || { overview: {}, performanceData: [] });
+          
+          const tests = testsRes?.data || [];
+          
+          if (!cancelled) {
+            setTeacherTests(tests);
+            
+            // Calculate overview
+            const totalTests = tests.length;
+            const publishedTests = tests.filter(t => t.status === 'published').length;
+            const draftTests = tests.filter(t => t.status === 'draft').length;
+            const completedTests = tests.filter(t => t.status === 'completed').length;
+            
+            // Fetch results for each test to get submission counts and averages
+            let allResults = [];
+            let totalSubmissions = 0;
+            
+            for (const test of tests) {
+              try {
+                const resultRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/teacher/test-results/${test._id}`, {
+                  headers: { Authorization: `Bearer ${token}` }
+                });
+                const testData = resultRes?.data;
+                
+                if (testData) {
+                  const submissionCount = testData.submissions?.length || 0;
+                  totalSubmissions += submissionCount;
+                  allResults.push({
+                    testId: test._id,
+                    testName: test.testName,
+                    submissions: testData.submissions || [],
+                    analytics: testData.analytics || {},
+                    averagePercentage: testData.analytics?.averagePercentage || 0,
+                    submissionCount: submissionCount,
+                    date: test.publishedAt || test.createdAt || test.scheduledAt
+                  });
+                }
+              } catch (err) {
+                // Add test with zero submissions
+                allResults.push({
+                  testId: test._id,
+                  testName: test.testName,
+                  submissions: [],
+                  analytics: {},
+                  averagePercentage: 0,
+                  submissionCount: 0,
+                  date: test.publishedAt || test.createdAt || test.scheduledAt
+                });
+              }
+            }
+            
+            if (!cancelled) {
+              setTestResults(allResults);
+              const overviewData = {
+                totalTests,
+                publishedTests,
+                draftTests,
+                completedTests,
+                totalSubmissions
+              };
+              setOverview(overviewData);
+              
+              // Pass comprehensive data to parent via callback
+              if (onDataLoad) {
+                onDataLoad({
+                  overview: overviewData,
+                  testResults: allResults,
+                  teacherTests: tests
+                });
+              }
+            }
+          }
         } catch (e) {
-          if (!cancelled) setDataTA({ overview: {}, performanceData: [] });
+          console.error('Error fetching teacher data:', e);
+          console.error('Error details:', {
+            message: e.message,
+            response: e.response?.data,
+            status: e.response?.status
+          });
+          if (!cancelled) {
+            setTeacherTests([]);
+            setTestResults([]);
+            setOverview({ totalTests: 0, publishedTests: 0, draftTests: 0, completedTests: 0, totalSubmissions: 0 });
+          }
         } finally {
           if (!cancelled) setLoadingTA(false);
         }
       };
-      run();
+      
+      fetchTeacherData();
       return () => { cancelled = true; };
-    }, [teacher?._id]);
+    }, [teacher?.profileId, token]);
 
     const handleDownload = () => {
       const chartData = {
-        performanceData: (dataTA.performanceData || []).map(d => ({ test: d.testName, averageScore: Math.round((d.averageScore || 0) * 100) / 100, submissions: d.submissionCount || 0, date: d.date ? new Date(d.date).toISOString().slice(0,10) : '' }))
+        testsCreated: testResults.map(d => ({ 
+          testName: d.testName, 
+          submissions: d.submissionCount || 0, 
+          date: d.date ? new Date(d.date).toISOString().slice(0,10) : '',
+          averagePercentage: Math.round((d.averagePercentage || 0) * 100) / 100
+        }))
       };
       downloadCompleteReport(chartData);
     };
 
+    if (loadingTA) {
+      return (
+        <div className="flex justify-center items-center py-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+            <p className="text-gray-600">Loading analytics data...</p>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-6">
+        {/* Debug info */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs">
+            <p><strong>Debug:</strong> Teacher ID: {teacher?.profileId || 'N/A'}, Tests loaded: {testResults.length || 0}, Total submissions: {overview.totalSubmissions || 0}</p>
+          </div>
+        )}
+        
         {/* Overview badges */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           {[
-            { label: 'Total Tests', value: dataTA.overview?.totalTests || 0 },
-            { label: 'Assignments', value: dataTA.overview?.totalAssignments || 0 },
-            { label: 'Submissions', value: dataTA.overview?.totalSubmissions || 0 },
-            { label: 'Completion %', value: dataTA.overview?.overallCompletionRate || 0 }
+            { label: 'Total Tests', value: overview?.totalTests || 0, color: 'text-blue-600' },
+            { label: 'Total Submissions', value: overview?.totalSubmissions || 0, color: 'text-green-600' }
           ].map((c, idx) => (
             <div key={idx} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
               <div className="text-sm text-gray-500">{c.label}</div>
-              <div className="text-xl font-semibold text-gray-800">{c.value}</div>
+              <div className={`text-xl font-semibold ${c.color}`}>{c.value}</div>
             </div>
           ))}
         </div>
 
-        {/* Performance Bar Chart */}
+        {/* Additional status cards */}
+        <div className="grid grid-cols-3 gap-4">
+          {[{label:'Published', value: overview?.publishedTests || 0}, {label:'Completed', value: overview?.completedTests || 0}, {label:'Drafts', value: overview?.draftTests || 0}].map((c, i) => (
+            <div key={i} className="bg-white rounded-lg border border-gray-200 p-4">
+              <div className="text-sm text-gray-500">{c.label}</div>
+              <div className="text-lg font-semibold text-gray-800">{c.value}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Tests Created Chart */}
         <div className="bg-white rounded-xl shadow p-4 border border-gray-200">
           <div className="flex justify-between items-center mb-3">
-            <h4 className="font-semibold text-gray-800">Average Student Score by Test (%)</h4>
-            <button onClick={() => downloadChartDataAsCSV('teacher-performance', (dataTA.performanceData||[]).map(d=>({ testName: d.testName, averageScore: Math.round((d.averageScore||0)*100)/100, submissions: d.submissionCount||0, date: d.date?new Date(d.date).toISOString().slice(0,10):'' })))} className="text-sm text-blue-600 hover:text-blue-800">Download CSV</button>
+            <h4 className="font-semibold text-gray-800">Tests Created Over Time</h4>
+            <button onClick={() => createDashboardPdf([{ title: 'Teacher - Tests Created Over Time', data: testResults }], { filename: 'teacher-tests-created.pdf' })} className="text-sm text-emerald-700 hover:text-emerald-800">Download PDF</button>
           </div>
           <div className="h-[360px]">
+            {(!Array.isArray(testResults) || testResults.length === 0) ? (
+              <div className="flex items-center justify-center h-full text-gray-500">
+                <div className="text-center">
+                  <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-medium text-gray-600">No Tests Created</p>
+                  <p className="text-xs text-gray-500 mt-1">This teacher hasn't created any tests yet</p>
+                </div>
+              </div>
+            ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={(dataTA.performanceData||[]).map(d=>({ name: d.testName, avg: Math.round((d.averageScore||0)*100)/100 }))}>
+                <BarChart data={testResults.map((d, index) => ({ 
+                  name: d.testName || `Test ${index + 1}`, 
+                  submissions: d.submissionCount || 0,
+                  date: d.date ? new Date(d.date).toLocaleDateString() : 'N/A'
+                }))}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" interval={0} angle={-15} textAnchor="end" height={70} />
-                <YAxis domain={[0,100]} />
-                <Tooltip />
-                <Bar dataKey="avg" fill="#3B82F6" radius={[4,4,0,0]} />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip 
+                    formatter={(value, name) => [value, 'Submissions']}
+                    labelFormatter={(label, payload) => {
+                      const data = payload?.[0]?.payload;
+                      return data ? `${label} (Created: ${data.date})` : label;
+                    }}
+                  />
+                  <Bar dataKey="submissions" fill="#10B981" radius={[4,4,0,0]} />
               </BarChart>
             </ResponsiveContainer>
+            )}
           </div>
         </div>
 
-        <div className="flex justify-end">
-          <button onClick={handleDownload} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Download Complete Report</button>
+        {/* Tests Created Table */}
+        <div className="bg-white rounded-xl shadow p-4 border border-gray-200">
+          <div className="flex justify-between items-center mb-3">
+            <h4 className="font-semibold text-gray-800">Tests Created</h4>
+            <button onClick={() => createDashboardPdf([{ title: 'Teacher - Tests Table', data: testResults }], { filename: 'teacher-tests-table.pdf' })} className="text-sm text-emerald-700 hover:text-emerald-800">Download PDF</button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-2 px-3 text-gray-700">Test Name</th>
+                  <th className="text-left py-2 px-3 text-gray-700">Submissions</th>
+                  <th className="text-left py-2 px-3 text-gray-700">Created Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {testResults.map((d, i) => (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-2 px-3 font-medium">{d.testName}</td>
+                    <td className="py-2 px-3">{d.submissionCount || 0}</td>
+                    <td className="py-2 px-3">{d.date ? new Date(d.date).toLocaleDateString() : '—'}</td>
+                  </tr>
+                ))}
+                {(!Array.isArray(testResults) || testResults.length === 0) && (
+                  <tr><td colSpan="3" className="py-4 px-3 text-gray-500">
+                    No tests created yet. This teacher hasn't created any tests.
+                  </td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Total Average Percentage */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl shadow p-6 border border-blue-200">
+          <div className="text-center">
+            <h4 className="text-lg font-semibold text-gray-800 mb-2">Overall Performance Summary</h4>
+            <div className="flex justify-center items-center space-x-8">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-blue-600">
+                  {(() => {
+                    const testsWithSubmissions = testResults.filter(d => d.submissionCount > 0);
+                    const totalAvg = testsWithSubmissions.length ? 
+                      Math.round((testsWithSubmissions.reduce((s, d) => s + Number(d.averagePercentage || 0), 0) / testsWithSubmissions.length) * 100) / 100 : 0;
+                    return totalAvg;
+                  })()}%
+                </div>
+                <div className="text-sm text-gray-600 mt-1">Total Average Percentage</div>
+                <div className="text-xs text-gray-500 mt-1">Across all tests with submissions</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-green-600">
+                  {overview.totalTests || 0}
+                </div>
+                <div className="text-sm text-gray-600 mt-1">Total Tests Created</div>
+                <div className="text-xs text-gray-500 mt-1">All test statuses included</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-purple-600">
+                  {overview.totalSubmissions || 0}
+                </div>
+                <div className="text-sm text-gray-600 mt-1">Total Submissions</div>
+                <div className="text-xs text-gray-500 mt-1">From all students</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -210,13 +507,13 @@ export default function AdminDashboardNew() {
     }
     
     const csvContent = [
-      ['Name', 'Email', 'Organization', 'Tests Taken', 'Average Score', 'Status'],
+       ['Name', 'Email', 'Organization', 'Tests Taken', 'Average Percentage', 'Status'],
       ...students.map(student => [
         student.name || 'N/A',
         student.email || 'N/A',
         student.organization || 'N/A',
         student.testsTaken || 0,
-        student.averageScore || 'N/A',
+        student.averagePercentage || 'N/A',
         student.status || 'inactive'
       ])
     ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
@@ -271,7 +568,9 @@ export default function AdminDashboardNew() {
     
     const csvContent = [
       ['Name', 'Email', 'Students', 'Teachers', 'Tests', 'Status'],
-      ...organizations.map(org => [
+      ...organizations
+        .filter(org => org.name && org.name !== 'N/A')
+        .map(org => [
         org.name || 'N/A',
         org.email || 'N/A',
         org.studentCount || 0,
@@ -322,7 +621,10 @@ export default function AdminDashboardNew() {
         ongoingTests: response.data.ongoingTests || 0,
         completedTests: response.data.completedTests || 0,
         activeUsers: response.data.activeUsers || 0,
-        pendingUsers: response.data.pendingUsers || 0
+        pendingUsers: response.data.pendingUsers || 0,
+        publishedTests: response.data.publishedTests || 0,
+        draftTests: response.data.draftTests || 0,
+        totalResults: response.data.totalResults || 0
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -376,11 +678,32 @@ export default function AdminDashboardNew() {
       const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/user/admin/organizations`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setOrganizations(response.data.organizations || []);
+      const orgs = response.data.organizations || [];
+      setOrganizations(orgs);
+      
+      // Also update chart data for analytics
+      setChartData(prev => ({
+        ...prev,
+        organizationsData: orgs
+      }));
     } catch (error) {
       console.error('Error fetching organizations:', error);
       toast.error('Failed to fetch organizations data');
       setOrganizations([]);
+    }
+  };
+
+  // Fetch tests (normalized for admin)
+  const fetchTests = async () => {
+    try {
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/user/admin/tests`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setTests(res.data.tests || []);
+    } catch (err) {
+      console.error('Error fetching tests:', err);
+      toast.error('Failed to fetch tests');
+      setTests([]);
     }
   };
 
@@ -399,6 +722,7 @@ export default function AdminDashboardNew() {
         totalTests: response.data.totalTests || 0,
         totalStudents: response.data.totalStudents || 0,
         totalTeachers: response.data.totalTeachers || 0,
+        totalAdmins: response.data.totalAdmins || 0,
         systemOverview: response.data.systemOverview || {}
       });
       // Ensure cards show correct test count even if stats endpoint lacks it
@@ -428,6 +752,46 @@ export default function AdminDashboardNew() {
     }
   };
 
+  // Fetch average marks by test for the chart
+  const fetchTestAverageMarks = async () => {
+    try {
+      // Fetch all tests
+      const testsResponse = await axios.get(`${import.meta.env.VITE_API_URL}/api/user/admin/tests`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const allTests = testsResponse.data.tests || [];
+      
+      // Get first 10 tests and calculate their average marks
+      const testMarksData = await Promise.all(
+        allTests.slice(0, 10).map(async (test) => {
+          try {
+            const resultsResponse = await axios.get(`${import.meta.env.VITE_API_URL}/api/teacher/test-results/${test._id}`, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            const testData = resultsResponse.data;
+            const averagePercentage = testData?.analytics?.averagePercentage || 0;
+            
+            return {
+              testName: (test.testName || 'Unnamed Test').length > 20 
+                ? (test.testName || 'Unnamed Test').substring(0, 20) + '...' 
+                : (test.testName || 'Unnamed Test'),
+              averagePercentage: Math.round(averagePercentage),
+              submissionCount: testData?.submissions?.length || 0
+            };
+          } catch (err) {
+            return null;
+          }
+        })
+      );
+      
+      // Filter out null results and tests with no submissions
+      return testMarksData.filter(test => test && test.submissionCount > 0);
+    } catch (error) {
+      console.error('Error fetching test average marks:', error);
+      return [];
+    }
+  };
+
   // Fetch chart data
   const fetchChartData = async () => {
     try {
@@ -435,6 +799,9 @@ export default function AdminDashboardNew() {
         headers: { Authorization: `Bearer ${token}` }
       });
       const api = response.data || {};
+      
+      // Fetch test average marks data
+      const testAverageMarks = await fetchTestAverageMarks();
 
       // Normalize testsPerWeek: [{ _id: {week, year}, count }] -> [{ week, count }]
       const testsPerWeek = Array.isArray(api.testsPerWeek)
@@ -470,7 +837,8 @@ export default function AdminDashboardNew() {
         activityData: Array.isArray(api.dailyLogins) ? api.dailyLogins.map(row => ({
           date: row?.date || '',
           teachers: Number(row?.teachers || 0),
-          students: Number(row?.students || 0)
+          students: Number(row?.students || 0),
+          admins: Number(row?.admins || 0)
         })) : [],
         performanceData: marksDistribution,
         subjectData: performanceTrend,
@@ -487,8 +855,14 @@ export default function AdminDashboardNew() {
           { week: 'May', completed: 2 },
           { week: 'Jun', completed: 3 }
         ],
-        systemOverview: api.systemOverview || {}
+        systemOverview: api.systemOverview || {},
+        testsPerWeek,
+        studentsByOrg,
+        teachersByOrg,
+        marksDistribution,
+        testAverageMarks
       });
+      
     } catch (error) {
       console.error('Error fetching chart data:', error);
       toast.error('Failed to fetch chart data');
@@ -496,10 +870,12 @@ export default function AdminDashboardNew() {
         testsPerWeek: [],
         studentsByOrg: [],
         teachersByOrg: [],
+        performanceData: [],
         performanceTrend: [],
-        marksDistribution: [],
+        marksDistribution: {},
         dailyLogins: [],
-        systemOverview: undefined
+        systemOverview: undefined,
+        testAverageMarks: []
       });
     }
   };
@@ -616,14 +992,21 @@ export default function AdminDashboardNew() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       toast.success('Profile updated');
-      await Promise.all([fetchTeachers(), fetchStudents(), fetchStats(), fetchAnalytics()]);
+      // Refresh all data including organizations since profile changes might affect organization data
+      await Promise.all([
+        fetchTeachers(), 
+        fetchStudents(), 
+        fetchOrganizations(), 
+        fetchStats(), 
+        fetchAnalytics()
+      ]);
     } catch (e) {
       toast.error('Failed to update profile');
     }
   };
 
   // Inline component: Student Analytics (assigned vs attempted)
-  const StudentAnalyticsContent = ({ student }) => {
+  const StudentAnalyticsContent = ({ student, onDataLoad }) => {
     const [loadingSA, setLoadingSA] = useState(false);
     const [counts, setCounts] = useState({ upcoming: 0, ongoing: 0, completed: 0 });
     const [results, setResults] = useState([]);
@@ -654,11 +1037,29 @@ export default function AdminDashboardNew() {
           }
           if (!cancelled) {
             setResults(found);
+            let calculatedAvgScore = 0;
             if (found.length) {
-              const avg = found.reduce((s, r) => s + Number(r.score || 0), 0) / found.length;
-              setAvgScore(Math.round(avg * 100) / 100);
+              const sumPct = found.reduce((sum, r) => {
+                const outOf = r.outOfMarks || r.testId?.outOfMarks || 0;
+                if (!outOf) return sum;
+                return sum + (Number(r.score || 0) / outOf) * 100;
+              }, 0);
+              const avgPct = sumPct / found.length;
+              calculatedAvgScore = Math.round(avgPct * 100) / 100;
+              setAvgScore(calculatedAvgScore);
             } else {
               setAvgScore(0);
+            }
+            
+            // Pass comprehensive data to parent via callback
+            if (onDataLoad) {
+              const totalAssigned = (counts.upcoming || 0) + (counts.ongoing || 0) + (counts.completed || 0);
+              onDataLoad({
+                counts,
+                results: found,
+                avgScore: calculatedAvgScore,
+                totalAssigned
+              });
             }
           }
         } catch (e) {
@@ -686,7 +1087,7 @@ export default function AdminDashboardNew() {
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {[{label:'Assigned',value:totalAssigned},{label:'Completed',value:counts.completed||0},{label:'Ongoing',value:counts.ongoing||0},{label:'Upcoming',value:counts.upcoming||0},{label:'Average Score',value:avgScore}].map((c,idx)=>(
+          {[{label:'Assigned',value:totalAssigned},{label:'Completed',value:counts.completed||0},{label:'Ongoing',value:counts.ongoing||0},{label:'Upcoming',value:counts.upcoming||0},{label:'Average Percentage',value:`${avgScore}%`}].map((c,idx)=>(
             <div key={idx} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
               <div className="text-sm text-gray-500">{c.label}</div>
               <div className="text-xl font-semibold text-gray-800">{c.value}</div>
@@ -697,7 +1098,7 @@ export default function AdminDashboardNew() {
         <div className="bg-white rounded-xl shadow p-4 border border-gray-200">
           <div className="flex justify-between items-center mb-3">
             <h4 className="font-semibold text-gray-800">Assigned vs Attempted</h4>
-            <button onClick={() => downloadChartDataAsCSV('student-assigned-attempted', chartData)} className="text-sm text-blue-600 hover:text-blue-800">Download CSV</button>
+            <button onClick={() => createDashboardPdf([{ title: 'Student - Assigned vs Attempted', data: chartData }], { filename: 'student-assigned-attempted.pdf' })} className="text-sm text-emerald-700 hover:text-emerald-800">Download PDF</button>
           </div>
           <div className="h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -716,7 +1117,7 @@ export default function AdminDashboardNew() {
         <div className="bg-white rounded-xl shadow p-4 border border-gray-200">
           <div className="flex justify-between items-center mb-3">
             <h4 className="font-semibold text-gray-800">Recent Test Results</h4>
-            <button onClick={() => downloadChartDataAsCSV('student-recent-results', results.map(r => ({ test: r.testId?.testName || r.testName || 'Test', score: r.score, outOf: r.outOfMarks || r.testId?.outOfMarks || 0 })))} className="text-sm text-blue-600 hover:text-blue-800">Download CSV</button>
+            <button onClick={() => createDashboardPdf([{ title: 'Student - Recent Test Results', data: results }], { filename: 'student-recent-results.pdf' })} className="text-sm text-emerald-700 hover:text-emerald-800">Download PDF</button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -744,10 +1145,6 @@ export default function AdminDashboardNew() {
             </table>
           </div>
         </div>
-
-        <div className="flex justify-end">
-          <button onClick={handleDownload} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Download Complete Report</button>
-        </div>
       </div>
     );
   };
@@ -761,6 +1158,7 @@ export default function AdminDashboardNew() {
         fetchStudents(),
         fetchTeachers(),
         fetchOrganizations(),
+        fetchTests(),
         fetchAnalytics(),
         fetchChartData()
       ]);
@@ -777,10 +1175,15 @@ export default function AdminDashboardNew() {
         await fetchStudents();
       } else if (activeTab === 'teachers') {
         await fetchTeachers();
+      } else if (activeTab === 'tests') {
+        await fetchTests();
       } else if (activeTab === 'organizations') {
         await fetchOrganizations();
       } else if (activeTab === 'analytics') {
-        await fetchAnalytics();
+        await Promise.all([
+          fetchAnalytics(),
+          fetchOrganizations()
+        ]);
       } else if (activeTab === 'profile') {
         await fetchProfile();
       }
@@ -809,6 +1212,15 @@ export default function AdminDashboardNew() {
   useEffect(() => {
     let intervalId;
     let visibilityHandler;
+    
+    // Auto-refresh organizations every 30 seconds when on analytics or organizations tab
+    let orgIntervalId;
+    if (activeTab === 'analytics' || activeTab === 'organizations') {
+      orgIntervalId = setInterval(() => {
+        fetchOrganizations();
+      }, 30000); // 30 seconds
+    }
+    
     // periodic refresh of key widgets
     intervalId = setInterval(() => {
       // Only refresh the inexpensive, aggregated endpoints
@@ -825,21 +1237,109 @@ export default function AdminDashboardNew() {
 
     return () => {
       if (intervalId) clearInterval(intervalId);
+      if (orgIntervalId) clearInterval(orgIntervalId);
       document.removeEventListener('visibilitychange', visibilityHandler);
     };
-  }, []);
+  }, [activeTab]);
 
   // Initialize notifications
   useEffect(() => {
     setNotifications([]);
   }, []);
 
-  const USER_COLORS = ['#3B82F6', '#10B981'];
+  // Fetch organization analytics data
+  useEffect(() => {
+    const fetchOrgAnalytics = async () => {
+      if (!params.orgId || activeTab !== "organizations") {
+        setAnalyticsLoading(false);
+        return;
+      }
+      
+      // Wait for organizations to be loaded if not yet available
+      if (organizations.length === 0) {
+        await fetchOrganizations();
+      }
+      
+      const org = organizations.find(o => String(o._id) === String(params.orgId));
+      if (!org?.name || org.name === 'N/A') {
+        setAnalyticsLoading(false);
+        return;
+      }
+      
+      try {
+        setAnalyticsLoading(true);
+        
+        
+        // Fetch main analytics data
+        const analyticsResponse = await axios.get(
+          `${import.meta.env.VITE_API_URL}/api/analytics/organization/${encodeURIComponent(org.name)}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        // Optional debug logs (guarded to avoid ReferenceError in production)
+        if (typeof logAPICall === 'function') {
+          logAPICall(`/api/analytics/organization/${org.name}`, analyticsResponse);
+        }
+        if (typeof logAnalyticsData === 'function') {
+          logAnalyticsData('Organization Analytics', analyticsResponse.data);
+        }
+        setOrgAnalytics(analyticsResponse.data);
+
+        // Fetch timeline data (monthly)
+        const timelineResponse = await axios.get(
+          `${import.meta.env.VITE_API_URL}/api/analytics/organization/${encodeURIComponent(org.name)}/timeline?period=monthly`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setTimelineData(timelineResponse.data);
+
+        // Fetch weekly data
+        const weeklyResponse = await axios.get(
+          `${import.meta.env.VITE_API_URL}/api/analytics/organization/${encodeURIComponent(org.name)}/timeline?period=weekly`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setWeeklyData(weeklyResponse.data);
+
+        // Fetch yearly data
+        const yearlyResponse = await axios.get(
+          `${import.meta.env.VITE_API_URL}/api/analytics/organization/${encodeURIComponent(org.name)}/timeline?period=yearly`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setYearlyData(yearlyResponse.data);
+
+        // Fetch performance distribution
+        const distributionResponse = await axios.get(
+          `${import.meta.env.VITE_API_URL}/api/analytics/organization/${encodeURIComponent(org.name)}/performance-distribution`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setPerformanceDistribution(distributionResponse.data);
+
+      } catch (error) {
+        console.error('Error fetching organization analytics:', error);
+        toast.error('Failed to load analytics data');
+        
+        // Set fallback data to prevent chart rendering errors
+        setOrgAnalytics({ 
+          testPerformance: [], 
+          summary: { totalTests: 0, totalStudents: 0, totalTeachers: 0, totalResults: 0 }
+        });
+        setTimelineData([]);
+        setWeeklyData([]);
+        setYearlyData([]);
+        setPerformanceDistribution([]);
+      } finally {
+        setAnalyticsLoading(false);
+      }
+    };
+
+    fetchOrgAnalytics();
+  }, [params.orgId, activeTab, organizations, token]);
+
+  const USER_COLORS = ['#3B82F6', '#10B981', '#F59E0B'];
   const STATUS_COLORS = ['#16A34A', '#F59E0B'];
 
   const usersBreakdownData = [
     { name: 'Students', value: Number(stats.totalStudents || 0) },
-    { name: 'Teachers', value: Number(stats.totalTeachers || 0) }
+    { name: 'Teachers', value: Number(stats.totalTeachers || 0) },
+    { name: 'Admins', value: Number(analytics.totalAdmins || 0) }
   ];
 
   const usersStatusData = [
@@ -930,6 +1430,7 @@ export default function AdminDashboardNew() {
               <TrendingUp className="w-5 h-5" />
               Analytics
             </button>
+            
                         <button
               onClick={() => setActiveTab("profile")}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
@@ -962,41 +1463,44 @@ export default function AdminDashboardNew() {
         <div className="relative z-10 p-8">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">
+            <h1 className={`text-3xl font-bold mb-2 ${activeTab === "analytics" ? "text-white" : "text-gray-800"}`}>
               {activeTab === "dashboard" && "Dashboard"}
               {activeTab === "teachers" && "Teacher"}
               {activeTab === "students" && "Student"}
               {activeTab === "organizations" && (params.orgId ? "Organization Details" : "Organization")}
               {activeTab === "analytics" && "Analytics"}
+              
               {activeTab === "profile" && "Profile"}
             </h1>
-            <p className="text-gray-600">
+            <p className={`${activeTab === "analytics" ? "text-gray-200" : "text-gray-600"}`}>
               {activeTab === "dashboard" && "Overview of your examination system"}
               {activeTab === "teachers" && "Manage teachers and their activities"}
               {activeTab === "students" && "Manage students and their progress"}
               {activeTab === "organizations" && "Manage organizations and institutions"}
               {activeTab === "analytics" && "System performance and insights"}
+              
               {activeTab === "profile" && "Your profile information"}
             </p>
             </div>
 
           {/* Dashboard Content */}
           {activeTab === "dashboard" && (
-            <div className="space-y-8">
+            <div className="space-y-8" id="admin-analytics-section">
               {/* Top cards */}
               <AdminAnalyticsCards 
                 analytics={{
-                  totalUsers: stats.totalUsers || 0,
-                  totalTests: stats.totalTests || 0,
-                  totalStudents: stats.totalStudents || 0,
-                  totalTeachers: stats.totalTeachers || 0,
+                  totalUsers: analytics.totalUsers || stats.totalUsers || 0,
+                  totalTests: analytics.totalTests || stats.totalTests || 0,
+                  totalStudents: analytics.totalStudents || stats.totalStudents || 0,
+                  totalTeachers: analytics.totalTeachers || stats.totalTeachers || 0,
+                  totalAdmins: analytics.totalAdmins || 0,
                   activeUsers: stats.activeUsers || 0,
                   completedTests: stats.completedTests || 0,
                   pendingUsers: stats.pendingUsers || 0,
                   systemHealth: 98
                 }}
                 loading={loading}
-                onDownload={(chartType, data) => downloadChartDataAsCSV(chartType, data)}
+                onDownload={(chartType, data) => createDashboardPdf([{ title: chartType, data }], { filename: `${chartType}.pdf` })}
               />
 
 
@@ -1046,6 +1550,16 @@ export default function AdminDashboardNew() {
                     </ResponsiveContainer>
                   </div>
                 </div>
+              </div>
+
+              {/* Analytics Toolbar */}
+              <div className="flex justify-end -mt-4">
+                <button
+                  onClick={() => exportSelectionToPdf('#admin-analytics-section', 'admin-analytics-landscape.pdf', { landscape: true, includeCharts: true })}
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4" /> Download PDF (Landscape)
+                </button>
               </div>
 
               {/* Hidden chart containers for PDF capture (kept for PDF creation) */}
@@ -1102,7 +1616,7 @@ export default function AdminDashboardNew() {
             <div className="space-y-8">
 
               {/* Filters and Search */}
-              <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200">
+               <div id="students-section" className="bg-white rounded-xl p-6 shadow-lg border border-gray-200">
                 <div className="flex flex-wrap gap-4 mb-6">
                   <div className="flex-1 min-w-[200px]">
                     <input
@@ -1119,7 +1633,9 @@ export default function AdminDashboardNew() {
                     className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">All Organizations</option>
-                    {organizations.map((org) => (
+                    {organizations
+                      .filter(org => org.name && org.name !== 'N/A')
+                      .map((org) => (
                       <option key={org._id} value={org.name}>{org.name}</option>
                     ))}
                   </select>
@@ -1141,7 +1657,7 @@ export default function AdminDashboardNew() {
                     <option value="email">Sort: Email</option>
                     <option value="organization">Sort: Organization</option>
                     <option value="testsTaken">Sort: Tests Taken</option>
-                    <option value="averageScore">Sort: Avg Score</option>
+                    <option value="averagePercentage">Sort: Avg Percentage</option>
                     <option value="status">Sort: Status</option>
                   </select>
                   <select
@@ -1154,6 +1670,9 @@ export default function AdminDashboardNew() {
                   </select>
                 </div>
 
+                <div className="flex justify-end mb-2">
+                  <button onClick={()=>exportSelectionToPdf('#students-section','students.pdf')} className="px-3 py-2 text-sm rounded bg-emerald-600 hover:bg-emerald-700 text-white">Download PDF</button>
+                </div>
                 {/* Students Table */}
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -1163,7 +1682,7 @@ export default function AdminDashboardNew() {
                         <th className="text-left py-3 px-4 font-semibold text-gray-700">Email</th>
                         <th className="text-left py-3 px-4 font-semibold text-gray-700">Organization</th>
                         <th className="text-left py-3 px-4 font-semibold text-gray-700">Tests Taken</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Average Score</th>
+                         <th className="text-left py-3 px-4 font-semibold text-gray-700">Average Percentage</th>
                         <th className="text-left py-3 px-4 font-semibold text-gray-700">Analytics</th>
                         <th className="text-left py-3 px-4 font-semibold text-gray-700">Actions</th>
                       </tr>
@@ -1196,7 +1715,7 @@ export default function AdminDashboardNew() {
                             let av = a[key];
                             let bv = b[key];
                             if (key === 'testsTaken') { av = Number(av||0); bv = Number(bv||0);} 
-                            if (key === 'averageScore') {
+                            if (key === 'averagePercentage') {
                               const num = (v) => typeof v === 'string' && v.endsWith('%') ? Number(v.replace('%','')) : Number(v||0);
                               av = num(av); bv = num(bv);
                             }
@@ -1212,10 +1731,10 @@ export default function AdminDashboardNew() {
                               <td className="py-3 px-4">{student.email || 'N/A'}</td>
                               <td className="py-3 px-4">{student.organization || 'N/A'}</td>
                               <td className="py-3 px-4">{student.testsTaken || 0}</td>
-                              <td className="py-3 px-4">{student.averageScore || 'N/A'}</td>
+                              <td className="py-3 px-4">{student.averagePercentage || 'N/A'}</td>
                               <td className="py-3 px-4">
                                 <div className="flex gap-2">
-                                  <button className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700" onClick={() => setAnalyticsStudent(student)}>Analytics</button>
+                                  <button className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700" onClick={() => setAnalyticsStudent({ ...student })}>Analytics</button>
                                   <button className="px-3 py-1 text-xs bg-gray-700 text-white rounded hover:bg-gray-800" onClick={() => setViewStudent(student)}>Details</button>
                                 </div>
                               </td>
@@ -1235,16 +1754,7 @@ export default function AdminDashboardNew() {
                 </div>
               </div>
 
-              {/* Download Complete Report Button */}
-              <div className="flex justify-end mb-6">
-                <button
-                  onClick={() => downloadCompleteReport(chartData)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors"
-                >
-                  <Download className="w-5 h-5" />
-                  Download Complete Report
-                    </button>
-                  </div>
+               
 
               {/* Interactive Charts */}
               {/* AdminCharts component is removed as per the edit hint */}
@@ -1252,15 +1762,60 @@ export default function AdminDashboardNew() {
               {/* Student Analytics Modal */}
               {analyticsStudent && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                  <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl p-6 relative">
+                  <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl p-6 relative max-h-[85vh] overflow-y-auto">
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="text-xl font-bold text-gray-800">{analyticsStudent.name || analyticsStudent.email || 'Student'} Analytics</h3>
                       <button className="text-gray-600 hover:text-gray-900" onClick={() => setAnalyticsStudent(null)}>
                         <X className="w-5 h-5" />
                       </button>
                     </div>
-                    <StudentAnalyticsContent student={analyticsStudent} />
-                    <div className="mt-6 flex justify-end">
+                    <StudentAnalyticsContent 
+                      student={analyticsStudent}
+                      onDataLoad={(data) => {
+                        // Store the comprehensive data for download
+                        analyticsStudent.comprehensiveData = data;
+                      }}
+                    />
+                    <div className="mt-6 flex justify-between items-center">
+                      <button
+                        onClick={async () => {
+                          const button = event.target;
+                          const originalText = button.innerHTML;
+                          const originalClass = button.className;
+                          
+                          try {
+                            // Show loading state
+                            button.innerHTML = '<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> Generating PDF...';
+                            button.disabled = true;
+                            button.style.opacity = '0.7';
+                            
+                            await exportSelectionToPdf('#student-analytics-modal .modal-content', `${analyticsStudent.name || 'Student'}_Analytics_Report.pdf`, { landscape: true, includeCharts: true });
+                            
+                            // Reset button
+                            button.innerHTML = originalText;
+                            button.disabled = false;
+                            button.style.opacity = '1';
+                            button.style.backgroundColor = '#2563eb'; // blue-600
+                            button.style.color = '#ffffff';
+                            button.className = originalClass;
+                          } catch (error) {
+                            console.error('Error generating PDF:', error);
+                            alert('Failed to generate PDF. Please try again.');
+                            
+                            // Reset button on error
+                            button.innerHTML = originalText;
+                            button.disabled = false;
+                            button.style.opacity = '1';
+                            button.style.backgroundColor = '#2563eb'; // blue-600
+                            button.style.color = '#ffffff';
+                            button.className = originalClass;
+                          }
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors"
+                      >
+                        <Download className="w-4 h-4" />
+                        Download Complete Report
+                      </button>
                       <button onClick={() => setAnalyticsStudent(null)} className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Close</button>
                     </div>
                   </div>
@@ -1270,7 +1825,7 @@ export default function AdminDashboardNew() {
               {/* Student Details Modal */}
               {viewStudent && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                  <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl p-6 relative">
+                  <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl p-6 relative max-h-[85vh] overflow-y-auto">
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="text-xl font-bold text-gray-800">Student Details</h3>
                       <button className="text-gray-600 hover:text-gray-900" onClick={() => setViewStudent(null)}><X className="w-5 h-5" /></button>
@@ -1281,7 +1836,7 @@ export default function AdminDashboardNew() {
                       <div><div className="text-sm text-gray-500">Organization</div><div className="font-semibold">{viewStudent.organization || 'N/A'}</div></div>
                       <div><div className="text-sm text-gray-500">Status</div><div className="font-semibold">{viewStudent.status || 'active'}</div></div>
                       <div><div className="text-sm text-gray-500">Tests Taken</div><div className="font-semibold">{viewStudent.testsTaken || 0}</div></div>
-                      <div><div className="text-sm text-gray-500">Average Score</div><div className="font-semibold">{viewStudent.averageScore || 'N/A'}</div></div>
+                      <div><div className="text-sm text-gray-500">Average Percentage</div><div className="font-semibold">{viewStudent.averagePercentage || 'N/A'}</div></div>
                     </div>
                     <div className="mt-6 flex justify-end"><button onClick={() => setViewStudent(null)} className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Close</button></div>
                   </div>
@@ -1291,7 +1846,7 @@ export default function AdminDashboardNew() {
               {/* Student Edit Modal */}
               {editStudentProfile && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                  <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 relative">
+                  <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 relative max-h-[85vh] overflow-y-auto">
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="text-xl font-bold text-gray-800">Edit Student</h3>
                       <button className="text-gray-600 hover:text-gray-900" onClick={() => setEditStudentProfile(null)}><X className="w-5 h-5" /></button>
@@ -1327,7 +1882,7 @@ export default function AdminDashboardNew() {
             <div className="space-y-8">
 
               {/* Teacher Data Table */}
-              <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200">
+               <div id="teachers-section" className="bg-white rounded-xl p-6 shadow-lg border border-gray-200">
                 <div className="flex flex-wrap gap-4 mb-6">
                   <div className="flex-1 min-w-[200px]">
                     <input
@@ -1344,7 +1899,9 @@ export default function AdminDashboardNew() {
                     className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
                   >
                     <option value="">All Organizations</option>
-                    {organizations.map((org) => (
+                    {organizations
+                      .filter(org => org.name && org.name !== 'N/A')
+                      .map((org) => (
                       <option key={org._id} value={org.name}>{org.name}</option>
                     ))}
                   </select>
@@ -1370,18 +1927,20 @@ export default function AdminDashboardNew() {
                   </select>
                 </div>
 
+                <div className="flex justify-end mb-2">
+                  <button onClick={()=>exportSelectionToPdf('#teachers-section','teachers.pdf')} className="px-3 py-2 text-sm rounded bg-emerald-600 hover:bg-emerald-700 text-white">Download PDF</button>
+                </div>
                 {/* Teachers Table */}
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto rounded-lg ring-1 ring-gray-200">
                   <table className="w-full">
                     <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Name</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Email</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Organization</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Tests Created</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Avg Score</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Analytics</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Actions</th>
+                      <tr className="border-b border-gray-200 bg-gray-50">
+                        <th className="text-left py-3 px-4 text-gray-600 text-xs uppercase tracking-wide">Name</th>
+                        <th className="text-left py-3 px-4 text-gray-600 text-xs uppercase tracking-wide">Email</th>
+                        <th className="text-left py-3 px-4 text-gray-600 text-xs uppercase tracking-wide">Organization</th>
+                        <th className="text-left py-3 px-4 text-gray-600 text-xs uppercase tracking-wide">Tests Created</th>
+                        <th title="Analytics" className="text-left py-3 px-4 text-gray-600 text-xs uppercase tracking-wide"></th>
+                        <th title="Actions" className="text-left py-3 px-4 text-gray-600 text-xs uppercase tracking-wide"></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1417,16 +1976,15 @@ export default function AdminDashboardNew() {
                             if (av > bv) return 1*dir;
                             return 0;
                           })
-                          .map((teacher) => (
-                            <tr key={teacher._id} className="border-b border-gray-100 hover:bg-gray-50">
-                              <td className="py-3 px-4">{teacher.name || 'N/A'}</td>
-                              <td className="py-3 px-4">{teacher.email || 'N/A'}</td>
-                              <td className="py-3 px-4">{teacher.organization || 'N/A'}</td>
-                              <td className="py-3 px-4">{teacher.testsCreated || 0}</td>
-                              <td className="py-3 px-4">{teacher.averageScore ?? teacher.avgScore ?? 'N/A'}</td>
+                          .map((teacher, idx) => (
+                            <tr key={teacher._id} className={idx%2===0?"bg-white border-b border-gray-100":"bg-gray-50 border-b border-gray-100"}>
+                              <td className="py-3 px-4 font-medium text-gray-800">{teacher.name || 'N/A'}</td>
+                              <td className="py-3 px-4 text-gray-700">{teacher.email || 'N/A'}</td>
+                              <td className="py-3 px-4 text-gray-700">{teacher.organization || 'N/A'}</td>
+                              <td className="py-3 px-4 text-gray-700">{teacher.testsCreated || 0}</td>
                               <td className="py-3 px-4">
                                 <div className="flex gap-2">
-                                  <button className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700" onClick={() => setAnalyticsTeacher(teacher)}>Analytics</button>
+                                  <button className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700" onClick={() => setAnalyticsTeacher({ ...teacher })}>Analytics</button>
                                   <button className="px-3 py-1 text-xs bg-gray-700 text-white rounded hover:bg-gray-800" onClick={() => setViewTeacher(teacher)}>Details</button>
                                 </div>
                               </td>
@@ -1446,16 +2004,7 @@ export default function AdminDashboardNew() {
                 </div>
               </div>
 
-              {/* Download Complete Report Button */}
-              <div className="flex justify-end mb-6">
-                <button
-                  onClick={() => downloadCompleteReport(chartData)}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors"
-                >
-                  <Download className="w-5 h-5" />
-                  Download Complete Report
-                    </button>
-                  </div>
+               
 
               {/* Interactive Charts */}
               {/* AdminCharts component is removed as per the edit hint */}
@@ -1463,15 +2012,59 @@ export default function AdminDashboardNew() {
               {/* Teacher Analytics Modal */}
               {analyticsTeacher && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                  <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl p-6 relative">
+                  <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl p-6 relative max-h-[85vh] overflow-y-auto">
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="text-xl font-bold text-gray-800">{analyticsTeacher.name}'s Analytics</h3>
                       <button className="text-gray-600 hover:text-gray-900" onClick={() => setAnalyticsTeacher(null)}>
                         <X className="w-5 h-5" />
                       </button>
                     </div>
-                    <TeacherAnalyticsContent teacher={analyticsTeacher} />
-                    <div className="mt-6 flex justify-end">
+                    <TeacherAnalyticsContent 
+                      teacher={analyticsTeacher} 
+                      tests={tests}
+                      onDataLoad={(data) => {
+                        // Store the comprehensive data for download
+                        analyticsTeacher.comprehensiveData = data;
+                      }}
+                    />
+                    <div className="mt-6 flex justify-between items-center">
+                      <button
+                        onClick={async () => {
+                          const button = event.target;
+                          const originalText = button.innerHTML;
+                          const originalClass = button.className;
+                          
+                          try {
+                            // Show loading state
+                            button.innerHTML = '<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> Generating PDF...';
+                            button.disabled = true;
+                            button.style.opacity = '0.7';
+                            
+                            await exportSelectionToPdf('#teacher-analytics-modal .modal-content', `${analyticsTeacher.name || 'Teacher'}_Analytics_Report.pdf`, { landscape: true, includeCharts: true });
+                            
+                            // Reset button
+                            button.innerHTML = originalText;
+                            button.disabled = false;
+                            button.style.opacity = '1';
+                            button.className = originalClass;
+                          } catch (error) {
+                            console.error('Error generating PDF:', error);
+                            alert('Failed to generate PDF. Please try again.');
+                            
+                            // Reset button on error
+                            button.innerHTML = originalText;
+                            button.disabled = false;
+                            button.style.opacity = '1';
+                            button.style.backgroundColor = '#2563eb'; // blue-600
+                            button.style.color = '#ffffff';
+                            button.className = originalClass;
+                          }
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors"
+                      >
+                        <Download className="w-4 h-4" />
+                        Download Complete Report
+                      </button>
                       <button onClick={() => setAnalyticsTeacher(null)} className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Close</button>
                     </div>
                   </div>
@@ -1519,7 +2112,6 @@ export default function AdminDashboardNew() {
                       <div><div className="text-sm text-gray-500">Organization</div><div className="font-semibold">{viewTeacher.organization || 'N/A'}</div></div>
                       <div><div className="text-sm text-gray-500">Status</div><div className="font-semibold">{viewTeacher.status || 'active'}</div></div>
                       <div><div className="text-sm text-gray-500">Tests Created</div><div className="font-semibold">{viewTeacher.testsCreated || 0}</div></div>
-                      <div><div className="text-sm text-gray-500">Avg Score</div><div className="font-semibold">{viewTeacher.averageScore ?? viewTeacher.avgScore ?? 'N/A'}</div></div>
                     </div>
                     <div className="mt-6 flex justify-end"><button onClick={() => setViewTeacher(null)} className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Close</button></div>
                   </div>
@@ -1559,6 +2151,21 @@ export default function AdminDashboardNew() {
           {/* Organization Management Section */}
           {activeTab === "organizations" && !params.orgId && (
             <div className="space-y-6">
+              {/* Refresh Button */}
+              <div className="flex justify-end">
+                <button
+                  onClick={() => {
+                    fetchOrganizations();
+                    toast.info('Organizations refreshed');
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh Organizations
+                </button>
+              </div>
               <div className="p-6">
 
                 {loading ? (
@@ -1566,7 +2173,7 @@ export default function AdminDashboardNew() {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {organizations
-                      .filter(org => true)
+                      .filter(org => org.name && org.name !== 'N/A')
                       .map((org, idx) => {
                         const accents = ['border-l-pink-500 bg-pink-50','border-l-orange-500 bg-orange-50','border-l-emerald-500 bg-emerald-50'];
                         const iconBg = ['bg-pink-100','bg-orange-100','bg-emerald-100'];
@@ -1596,7 +2203,7 @@ export default function AdminDashboardNew() {
 
           {/* Organization Detail Page (reuses dashboard component route) */}
           {activeTab === "organizations" && params.orgId && (
-            <div className="space-y-8">
+            <div id="organization-detail" className="space-y-8">
               {(() => {
                 const org = organizations.find(o=>String(o._id)===String(params.orgId)) || {};
                 const orgStudents = students.filter(s=>s.organization===org.name);
@@ -1611,9 +2218,12 @@ export default function AdminDashboardNew() {
                   <>
                     {/* Header Actions */}
                     <div className="flex items-center justify-between">
-                      <button onClick={()=>navigate('/admin')} className="px-3 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200">Back</button>
+                      <button onClick={()=>navigate('/admin')} className="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg bg-white border border-gray-200 shadow-sm hover:shadow transition-all hover:bg-gray-50">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline><path d="M20 12H9"></path></svg>
+                        Back
+                      </button>
                       <div className="flex items-center gap-3">
-                        <button onClick={()=>downloadOrganizationsReport()} className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 flex items-center gap-2"><Download className="w-4 h-4"/>Download CSV</button>
+                        <button onClick={()=>exportSelectionToPdf('#organization-detail', `${org.name || 'organization'}.pdf`)} className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center gap-2"><Download className="w-4 h-4"/>Download PDF</button>
                       </div>
                     </div>
 
@@ -1635,10 +2245,10 @@ export default function AdminDashboardNew() {
 
                     {/* Tables */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+                      <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6" id="org-teachers-table">
                         <div className="flex justify-between items-center mb-4">
                           <h4 className="text-lg font-semibold text-gray-800">Teachers</h4>
-                          <button onClick={()=>downloadChartDataAsCSV('org-teachers', orgTeachers.map(t=>({name:t.name,email:t.email})))} className="text-sm text-blue-600 hover:text-blue-800">Download CSV</button>
+                          <button onClick={()=>exportSelectionToPdf('#org-teachers-table','org-teachers.pdf')} className="text-sm text-emerald-700 hover:text-emerald-800">Download PDF</button>
                         </div>
                         <div className="max-h-80 overflow-auto">
                           <table className="w-full">
@@ -1653,10 +2263,10 @@ export default function AdminDashboardNew() {
                           </table>
                         </div>
                       </div>
-                      <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+                      <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6" id="org-students-table">
                         <div className="flex justify-between items-center mb-4">
                           <h4 className="text-lg font-semibold text-gray-800">Students</h4>
-                          <button onClick={()=>downloadChartDataAsCSV('org-students', orgStudents.map(s=>({name:s.name,email:s.email})))} className="text-sm text-blue-600 hover:text-blue-800">Download CSV</button>
+                          <button onClick={()=>exportSelectionToPdf('#org-students-table','org-students.pdf')} className="text-sm text-emerald-700 hover:text-emerald-800">Download PDF</button>
                         </div>
                         <div className="max-h-80 overflow-auto">
                           <table className="w-full">
@@ -1672,6 +2282,107 @@ export default function AdminDashboardNew() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Analytics Graphs Section */}
+                    <div className="space-y-6">
+                      <h3 className="text-xl font-bold text-gray-900 mb-6">Organization Analytics</h3>
+                      
+                      {analyticsLoading ? (
+                        <div className="flex justify-center py-12">
+                          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          {/* Tests Created Per Week Graph */}
+                          <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+                            <div className="flex items-center justify-between mb-4">
+                              <h4 className="text-lg font-semibold text-gray-800">Tests Created Per Week</h4>
+                              <BarChart3 className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <div className="h-80">
+                              {weeklyData && Array.isArray(weeklyData) && weeklyData.length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <BarChart data={weeklyData.filter(item => item && typeof item === 'object')}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis 
+                                      dataKey="week" 
+                                      angle={-45}
+                                      textAnchor="end"
+                                      height={60}
+                                      fontSize={12}
+                                    />
+                                    <YAxis allowDecimals={false} />
+                                    <Tooltip 
+                                      formatter={(value) => [value, 'Tests Created']}
+                                      labelFormatter={(label) => `Week: ${label}`}
+                                    />
+                                    <Bar 
+                                      dataKey="testsCreated" 
+                                      fill="#3B82F6" 
+                                      radius={[4,4,0,0]}
+                                      name="Tests Created"
+                                    />
+                                  </BarChart>
+                                </ResponsiveContainer>
+                              ) : (
+                                <div className="flex items-center justify-center h-full text-gray-500">
+                                  <div className="text-center">
+                                    <BarChart3 className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                                    <p>No test data available</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Average Test Percentage Graph */}
+                          <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+                            <div className="flex items-center justify-between mb-4">
+                              <h4 className="text-lg font-semibold text-gray-800">Average Test Performance</h4>
+                              <TrendingUp className="w-5 h-5 text-emerald-600" />
+                            </div>
+                            <div className="h-80">
+                              {orgAnalytics?.testPerformance && orgAnalytics.testPerformance.length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <BarChart data={orgAnalytics.testPerformance}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis 
+                                      dataKey="name" 
+                                      angle={-45}
+                                      textAnchor="end"
+                                      height={60}
+                                      fontSize={12}
+                                    />
+                                    <YAxis 
+                                      domain={[0, 100]}
+                                      tickFormatter={(value) => `${value}%`}
+                                    />
+                                    <Tooltip 
+                                      formatter={(value) => [`${value}%`, 'Average Score']}
+                                      labelFormatter={(label) => `Test: ${label}`}
+                                    />
+                                    <Bar 
+                                      dataKey="percentage" 
+                                      fill="#10B981" 
+                                      radius={[4,4,0,0]}
+                                      name="Average Percentage"
+                                    />
+                                  </BarChart>
+                                </ResponsiveContainer>
+                              ) : (
+                                <div className="flex items-center justify-center h-full text-gray-500">
+                                  <div className="text-center">
+                                    <TrendingUp className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                                    <p>No test performance data</p>
+                                    <p className="text-sm">Tests will appear here once created</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </>
                 );
               })()}
@@ -1680,14 +2391,87 @@ export default function AdminDashboardNew() {
 
           {/* Analytics Section */}
           {activeTab === "analytics" && (
-            <div className="space-y-8">
-              {/* Analytics Overview Cards - Matching Reference Design */}
+            <div className="space-y-8" id="analytics-section" style={{ position: 'relative' }}>
+              {/* Analytics Download Button */}
+              <div className="flex justify-end">
+                <button
+                  onClick={async () => {
+                    try {
+                      // Show loading state
+                      const button = event.target;
+                      const originalText = button.innerHTML;
+                      button.innerHTML = '<div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> Generating PDF...';
+                      button.disabled = true;
+                      
+                      // Hide download buttons during PDF generation
+                      const analyticsSection = document.getElementById('analytics-section');
+                      const downloadButtons = analyticsSection.querySelectorAll('button');
+                      const downloadButtonsToHide = Array.from(downloadButtons).filter(btn => 
+                        btn.textContent?.includes('Download') || 
+                        btn.classList.toString().includes('download')
+                      );
+                      downloadButtonsToHide.forEach(btn => {
+                        btn.style.display = 'none';
+                      });
+                      
+                      await exportSelectionToPdf('#analytics-section', 'admin-analytics-complete.pdf', { landscape: true, includeCharts: true });
+                      
+                      // Show download buttons again
+                      downloadButtonsToHide.forEach(btn => {
+                        btn.style.display = '';
+                      });
+                      
+                      // Reset button with proper styling
+                      button.innerHTML = originalText;
+                      button.disabled = false;
+                      button.style.opacity = '1';
+                      button.style.cursor = 'pointer';
+                      button.style.backgroundColor = '#059669'; // emerald-600
+                      button.style.color = '#ffffff';
+                      button.className = 'px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
+                    } catch (error) {
+                      console.error('Error generating PDF:', error);
+                      alert('Failed to generate PDF. Please try again.');
+                      // Reset button on error
+                      const button = event.target;
+                      button.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg> Download Complete Analytics PDF (Landscape)';
+                      button.disabled = false;
+                      button.style.opacity = '1';
+                      button.style.cursor = 'pointer';
+                      button.style.backgroundColor = '#059669'; // emerald-600
+                      button.style.color = '#ffffff';
+                      button.className = 'px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
+                      
+                      // Show download buttons again in case of error
+                      const analyticsSection = document.getElementById('analytics-section');
+                      const downloadButtons = analyticsSection.querySelectorAll('button');
+                      const downloadButtonsToShow = Array.from(downloadButtons).filter(btn => 
+                        btn.textContent?.includes('Download') || 
+                        btn.classList.toString().includes('download')
+                      );
+                      downloadButtonsToShow.forEach(btn => {
+                        btn.style.display = '';
+                      });
+                    }
+                  }}
+                  className="px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Download className="w-5 h-5" />
+                  Download Complete Analytics PDF (Landscape)
+                </button>
+              </div>
+              
+              {/* Analytics Overview Cards and Organization Pie Chart */}
+              <div className="grid grid-cols-2 gap-6">
+                {/* Analytics Cards - 50% width */}
+                <div className="col-span-1">
               <AdminAnalyticsCards 
                 analytics={{
                   totalUsers: analytics.totalUsers || stats.totalUsers || 0,
                   totalTests: analytics.totalTests || stats.totalTests || 0,
                   totalStudents: analytics.totalStudents || stats.totalStudents || 0,
                   totalTeachers: analytics.totalTeachers || stats.totalTeachers || 0,
+                  totalAdmins: analytics.totalAdmins || 0,
                   activeUsers: analytics.activeUsers || stats.activeUsers || 0,
                   completedTests: analytics.completedTests || stats.completedTests || 0,
                   pendingUsers: analytics.pendingUsers || stats.pendingUsers || 0,
@@ -1696,22 +2480,244 @@ export default function AdminDashboardNew() {
                 loading={loading}
                 onDownload={(chartType, data) => downloadChartDataAsCSV(chartType, data)}
               />
-
-              {/* Download Complete Report Button */}
-              <div className="flex justify-end mb-6">
-                <button
-                  onClick={() => downloadCompleteReport(chartData)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors"
-                >
-                  <Download className="w-5 h-5" />
-                  Download Complete Report
-                    </button>
                   </div>
 
+                {/* Organization Distribution Pie Chart - 50% width */}
+                <div className="col-span-1">
+                  <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 h-full">
+                  <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-gray-800">Organizations</h3>
+                    <button onClick={() => createDashboardPdf([{ title: 'Organizations Distribution', data: organizations }], { filename: 'organizations-distribution.pdf' })} className="text-sm text-emerald-700 hover:text-emerald-800">Download PDF</button>
+                  </div>
+                  <div className="h-80">
+                      {organizations && organizations.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={organizations.map((org, index) => ({
+                                name: org.name || `Org ${index + 1}`,
+                                value: (org.studentCount || 0) + (org.teacherCount || 0),
+                                fill: [
+                                  '#3B82F6', '#10B981', '#F59E0B', '#EF4444', 
+                                  '#8B5CF6', '#06B6D4', '#84CC16', '#F97316'
+                                ][index % 8]
+                              }))}
+                              dataKey="value"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={100}
+                              innerRadius={40}
+                              paddingAngle={2}
+                            >
+                              {organizations.map((entry, index) => (
+                                <Cell 
+                                  key={`cell-${index}`} 
+                                  fill={[
+                                    '#3B82F6', '#10B981', '#F59E0B', '#EF4444', 
+                                    '#8B5CF6', '#06B6D4', '#84CC16', '#F97316'
+                                  ][index % 8]}
+                                />
+                              ))}
+                            </Pie>
+                            <Tooltip 
+                              formatter={(value, name) => [
+                                `${value} members`, 
+                                name
+                              ]}
+                            />
+                            <Legend 
+                              verticalAlign="bottom" 
+                              height={36}
+                              formatter={(value) => value.length > 15 ? value.substring(0, 15) + '...' : value}
+                            />
+                          </PieChart>
+                    </ResponsiveContainer>
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-gray-500">
+                          <div className="text-center">
+                            <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                              <Users className="w-8 h-8 text-gray-400" />
+                            </div>
+                            <p className="text-sm font-medium text-gray-600">No Organizations</p>
+                            <p className="text-xs text-gray-500 mt-1">Organizations will appear here</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  </div>
+                </div>
+
+
               {/* Interactive Charts */}
-              {/* AdminCharts component is removed as per the edit hint */}
+              <div className="grid grid-cols-1 gap-6">
+                {/* Average Student Marks by Test */}
+                <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-800">Average Student Marks by Test</h3>
+                    <button onClick={() => createDashboardPdf([{ title: 'Average Student Marks by Test', data: chartData.testAverageMarks || [] }], { filename: 'average-marks.pdf' })} className="text-sm text-emerald-700 hover:text-emerald-800">Download PDF</button>
+                  </div>
+                  <div className="h-80">
+                    {chartData.testAverageMarks && Array.isArray(chartData.testAverageMarks) && chartData.testAverageMarks.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartData.testAverageMarks}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis 
+                            dataKey="testName" 
+                            angle={-45}
+                            textAnchor="end"
+                            height={60}
+                            fontSize={12}
+                          />
+                          <YAxis 
+                            domain={[0, 100]}
+                            tickFormatter={(value) => `${value}%`}
+                          />
+                          <Tooltip 
+                            formatter={(value, name) => [`${value}%`, 'Average Score']}
+                            labelFormatter={(label) => `Test: ${label}`}
+                          />
+                          <Bar 
+                            dataKey="averagePercentage" 
+                            fill="#10B981" 
+                            radius={[4,4,0,0]}
+                            name="Average Score"
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-gray-500">
+                        <div className="text-center">
+                          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-lg flex items-center justify-center">
+                            <TrendingUp className="w-8 h-8 text-gray-400" />
+                          </div>
+                          <p className="text-sm font-medium text-gray-600">No Student Marks Data Available</p>
+                          <p className="text-xs text-gray-500 mt-1">Average student marks by test will appear here</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Students by Organization */}
+                <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-800">Students by Organization</h3>
+                    <button onClick={() => createDashboardPdf([{ title: 'Students by Organization', data: chartData.studentsByOrg }], { filename: 'students-by-organization.pdf' })} className="text-sm text-emerald-700 hover:text-emerald-800">Download PDF</button>
+                  </div>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartData.studentsByOrg || []}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" angle={-45} textAnchor="end" height={60} />
+                        <YAxis allowDecimals={false} />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="#F59E0B" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Teachers by Organization */}
+                <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-800">Teachers by Organization</h3>
+                    <button onClick={() => createDashboardPdf([{ title: 'Teachers by Organization', data: chartData.teachersByOrg }], { filename: 'teachers-by-organization.pdf' })} className="text-sm text-emerald-700 hover:text-emerald-800">Download PDF</button>
+                  </div>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartData.teachersByOrg || []}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" angle={-45} textAnchor="end" height={60} />
+                        <YAxis allowDecimals={false} />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="#EF4444" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              {/* Daily Logins by Role Chart */}
+              <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-semibold text-gray-800">Daily Logins by Role</h3>
+                  <button onClick={() => createDashboardPdf([{ title: 'Daily Logins by Role', data: chartData.activityData || [] }], { filename: 'daily-logins.pdf' })} className="text-sm text-emerald-700 hover:text-emerald-800">Download PDF</button>
+                </div>
+                
+                {chartData.activityData && Array.isArray(chartData.activityData) && chartData.activityData.length > 0 ? (
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={chartData.activityData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis 
+                          dataKey="date" 
+                          stroke="#6B7280"
+                          fontSize={12}
+                          tickLine={false}
+                        />
+                        <YAxis 
+                          stroke="#6B7280"
+                          fontSize={12}
+                          tickLine={false}
+                          axisLine={false}
+                        />
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: 'white', 
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '8px',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                          }}
+                        />
+                        <Legend />
+                        <Line 
+                          type="monotone" 
+                          dataKey="students" 
+                          stroke="#3B82F6" 
+                          strokeWidth={3}
+                          dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }}
+                          activeDot={{ r: 6, stroke: '#3B82F6', strokeWidth: 2 }}
+                          name="Students"
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="teachers" 
+                          stroke="#10B981" 
+                          strokeWidth={3}
+                          dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
+                          activeDot={{ r: 6, stroke: '#10B981', strokeWidth: 2 }}
+                          name="Teachers"
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="admins" 
+                          stroke="#F59E0B" 
+                          strokeWidth={3}
+                          dot={{ fill: '#F59E0B', strokeWidth: 2, r: 4 }}
+                          activeDot={{ r: 6, stroke: '#F59E0B', strokeWidth: 2 }}
+                          name="Admins"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center py-12 text-gray-500">
+                    <div className="text-center">
+                      <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-lg flex items-center justify-center">
+                        <TrendingUp className="w-8 h-8 text-gray-400" />
+                      </div>
+                      <p className="text-sm font-medium text-gray-600">No Login Data Available</p>
+                      <p className="text-xs text-gray-500 mt-1">Daily login activity will appear here as a line chart</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
+
+           
 
           {/* Profile Content - Integrated from ProfilePage.jsx */}
           {activeTab === "profile" && (

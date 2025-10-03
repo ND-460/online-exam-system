@@ -897,8 +897,24 @@ router.delete("/admin/users/:userId", auth, async (req, res) => {
     }
 
     // Also delete associated student/teacher records
+    const teacherDoc = await Teacher.findOneAndDelete({ profileInfo: userId });
     await Student.findOneAndDelete({ profileInfo: userId });
-    await Teacher.findOneAndDelete({ profileInfo: userId });
+
+    // If teacher, cascade delete their tests and results
+    if (teacherDoc) {
+      const Test = require("../model/Test");
+      const Result = require("../model/Result");
+      const tests = await Test.find({ teacherId: teacherDoc._id }, { _id: 1 });
+      const testIds = tests.map(t => t._id);
+      if (testIds.length) {
+        await Promise.all([
+          Test.deleteMany({ _id: { $in: testIds } }),
+          Result.deleteMany({ testId: { $in: testIds } })
+        ]);
+      }
+      // Also remove results that may directly reference teacherId
+      await Result.deleteMany({ teacherId: teacherDoc._id });
+    }
 
     res.status(200).json({ message: "User deleted successfully" });
   } catch (err) {
@@ -920,13 +936,27 @@ router.get("/admin/stats", auth, async (req, res) => {
       return res.status(403).json({ message: "Access denied. Admin role required." });
     }
 
-    const totalUsers = await User.countDocuments();
-    const activeUsers = await User.countDocuments({ status: 'active' });
-    const pendingUsers = await User.countDocuments({ status: 'pending' });
-    const blockedUsers = await User.countDocuments({ status: 'blocked' });
+    const Test = require("../model/Test");
+    const Result = require("../model/Result");
+
+    // User counts
     const students = await User.countDocuments({ role: 'student' });
     const teachers = await User.countDocuments({ role: 'teacher' });
     const admins = await User.countDocuments({ role: 'admin' });
+    const totalUsers = students + teachers + admins; // Ensure total = sum of all roles
+
+    const activeUsers = await User.countDocuments({ status: 'active' });
+    const pendingUsers = await User.countDocuments({ status: 'pending' });
+    const blockedUsers = await User.countDocuments({ status: 'blocked' });
+
+    // Test counts
+    const totalTests = await Test.countDocuments();
+    const publishedTests = await Test.countDocuments({ status: 'published' });
+    const draftTests = await Test.countDocuments({ status: 'draft' });
+    const completedTests = await Test.countDocuments({ status: 'completed' });
+
+    // Results count
+    const totalResults = await Result.countDocuments();
 
     res.status(200).json({
       totalUsers,
@@ -935,7 +965,12 @@ router.get("/admin/stats", auth, async (req, res) => {
       blockedUsers,
       students,
       teachers,
-      admins
+      admins,
+      totalTests,
+      publishedTests,
+      draftTests,
+      completedTests,
+      totalResults
     });
   } catch (err) {
     console.log(err.message);
@@ -957,9 +992,38 @@ router.get("/admin/tests", auth, async (req, res) => {
     }
 
     const Test = require("../model/Test");
-    const tests = await Test.find()
-      .populate('teacherId', 'firstName lastName email')
-      .sort({ createdAt: -1 });
+    const Result = require("../model/Result");
+
+    const testsRaw = await Test.find().populate({
+      path: 'teacherId',
+      populate: { path: 'profileInfo', model: 'users', select: 'firstName lastName email organisation' }
+    }).sort({ createdAt: -1 });
+
+    // Normalize for admin table: include org, teacher name/email, assigned count, submissions count
+    const tests = await Promise.all(testsRaw.map(async (t) => {
+      const teacherUser = t.teacherId?.profileInfo;
+      const orgName = teacherUser?.organisation?.name || 'N/A';
+      const assignedCount = Array.isArray(t.assignedTo) ? t.assignedTo.length : (Array.isArray(t.assignedStudents) ? t.assignedStudents.length : 0);
+      // Results reference Student docs; submissions can also be read from Result
+      const submissionsCount = await Result.countDocuments({ testId: t._id });
+      return {
+        _id: t._id,
+        testName: t.testName,
+        category: t.category,
+        organization: orgName,
+        teacher: teacherUser ? `${teacherUser.firstName} ${teacherUser.lastName}` : '—',
+        teacherEmail: teacherUser?.email || '—',
+        teacherId: t.teacherId?._id || null,
+        outOfMarks: t.outOfMarks,
+        minutes: t.minutes,
+        status: t.status,
+        scheduledAt: t.scheduledAt,
+        publishedAt: t.publishedAt,
+        dueDate: t.dueDate,
+        assignedCount,
+        submissionsCount
+      };
+    }));
 
     res.status(200).json({ tests });
   } catch (err) {
@@ -1136,22 +1200,28 @@ router.get("/admin/students", auth, async (req, res) => {
 
     // Get additional student data
     const studentsWithData = await Promise.all(students.map(async (student) => {
-      const studentData = await Student.findOne({ profileInfo: student._id });
+      // Find the Student doc linked to this User
+      const studentDoc = await Student.findOne({ profileInfo: student._id });
       const Result = require("../model/Result");
-      const results = await Result.find({ studentId: student._id });
+      // Results reference Student._id, not User._id
+      const results = studentDoc ? await Result.find({ studentId: studentDoc._id }) : [];
       
       const testsTaken = results.length;
-      const averageScore = results.length > 0 
-        ? (results.reduce((sum, r) => sum + r.score, 0) / results.length).toFixed(1)
-        : 0;
+      let averagePercentage = 0;
+      if (results.length > 0) {
+        const totalMarksObtained = results.reduce((sum, r) => sum + r.score, 0);
+        const totalMaxMarks = results.reduce((sum, r) => sum + (r.outOfMarks || 0), 0);
+        averagePercentage = totalMaxMarks > 0 ? (totalMarksObtained / totalMaxMarks) * 100 : 0;
+      }
 
       return {
         _id: student._id,
+        profileId: studentDoc?._id,
         name: `${student.firstName} ${student.lastName}`,
         email: student.email,
         organization: student.organisation?.name || 'N/A',
         testsTaken,
-        averageScore: `${averageScore}%`,
+        averagePercentage: `${averagePercentage.toFixed(1)}%`,
         status: student.status || 'active',
         createdAt: student.createdAt
       };
@@ -1161,6 +1231,44 @@ router.get("/admin/students", auth, async (req, res) => {
   } catch (err) {
     console.log(err.message);
     res.status(500).json({ message: "Error fetching students" });
+  }
+});
+
+/**
+ * @method - GET
+ * @param - /admin/admins
+ * @description - Get all admin users for admin panel
+ */
+router.get("/admin/admins", auth, async (req, res) => {
+  try {
+    // Check if user is admin
+    const adminUser = await User.findById(req.user.id);
+    if (!adminUser || adminUser.role !== 'admin') {
+      return res.status(403).json({ message: "Access denied. Admin role required." });
+    }
+
+    const admins = await User.find({ role: 'admin' }, { password: 0 })
+      .populate('organisation', 'name address')
+      .sort({ createdAt: -1 });
+
+    // Get additional admin data
+    const adminsWithData = await Promise.all(admins.map(async (admin) => {
+      return {
+        _id: admin._id,
+        name: `${admin.firstName} ${admin.lastName}`,
+        email: admin.email,
+        organization: admin.organisation?.name || 'N/A',
+        status: admin.status || 'active',
+        createdAt: admin.createdAt,
+        lastLogin: admin.lastLogin || 'Never',
+        role: admin.role
+      };
+    }));
+
+    res.status(200).json({ admins: adminsWithData });
+  } catch (err) {
+    console.log(err.message);
+    res.status(500).json({ message: "Error fetching admins" });
   }
 });
 
@@ -1183,22 +1291,43 @@ router.get("/admin/teachers", auth, async (req, res) => {
 
     // Get additional teacher data
     const teachersWithData = await Promise.all(teachers.map(async (teacher) => {
-      const teacherData = await Teacher.findOne({ profileInfo: teacher._id });
+      // Map User -> Teacher document for proper references
+      const teacherDoc = await Teacher.findOne({ profileInfo: teacher._id });
       const Test = require("../model/Test");
-      const tests = await Test.find({ teacherId: teacher._id });
-      
+      const Result = require("../model/Result");
+      const tests = teacherDoc ? await Test.find({ teacherId: teacherDoc._id }) : [];
+
       const testsCreated = tests.length;
-      const studentsTaught = new Set(tests.flatMap(test => test.students || [])).size;
+      // studentsTaught based on assignedStudents or assignedTo
+      const studentIds = new Set();
+      for (const t of tests) {
+        (t.assignedTo || []).forEach(id => studentIds.add(String(id)));
+        (t.assignedStudents || []).forEach(s => s?.studentId && studentIds.add(String(s.studentId)));
+      }
+      const studentsTaught = studentIds.size;
+      // Average percentage from Result collection filtered by teacherDoc._id
+      let averagePercentage = 'N/A';
+      if (teacherDoc) {
+        const results = await Result.find({ teacherId: teacherDoc._id });
+        if (results.length > 0) {
+          const totalMarksObtained = results.reduce((sum, r) => sum + r.score, 0);
+          const totalMaxMarks = results.reduce((sum, r) => sum + (r.outOfMarks || 0), 0);
+          const avgPercentage = totalMaxMarks > 0 ? (totalMarksObtained / totalMaxMarks) * 100 : 0;
+          averagePercentage = `${avgPercentage.toFixed(1)}%`;
+        }
+      }
 
       return {
         _id: teacher._id,
+        profileId: teacherDoc?._id,
         name: `${teacher.firstName} ${teacher.lastName}`,
         email: teacher.email,
         organization: teacher.organisation?.name || 'N/A',
         testsCreated,
         studentsTaught,
         status: teacher.status || 'active',
-        createdAt: teacher.createdAt
+        createdAt: teacher.createdAt,
+        averagePercentage
       };
     }));
 
@@ -1241,12 +1370,16 @@ router.get("/admin/organizations", auth, async (req, res) => {
       { $sort: { _id: 1 } }
     ]);
 
-    // Get test count for each organization
+    // Map User ids -> Teacher documents, then count tests for those teachers
+    const teacherDocs = await Teacher.find({ profileInfo: { $in: organizations.flatMap(o => o.users) } }, { _id: 1, profileInfo: 1 });
+    const profileToTeacherId = new Map(teacherDocs.map(t => [String(t.profileInfo), t._id]));
+    const Test = require("../model/Test");
+
     const organizationsWithData = await Promise.all(organizations.map(async (org) => {
-      const Test = require("../model/Test");
-      const testCount = await Test.countDocuments({
-        teacherId: { $in: org.users }
-      });
+      const teacherIds = org.users
+        .map(id => profileToTeacherId.get(String(id)))
+        .filter(Boolean);
+      const testCount = teacherIds.length ? await Test.countDocuments({ teacherId: { $in: teacherIds } }) : 0;
 
       return {
         _id: org._id,
@@ -1293,26 +1426,38 @@ router.get("/admin/analytics", auth, async (req, res) => {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const testsThisWeek = await Test.countDocuments({ createdAt: { $gte: sevenDaysAgo } });
 
-    // Get average scores
-    const avgScoreResult = await Result.aggregate([
-      { $group: { _id: null, averageScore: { $avg: '$score' } } }
-    ]);
-    const averageScore = avgScoreResult.length > 0 ? avgScoreResult[0].averageScore : 0;
+    // Get average percentage
+    const results = await Result.find({});
+    let averagePercentage = 0;
+    if (results.length > 0) {
+      const totalMarksObtained = results.reduce((sum, r) => sum + r.score, 0);
+      const totalMaxMarks = results.reduce((sum, r) => sum + (r.outOfMarks || 0), 0);
+      averagePercentage = totalMaxMarks > 0 ? (totalMarksObtained / totalMaxMarks) * 100 : 0;
+    }
 
     // Get success rate
     const passedResults = await Result.countDocuments({ status: 'passed' });
     const successRate = totalResults > 0 ? (passedResults / totalResults * 100).toFixed(1) : 0;
+
+    // Get user role counts
+    const students = await User.countDocuments({ role: 'student' });
+    const teachers = await User.countDocuments({ role: 'teacher' });
+    const admins = await User.countDocuments({ role: 'admin' });
+    const calculatedTotalUsers = students + teachers + admins;
 
     res.status(200).json({
       systemHealth: 98,
       activeUsers,
       testsToday: testsThisWeek,
       successRate: parseFloat(successRate),
-      totalUsers,
+      totalUsers: calculatedTotalUsers,
       totalTests,
-      averageScore: Math.round(averageScore),
+      totalStudents: students,
+      totalTeachers: teachers,
+      totalAdmins: admins,
+      averagePercentage: Math.round(averagePercentage),
       systemOverview: {
-        users: totalUsers,
+        users: calculatedTotalUsers,
         tests: totalTests,
         results: totalResults
       }
@@ -1338,6 +1483,45 @@ router.get("/admin/chart-data", auth, async (req, res) => {
 
     const Test = require("../model/Test");
     const Result = require("../model/Result");
+
+    // Daily logins by role (last 7 days) - simulated based on activity
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    // Create date range for last 7 days
+    const dailyLogins = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      // Count activity for each role on this date
+      const dayStart = new Date(date);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(date);
+      dayEnd.setHours(23, 59, 59, 999);
+      
+      // Student activity (based on test submissions)
+      const studentActivity = await Result.countDocuments({
+        submittedAt: { $gte: dayStart, $lte: dayEnd }
+      });
+      
+      // Teacher activity (based on test creation)
+      const teacherActivity = await Test.countDocuments({
+        createdAt: { $gte: dayStart, $lte: dayEnd }
+      });
+      
+      // Admin activity (simulated - could be based on user management actions)
+      // For now, we'll simulate 1-3 admin logins per day
+      const adminActivity = Math.floor(Math.random() * 3) + 1;
+      
+      dailyLogins.push({
+        date: dateStr,
+        students: studentActivity,
+        teachers: teacherActivity,
+        admins: adminActivity
+      });
+    }
 
     // Tests created per week (last 4 weeks)
     const fourWeeksAgo = new Date();
@@ -1404,6 +1588,7 @@ router.get("/admin/chart-data", auth, async (req, res) => {
       studentsByOrg,
       teachersByOrg,
       performanceTrend,
+      dailyLogins,
       marksDistribution: {
         '0-20': await Result.countDocuments({ score: { $gte: 0, $lt: 20 } }),
         '20-40': await Result.countDocuments({ score: { $gte: 20, $lt: 40 } }),

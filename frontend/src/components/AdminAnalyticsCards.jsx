@@ -38,28 +38,28 @@ const AdminAnalyticsCards = ({ analytics }) => {
   ];
 
   return (
-    <div className="grid grid-cols-4 gap-6 mb-8">
+    <div className="space-y-4">
       {cards.map((card, index) => {
         const IconComponent = card.icon;
-  return (
-          <div key={index} className="bg-white rounded-xl shadow-lg p-8 border border-gray-200">
+        return (
+          <div key={index} className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
             <div className="flex items-center justify-between">
-        <div className="flex items-center">
-                <div className={`p-4 rounded-full ${card.iconColor}`}>
-                  <IconComponent className="w-8 h-8" />
-          </div>
-                <div className="ml-6">
-                  <p className="text-base font-medium text-gray-600">{card.title}</p>
-                  <p className="text-3xl font-bold text-gray-900">{card.value}</p>
-          </div>
-        </div>
-      </div>
-            <div className="mt-4 flex items-center">
-              <TrendingUp className="w-5 h-5 text-green-600 mr-2" />
-              <p className={`text-base font-medium ${card.changeColor}`}>
-                {card.change}
-              </p>
-      </div>
+              <div className="flex items-center">
+                <div className={`p-3 rounded-full ${card.iconColor} mr-4`}>
+                  <IconComponent className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-600">{card.title}</p>
+                  <p className="text-2xl font-bold text-gray-900">{card.value}</p>
+                </div>
+              </div>
+              <div className="flex items-center">
+                <TrendingUp className="w-4 h-4 text-green-600 mr-1" />
+                <p className={`text-sm font-medium ${card.changeColor}`}>
+                  {card.change}
+                </p>
+              </div>
+            </div>
           </div>
         );
       })}

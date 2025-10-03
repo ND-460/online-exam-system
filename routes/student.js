@@ -180,10 +180,9 @@ router.get("/results/:studentID", auth, async (req, res) => {
   const studentID = req.params.studentID;
 
   try {
-    const results = await Result.find({ studentID }).populate(
-      "testID",
-      "title duration"
-    );
+    const results = await Result.find({ studentId: studentID })
+      .populate("testId", "testName outOfMarks minutes")
+      .sort({ attemptedAt: -1 });
     res.status(200).json({ results });
   } catch (err) {
     console.log(err.message);
@@ -365,21 +364,26 @@ router.post("/attempt-test/:testId", auth, async (req, res) => {
       return res.status(400).json({ message: "Test already submitted" });
     }
 
-    // Evaluate answers
+    // Evaluate answers and normalize to Result schema fields
     let score = 0;
     const evaluatedAnswers = [];
 
     test.questions.forEach((q, i) => {
-      const submitted = answers[i];
-      const isCorrect = submitted === q.answer;
+      const selectedOption = answers[i];
+      const isCorrect = selectedOption === q.answer;
       if (isCorrect) score += q.marks || 1;
       evaluatedAnswers.push({
-        question: q._id,
-        submitted,
-        correctAnswer: q.answer,
+        questionId: q._id,
+        selectedOption,
+        correctOption: q.answer,
         isCorrect,
       });
     });
+
+    const totalMarks =
+      typeof test.outOfMarks === "number" && test.outOfMarks > 0
+        ? test.outOfMarks
+        : test.questions.reduce((sum, item) => sum + (item.marks || 1), 0);
 
     // Mark test as submitted for this user
     await Test.updateOne(
@@ -396,7 +400,7 @@ router.post("/attempt-test/:testId", auth, async (req, res) => {
             testId: test._id,
             testName: test.testName,
             score,
-            outOfMarks: test.questions.length,
+            outOfMarks: totalMarks,
             attemptedAt: date,
           },
         },
@@ -408,22 +412,22 @@ router.post("/attempt-test/:testId", auth, async (req, res) => {
       { arrayFilters: [{ "elem.testId": test._id }] }
     );
 
-    // Save Result
+    // Save Result aligned with schema
     await Result.create({
       studentId: student._id,
       testId: test._id,
       teacherId: test.teacherId,
-      testName: test.testName,
       score,
-      outOfMarks: test.questions.length,
+      outOfMarks: totalMarks,
       answers: evaluatedAnswers,
-      submittedAt: date,
+      attemptedAt: date,
+      submitted: true,
     });
 
     res.status(200).json({
       message: "Test submitted successfully",
       score,
-      total: test.questions.length,
+      total: totalMarks,
     });
   } catch (err) {
     console.error("Error in attempt-test:", err);

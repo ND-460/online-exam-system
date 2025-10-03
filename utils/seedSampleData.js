@@ -228,10 +228,12 @@ async function seedPerOrganization() {
 async function run() {
   await connectDb();
 
-  // 1) Create realistic teachers (keep orgs only as "BVM" or "N/A")
+  // 1) Create realistic teachers for multiple organizations
   const teacherUsers = [
     { firstName: 'Amit', lastName: 'Patel', email: 'amit.patel@bvm.edu', role: 'teacher', organisationName: 'BVM' },
-    { firstName: 'Neha', lastName: 'Sharma', email: 'neha.sharma@demo.edu', role: 'teacher', organisationName: 'N/A' }
+    { firstName: 'Neha', lastName: 'Sharma', email: 'neha.sharma@demo.edu', role: 'teacher', organisationName: 'N/A' },
+    { firstName: 'Vikas', lastName: 'Gupta', email: 'vikas.gupta@businessacademy.edu', role: 'teacher', organisationName: 'Business Academy' },
+    { firstName: 'Ananya', lastName: 'Roy', email: 'ananya.roy@scienceinstitute.edu', role: 'teacher', organisationName: 'Science Institute' }
   ];
 
   const teacherProfiles = [];
@@ -240,12 +242,22 @@ async function run() {
     teacherProfiles.push(await ensureTeacher(profile));
   }
 
-  // 2) Create realistic students
+  // 2) Create realistic students (mapped to their organizations)
   const studentUsers = [
+    // BVM
     { firstName: 'Rohan', lastName: 'Desai', email: 'rohan.desai@student.demo', role: 'student', organisationName: 'BVM' },
-    { firstName: 'Priya', lastName: 'Kapoor', email: 'priya.kapoor@student.demo', role: 'student', organisationName: 'N/A' },
     { firstName: 'Kabir', lastName: 'Joshi', email: 'kabir.joshi@student.demo', role: 'student', organisationName: 'BVM' },
+    // N/A (unaffiliated)
+    { firstName: 'Priya', lastName: 'Kapoor', email: 'priya.kapoor@student.demo', role: 'student', organisationName: 'N/A' },
     { firstName: 'Sara', lastName: 'Iqbal', email: 'sara.iqbal@student.demo', role: 'student', organisationName: 'N/A' },
+    // Business Academy
+    { firstName: 'Arjun', lastName: 'Mehta', email: 'arjun.mehta@businessacademy.student', role: 'student', organisationName: 'Business Academy' },
+    { firstName: 'Diya', lastName: 'Varma', email: 'diya.varma@businessacademy.student', role: 'student', organisationName: 'Business Academy' },
+    { firstName: 'Ishan', lastName: 'Bose', email: 'ishan.bose@businessacademy.student', role: 'student', organisationName: 'Business Academy' },
+    // Science Institute
+    { firstName: 'Meera', lastName: 'Sen', email: 'meera.sen@scienceinstitute.student', role: 'student', organisationName: 'Science Institute' },
+    { firstName: 'Rahul', lastName: 'Khan', email: 'rahul.khan@scienceinstitute.student', role: 'student', organisationName: 'Science Institute' },
+    { firstName: 'Zara', lastName: 'Ali', email: 'zara.ali@scienceinstitute.student', role: 'student', organisationName: 'Science Institute' },
   ];
 
   const studentProfiles = [];
@@ -254,15 +266,19 @@ async function run() {
     studentProfiles.push(await ensureStudent(profile));
   }
 
-  // 3) Assign tests per teacher by organisation and create results
+  // 3) Ensure every existing teacher user has a Teacher document
+  const allTeacherUsers = await require('../model/User').find({ role: 'teacher' });
+  for (const tUser of allTeacherUsers) {
+    const exists = await Teacher.findOne({ profileInfo: tUser._id });
+    if (!exists) {
+      await ensureTeacher(tUser);
+    }
+  }
+
+  // 4) Assign tests per teacher by organisation and create results (strictly same-organisation only)
   await seedPerOrganization();
 
-  // Also ensure at least the first teacher has tests with all demo students
-  const primaryTeacher = teacherProfiles[0];
-  const tests = await createTestsSequential(primaryTeacher, studentProfiles);
-  await createResults(tests, studentProfiles, primaryTeacher);
-
-  console.log(`Seed complete: ${teacherProfiles.length} teachers, ${studentProfiles.length} students.`);
+  console.log(`Seed complete: teachers=${(await Teacher.countDocuments())}, students=${(await Student.countDocuments())}.`);
   await mongoose.connection.close();
 }
 
