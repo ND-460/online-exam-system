@@ -7,7 +7,8 @@ import { useAuthStore } from "../../store/authStore";
 import axios from "axios";
 import { toast } from "react-toastify";
 import "react-toastify/ReactToastify.css";
-import "./Exam.css"
+import "./Exam.css";
+import shuffleArray from "../../../../utils/shuffleArray";
 const paletteColors = {
   notVisited: "bg-yellow-200",
   answered: "bg-green-500",
@@ -41,7 +42,6 @@ export default function Exam() {
   const { token, user } = useAuthStore();
   const navigate = useNavigate();
   const { testId } = useParams();
-  // console.log(testId)
   const [questions, setQuestions] = useState([]);
   const [examInfo, setExamInfo] = useState({
     title: "",
@@ -51,6 +51,8 @@ export default function Exam() {
     timeLimit: 0,
     instructions: [],
   });
+  const [currentSection, setCurrentSection] = useState(0);
+  const [sections, setSections] = useState([]);
   const [timer, setTimer] = useState(null);
   const submittingRef = useRef(false);
   const addViolation = (reason) => {
@@ -208,24 +210,41 @@ export default function Exam() {
       );
       const test = res.data;
 
-      const formattedQuestions = (test.questions || []).map((q) => ({
+      let formattedQuestions = (test.questions || []).map((q) => ({
         ...q,
         type: test.category.toLowerCase(),
         marks: q.marks || 1,
       }));
 
-      setQuestions(formattedQuestions);
+      const difficulties = ["easy", "medium", "hard"];
+      const sec = difficulties.map((diff) => ({
+        name: diff,
+        questions: shuffleArray(
+          formattedQuestions.filter((q) => q.difficulty === diff)
+        ),
+      }));
+
+      let questionIndex = 0;
+      const questionsWithSection = sec.flatMap((section, secIdx) =>
+        section.questions.map((q) => ({
+          ...q,
+          section: section.name,
+          sectionIndex: secIdx,
+          globalIndex: questionIndex++,
+        }))
+      );
+
+      setQuestions(questionsWithSection);
+      setSections(sec.map((s) => s.name));
       setExamInfo({
         title: test.testName,
         subject: test.category,
-        totalQuestions: formattedQuestions.length,
-        totalMarks: formattedQuestions.reduce((sum, q) => sum + q.marks, 0),
+        totalQuestions: questionsWithSection.length,
+        totalMarks: questionsWithSection.reduce((sum, q) => sum + q.marks, 0),
         timeLimit: (test.minutes || 30) * 60,
-        instructions: test.rules || [
-          "Do not refresh or close the tab during the exam.",
-        ],
+        instructions: test.rules || ["Do not refresh or close the tab."],
       });
-      setPalette(formattedQuestions.map(() => "notVisited"));
+      setPalette(questionsWithSection.map(() => "notVisited"));
       setTimer((test.minutes || 30) * 60);
     };
     fetchTest();
@@ -449,6 +468,34 @@ export default function Exam() {
             {examInfo.title}
           </div>
           <div className="text-yellow-800 text-sm mb-2">{examInfo.subject}</div>
+          <div className="flex gap-4 mt-2">
+            {sections.map((sec, idx) => (
+              <button
+                key={idx}
+                onClick={() => {
+                  // Jump to first question of that section
+                  const firstQ = questions.find((q) => q.sectionIndex === idx);
+                  if (firstQ) {
+                    setCurrent(firstQ.globalIndex);
+                    setCurrentSection(idx);
+                  }
+                }}
+                className={`px-4 py-1 rounded-md font-semibold border-2 transition-all duration-150 
+        ${
+          currentSection === idx
+            ? "bg-yellow-600 border-yellow-600 text-white"
+            : "bg-white border-yellow-400 text-yellow-800 hover:bg-yellow-100"
+        }`}
+              >
+                {sec.toUpperCase()}
+              </button>
+            ))}
+          </div>
+
+          <div className="text-sm text-yellow-800">
+            Section: {questions[current]?.section?.toUpperCase()}
+          </div>
+
           <div className="flex gap-6 text-yellow-800 text-xs">
             <span>Total Questions: {examInfo.totalQuestions}</span>
             <span>Total Marks: {examInfo.totalMarks}</span>
@@ -491,91 +538,116 @@ export default function Exam() {
       </AnimatePresence>
 
       {/* Main Content */}
-<div className="main-content">
-  {/* Main Question Panel */}
-  <div className="question-panel">
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={current}
-        initial={{ opacity: 0, x: 40 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: -40 }}
-        transition={{ duration: 0.3 }}
-        className="question-box"
-      >
-        {renderQuestion()}
+      <div className="main-content">
+        {/* Main Question Panel */}
+        <div className="question-panel">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={current}
+              initial={{ opacity: 0, x: 40 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -40 }}
+              transition={{ duration: 0.3 }}
+              className="question-box"
+            >
+              {renderQuestion()}
 
-        {/* Navigation Buttons */}
-        <div className="nav-buttons">
-          <button
-            className="btn prev"
-            onClick={() => setCurrent((c) => Math.max(0, c - 1))}
-            disabled={current === 0}
-          >
-            Previous
-          </button>
-          <div className="middle-buttons">
-            <button className="btn action" onClick={markForReview}>
-              Mark for Review
-            </button>
-            <button className="btn action" onClick={clearAnswer}>
-              Clear Answer
-            </button>
-          </div>
-          <button
-            className="btn next"
-            onClick={() =>
-              setCurrent((c) => Math.min(questions.length - 1, c + 1))
-            }
-            disabled={current === questions.length - 1}
-          >
-            Next
-          </button>
+              {/* Navigation Buttons */}
+              <div className="nav-buttons">
+                <button
+                  className="btn prev"
+                  onClick={() => setCurrent((c) => Math.max(0, c - 1))}
+                  disabled={current === 0}
+                >
+                  Previous
+                </button>
+                <div className="middle-buttons">
+                  <button className="btn action" onClick={markForReview}>
+                    Mark for Review
+                  </button>
+                  <button className="btn action" onClick={clearAnswer}>
+                    Clear Answer
+                  </button>
+                </div>
+                <button
+                  className="btn next"
+                  onClick={() => {
+                    const currentQ = questions[current];
+                    const isLastInSection =
+                      questions.findLastIndex(
+                        (q) => q.sectionIndex === currentQ.sectionIndex
+                      ) === current;
+
+                    if (isLastInSection) {
+                      const nextSectionFirst = questions.find(
+                        (q) => q.sectionIndex === currentQ.sectionIndex + 1
+                      );
+                      if (nextSectionFirst) {
+                        setCurrent(nextSectionFirst.globalIndex);
+                        setCurrentSection(currentQ.sectionIndex + 1);
+                      }
+                    } else {
+                      setCurrent((c) => Math.min(questions.length - 1, c + 1));
+                    }
+                  }}
+                  disabled={current === questions.length - 1}
+                >
+                  Next
+                </button>
+              </div>
+            </motion.div>
+          </AnimatePresence>
         </div>
-      </motion.div>
-    </AnimatePresence>
-  </div>
 
-  {/* Sidebar / Palette */}
-  <div className="sidebar">
-    <div className="sidebar-title">Question Palette</div>
+        {/* Sidebar / Palette */}
+        <div className="sidebar">
+          <div className="sidebar-title">Question Palette</div>
 
-    <div className="palette">
-      {questions.map((_, idx) => (
-        <button
-          key={idx}
-          className={`palette-btn ${getPaletteColor(idx)}`}
-          onClick={() => goTo(idx)}
-        >
-          {idx + 1}
-        </button>
-      ))}
-    </div>
+          <div className="palette">
+            {questions
+              .filter((q) => q.sectionIndex === currentSection)
+              .map((q, idx) => (
+                <button
+                  key={q.globalIndex}
+                  className={`palette-btn ${getPaletteColor(q.globalIndex)}`}
+                  onClick={() => goTo(q.globalIndex)}
+                >
+                  {idx + 1} 
+                </button>
+              ))}
+          </div>
 
-    <div className="legend">
-      <div><span className="dot not-visited"></span> Not Visited</div>
-      <div><span className="dot answered"></span> Answered</div>
-      <div><span className="dot review"></span> Marked for Review</div>
-      <div><span className="dot not-answered"></span> Not Answered</div>
-    </div>
-  </div>
-</div>
+          <div className="legend">
+            <div>
+              <span className="dot not-visited"></span> Not Visited
+            </div>
+            <div>
+              <span className="dot answered"></span> Answered
+            </div>
+            <div>
+              <span className="dot review"></span> Marked for Review
+            </div>
+            <div>
+              <span className="dot not-answered"></span> Not Answered
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Footer Controls */}
-<div className="footer-controls">
-  <button
-    className="btn save-next"
-    onClick={() =>
-      setCurrent((c) => Math.min(questions.length - 1, c + 1))
-    }
-  >
-    Save & Next
-  </button>
-  <button className="btn submit-test" onClick={() => setShowSubmit(true)}>
-    Submit Test
-  </button>
-</div>
-
+      <div className="footer-controls">
+        <button
+          className="btn save-next"
+          onClick={() =>
+            setCurrent((c) => Math.min(questions.length - 1, c + 1))
+          }
+        >
+          Save & Next
+        </button>
+        <button className="btn submit-test" onClick={() => setShowSubmit(true)}>
+          Submit Test
+        </button>
+      </div>
 
       {/* Submit Modal */}
       <AnimatePresence>

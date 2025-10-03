@@ -182,7 +182,7 @@ filtered.sort((a, b) => {
             { id: "practice", label: "Practice", icon: "💻" },
             { id: "reports", label: "Reports", icon: "📊" },
             { id: "profile", label: "Profile", icon: "👤" },
-            { id: "logout", label: "Logout", icon: "🚪" }, // 👈 logout as tab
+            { id: "logout", label: "Logout", icon: "🚪" }, 
           ].map((tab) => (
             <button
               key={tab.id}
