@@ -11,6 +11,7 @@ const user = require("./routes/user");
 const student = require("./routes/student");
 const teacher = require("./routes/teacher");
 const codeRunner = require("./routes/codeRunner");
+const analytics = require("./routes/analytics");
 
 //database connection
 const connectMongooseDb = require("./config/db");
@@ -28,6 +29,7 @@ app.use("/api/user", user);
 app.use("/api/student", student);
 app.use("/api/teacher", teacher);
 app.use("/api/code", codeRunner);
+app.use("/api/analytics", analytics);
 
 //passport part for google sign in
 // app.use(

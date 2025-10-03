@@ -7,7 +7,6 @@ import SuccessStories from './pages/misc/SuccessStories';
 import Blog from './pages/misc/Blog';
 import About from './pages/misc/About';
 import Contact from './pages/misc/Contact';
-import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminDashboardNew from './pages/admin/AdminDashboardNew';
 import Questions from './pages/admin/Questions';
 import Results from './pages/admin/Results';
@@ -36,7 +35,7 @@ function App() {
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/admin" element={<AdminDashboardNew />} />
-        <Route path="/admin-old" element={<AdminDashboard />} />
+        <Route path="/admin/organization/:orgId" element={<AdminDashboardNew />} />
         <Route path="/admin/questions" element={<Questions />} />
         <Route path="/admin/results" element={<Results />} />
         <Route path="/admin/analytics" element={<Analytics />} />

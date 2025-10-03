@@ -413,7 +413,6 @@ IMPORTANT: Respond ONLY with valid JSON array. No additional text or markdown.`;
 
     for (let i = 0; i < numQuestions; i++) {
       const keyword = keywords[i % keywords.length];
-
       // Use subject-specific templates if available
       if (subjectQuestions.length > 0) {
         const template = subjectQuestions[i % subjectQuestions.length];

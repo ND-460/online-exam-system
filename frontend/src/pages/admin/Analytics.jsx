@@ -1,15 +1,63 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
-  BarChart3, TrendingUp, Users, FileText, Clock, CheckCircle, XCircle, Loader2, Home, Settings, LogOut, Search, Filter, Calendar, ArrowUpDown, Award, Activity, Eye
+  BarChart3, TrendingUp, Users, FileText, Clock, CheckCircle, XCircle, 
+  Loader2, Home, Settings, LogOut, Search, Filter, Calendar, ArrowUpDown, 
+  Award, Activity, Eye, Download
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
+import AdminCharts from "../../components/AdminCharts";
+import axios from "axios";
+import { downloadCompleteReport, downloadChartDataAsCSV } from "../../utils/reportGenerator";
 
 export default function Analytics() {
   const [activeTab, setActiveTab] = useState("analytics");
-  const { logout } = useAuthStore();
+  const [timeRange, setTimeRange] = useState("week");
+  const [loading, setLoading] = useState(false);
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const { logout, token } = useAuthStore();
   const navigate = useNavigate();
+
+  // Fetch analytics data (cards/top-level numbers)
+  useEffect(() => {
+    let cancelled = false;
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const base = import.meta.env.VITE_API_URL || '';
+        const auth = { headers: { Authorization: `Bearer ${token}` } };
+        const [activityRes, performanceRes, subjectsRes, completionRes] = await Promise.all([
+          axios.get(`${base}/api/analytics/activity`, { params: { range: timeRange }, ...auth }),
+          axios.get(`${base}/api/analytics/performance`, { params: { range: timeRange }, ...auth }),
+          axios.get(`${base}/api/analytics/subjects`, { params: { range: timeRange }, ...auth }),
+          axios.get(`${base}/api/analytics/completion`, { params: { range: timeRange }, ...auth })
+        ]);
+
+        const data = {
+          testsPerPeriod: Array.isArray(completionRes.data) ? completionRes.data.map((r) => ({ period: r?._id || '', count: Number(r?.completed || 0), avgPercentage: undefined })) : [],
+          performanceMetrics: Array.isArray(subjectsRes.data) ? subjectsRes.data.map((s) => ({ subject: s?.subject || 'N/A', avgPercentage: Number(s?.score || 0), passRate: undefined, participation: undefined })) : [],
+          userActivity: Array.isArray(activityRes.data) ? activityRes.data.map((r) => ({ time: r?.date || '', active: Number(r?.students || 0) + Number(r?.teachers || 0) })) : [],
+          systemOverview: {
+            // You can extend this if you add a dedicated overview endpoint
+            activeUsers: Array.isArray(activityRes.data) ? activityRes.data.reduce((sum, r) => sum + Number(r?.students || 0) + Number(r?.teachers || 0), 0) : 0,
+            completedTests: Array.isArray(completionRes.data) ? completionRes.data.reduce((sum, r) => sum + Number(r?.completed || 0), 0) : 0,
+            avgResponseTime: undefined,
+            successRate: Array.isArray(performanceRes.data) ? (performanceRes.data.find(p => p.name === 'Excellent')?.value || 0) : 0
+          }
+        };
+
+        if (!cancelled) setAnalyticsData(data);
+      } catch (error) {
+        console.error('Error fetching analytics data:', error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchData();
+    return () => { cancelled = true; };
+  }, [timeRange]);
 
   const handleLogout = () => {
     logout();
@@ -91,10 +139,11 @@ export default function Analytics() {
 
       {/* Main Content */}
       <div className="ml-64 min-h-screen">
-        {/* Background Image */}
-        <div className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-10" 
-             style={{ backgroundImage: "url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwMCIgaGVpZ2h0PSI4MDAiIHZpZXdCb3g9IjAgMCAxMjAwIDgwMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjEyMDAiIGhlaWdodD0iODAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxyZWN0IHg9IjUwMCIgeT0iMzAwIiB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEyMCIgcng9IjEwIiBmaWxsPSIjRTVFN0VCIi8+CjxyZWN0IHg9IjU1MCIgeT0iMzUwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjIwIiByeD0iMTAiIGZpbGw9IiNEMUQ1REIiLz4KPHJlY3QgeD0iNTUwIiB5PSIzODAiIHdpZHRoPSI4MCIgaGVpZ2h0PSIyMCIgcng9IjEwIiBmaWxsPSIjRDFENURCIi8+CjxyZWN0IHg9IjU1MCIgeT0iNDEwIiB3aWR0aD0iNjAiIGhlaWdodD0iMjAiIHJ4PSIxMCIgZmlsbD0iI0QxRDVEQiIvPgo8L3N2Zz4K')" }}>
-        </div>
+        {/* Background Image (bold with ~20% transparency), fixed */}
+        <div 
+          className="fixed inset-0 bg-cover bg-center bg-no-repeat" 
+          style={{ backgroundImage: `url("/images/back-image-min.jpg")`, opacity: 0.8 }}
+        />
 
         {/* Content Area */}
         <div className="relative z-10 p-8">
@@ -112,115 +161,35 @@ export default function Analytics() {
           >
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-gray-800 mb-2">Performance Reports</h2>
-              <p className="text-gray-600">Last 5 tests performance overview.</p>
+              <p className="text-gray-600">Last period performance overview.</p>
             </div>
             
-            {/* Chart Area */}
-            <div className="relative h-96 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
-              <div className="text-center">
-                <BarChart3 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500 text-lg">Performance Chart</p>
-                <p className="text-gray-400 text-sm">Chart visualization will be implemented here</p>
-              </div>
-              
-              {/* Y-axis Label */}
-              <div className="absolute left-4 top-1/2 transform -translate-y-1/2 -rotate-90">
-                <span className="text-gray-600 font-medium">Percentage (%)</span>
-              </div>
-              
-              {/* Legend */}
-              <div className="absolute bottom-4 right-4 flex items-center gap-2">
-                <div className="w-4 h-4 bg-orange-600 rounded"></div>
-                <span className="text-gray-600 font-medium">score</span>
-                <div className="ml-4">
-                  <span className="text-gray-600 font-medium">Tests</span>
-                </div>
-              </div>
+            {/* Charts Section */}
+            <AdminCharts 
+              chartData={analyticsData}
+              loading={loading}
+              onDownload={(chartType, data) => {
+                if (chartType === 'complete') {
+                  downloadCompleteReport(analyticsData);
+                } else {
+                  downloadChartDataAsCSV(chartType, data);
+                }
+              }}
+            />
+
+            {/* Download Complete Report Button */}
+            <div className="mt-6">
+              <button
+                onClick={() => downloadCompleteReport(analyticsData)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Download className="w-5 h-5" />
+                Download Complete Report
+              </button>
             </div>
           </motion.div>
-
-          {/* Additional Analytics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="bg-white rounded-xl p-6 shadow-lg"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">User Activity</h3>
-                <Activity className="w-6 h-6 text-blue-600" />
-              </div>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Active Users</span>
-                  <span className="font-semibold text-gray-800">1,234</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Tests Taken</span>
-                  <span className="font-semibold text-gray-800">5,678</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Completion Rate</span>
-                  <span className="font-semibold text-green-600">87%</span>
-                </div>
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="bg-white rounded-xl p-6 shadow-lg"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">Test Performance</h3>
-                <Award className="w-6 h-6 text-orange-600" />
-              </div>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Average Score</span>
-                  <span className="font-semibold text-gray-800">78%</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Highest Score</span>
-                  <span className="font-semibold text-green-600">98%</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Pass Rate</span>
-                  <span className="font-semibold text-blue-600">82%</span>
-                </div>
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="bg-white rounded-xl p-6 shadow-lg"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">System Health</h3>
-                <CheckCircle className="w-6 h-6 text-green-600" />
-              </div>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Uptime</span>
-                  <span className="font-semibold text-green-600">99.9%</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Response Time</span>
-                  <span className="font-semibold text-gray-800">120ms</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Error Rate</span>
-                  <span className="font-semibold text-red-600">0.1%</span>
-                </div>
-              </div>
-            </motion.div>
-          </div>
         </div>
       </div>
-    </div>
+    </div>  
   );
 } 

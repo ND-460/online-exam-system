@@ -1,131 +1,68 @@
 import React from 'react';
-import { motion } from 'framer-motion';
-import { 
-  Download, 
-  Users, 
-  BookOpen, 
-  GraduationCap, 
-  BarChart3,
-  TrendingUp,
-  Activity,
-  PieChart
-} from 'lucide-react';
+import { Users, BookOpen, GraduationCap, UserCheck, TrendingUp } from 'lucide-react';
 
-const AdminAnalyticsCards = ({ 
-  analytics = {}, 
-  loading = false, 
-  onDownload = () => {} 
-}) => {
-  // Default data structure with sample data for demonstration
-  const defaultAnalytics = {
-    totalUsers: 1250,
-    totalTests: 45,
-    totalStudents: 980,
-    totalTeachers: 85,
-    activeUsers: 1100,
-    completedTests: 38,
-    pendingUsers: 12,
-    systemHealth: 98
-  };
-
-  const data = { ...defaultAnalytics, ...analytics };
-
+const AdminAnalyticsCards = ({ analytics }) => {
   const cards = [
     {
-      id: 'users',
-      title: 'Total Users',
-      value: data.totalUsers || 0,
-      trend: '+12% from last month',
-      icon: <Users className="w-6 h-6" />,
-      color: 'purple',
-      bgColor: 'bg-purple-50',
-      iconBg: 'bg-purple-100',
-      textColor: 'text-purple-600',
-      accentColor: 'border-l-purple-500'
+      title: "Total Users",
+      value: analytics?.totalUsers || 12,
+      icon: Users,
+      iconColor: "bg-purple-100 text-purple-600",
+      change: "+12% from last month",
+      changeColor: "text-green-600"
     },
     {
-      id: 'tests',
-      title: 'Total Tests',
-      value: data.totalTests || 0,
-      trend: '+8% from last month',
-      icon: <BookOpen className="w-6 h-6" />,
-      color: 'orange',
-      bgColor: 'bg-orange-50',
-      iconBg: 'bg-orange-100',
-      textColor: 'text-orange-600',
-      accentColor: 'border-l-orange-500'
+      title: "Total Tests", 
+      value: analytics?.totalTests || 0,
+      icon: BookOpen,
+      iconColor: "bg-orange-100 text-orange-600",
+      change: "+8% from last month",
+      changeColor: "text-green-600"
     },
     {
-      id: 'students',
-      title: 'Students',
-      value: data.totalStudents || 0,
-      trend: '+15% from last month',
-      icon: <GraduationCap className="w-6 h-6" />,
-      color: 'purple',
-      bgColor: 'bg-purple-50',
-      iconBg: 'bg-purple-100',
-      textColor: 'text-purple-600',
-      accentColor: 'border-l-purple-500'
+      title: "Students",
+      value: analytics?.totalStudents || 5,
+      icon: GraduationCap,
+      iconColor: "bg-purple-100 text-purple-600", 
+      change: "+15% from last month",
+      changeColor: "text-green-600"
     },
     {
-      id: 'teachers',
-      title: 'Teachers',
-      value: data.totalTeachers || 0,
-      trend: '+5% from last month',
-      icon: <Users className="w-6 h-6" />,
-      color: 'teal',
-      bgColor: 'bg-teal-50',
-      iconBg: 'bg-teal-100',
-      textColor: 'text-teal-600',
-      accentColor: 'border-l-teal-500'
+      title: "Teachers",
+      value: analytics?.totalTeachers || 2,
+      icon: UserCheck,
+      iconColor: "bg-green-100 text-green-600",
+      change: "+5% from last month", 
+      changeColor: "text-green-600"
     }
   ];
 
-  if (loading) {
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="bg-white rounded-lg shadow-sm border-l-4 border-gray-200 p-6 animate-pulse">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                <div className="h-8 bg-gray-200 rounded w-1/2 mb-2"></div>
-                <div className="h-3 bg-gray-200 rounded w-2/3"></div>
-              </div>
-              <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      {cards.map((card, index) => (
-        <motion.div
-          key={card.id}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: index * 0.1 }}
-          className={`bg-white rounded-lg shadow-sm border-l-4 ${card.accentColor} p-6 hover:shadow-md transition-shadow duration-200`}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-sm font-medium text-gray-600 mb-1">{card.title}</p>
-              <p className="text-3xl font-bold text-gray-900 mb-1">
-                {card.value.toLocaleString()}
-              </p>
-              <p className="text-sm text-green-600 font-medium">{card.trend}</p>
-            </div>
-            <div className={`w-12 h-12 ${card.iconBg} rounded-full flex items-center justify-center`}>
-              <div className={card.textColor}>
-                {card.icon}
+    <div className="space-y-4">
+      {cards.map((card, index) => {
+        const IconComponent = card.icon;
+        return (
+          <div key={index} className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className={`p-3 rounded-full ${card.iconColor} mr-4`}>
+                  <IconComponent className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-600">{card.title}</p>
+                  <p className="text-2xl font-bold text-gray-900">{card.value}</p>
+                </div>
+              </div>
+              <div className="flex items-center">
+                <TrendingUp className="w-4 h-4 text-green-600 mr-1" />
+                <p className={`text-sm font-medium ${card.changeColor}`}>
+                  {card.change}
+                </p>
               </div>
             </div>
           </div>
-        </motion.div>
-      ))}
+        );
+      })}
     </div>
   );
 };

@@ -180,10 +180,9 @@ router.get("/results/:studentID", auth, async (req, res) => {
   const studentID = req.params.studentID;
 
   try {
-    const results = await Result.find({ studentID }).populate(
-      "testID",
-      "title duration"
-    );
+    const results = await Result.find({ studentId: studentID })
+      .populate("testId", "testName outOfMarks minutes")
+      .sort({ attemptedAt: -1 });
     res.status(200).json({ results });
   } catch (err) {
     console.log(err.message);
@@ -365,7 +364,7 @@ router.post("/attempt-test/:testId", auth, async (req, res) => {
       return res.status(400).json({ message: "Test already submitted" });
     }
 
-    // Evaluate answers
+    // Evaluate answers and normalize to Result schema fields
     let score = 0;
     const evaluatedAnswers = [];
 
