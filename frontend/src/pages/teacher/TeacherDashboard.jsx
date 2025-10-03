@@ -168,6 +168,7 @@ export default function TeacherDashboard() {
           description: testDesc,
           scheduledAt,
           questions: qs,
+          organisation: user.organisation,
         };
         await axios.post(
           `${import.meta.env.VITE_API_URL}/api/teacher/create-test`,
