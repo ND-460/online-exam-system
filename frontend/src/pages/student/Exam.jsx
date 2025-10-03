@@ -8,6 +8,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import "react-toastify/ReactToastify.css";
 import "./Exam.css"
+import shuffleArray from "../../../../utils/shuffleArray";
 const paletteColors = {
   notVisited: "bg-yellow-200",
   answered: "bg-green-500",
@@ -208,11 +209,14 @@ export default function Exam() {
       );
       const test = res.data;
 
-      const formattedQuestions = (test.questions || []).map((q) => ({
+      let formattedQuestions = (test.questions || []).map((q) => ({
         ...q,
         type: test.category.toLowerCase(),
         marks: q.marks || 1,
       }));
+
+      // 🔀 Shuffle question order once
+    formattedQuestions = shuffleArray(formattedQuestions);
 
       setQuestions(formattedQuestions);
       setExamInfo({
