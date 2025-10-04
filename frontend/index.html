@@ -9,7 +9,15 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
-    <script src="https://use.fontawesome.com/f59bcd8580.js"></script>
+    <!-- Removed external FontAwesome v4 script (slow network fallback warning). If icons needed, install '@fortawesome/react-fontawesome' or use Lucide/heroicons. Placeholder shim below keeps legacy 'fa' elements hidden gracefully. -->
+    <style>
+      .fa { display:inline-block; width:1em; text-align:center; font-style:normal; }
+      /* Optional: map a few legacy classes to existing unicode as minimal fallback */
+      .fa-user:before { content:'\1F464'; }
+      .fa-envelope:before { content:'\2709'; }
+      .fa-check:before { content:'\2713'; }
+      .fa-times:before { content:'\2715'; }
+    </style>
 
   </body>
 </html>

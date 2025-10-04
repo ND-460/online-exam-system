@@ -10,6 +10,8 @@ import {
   Tooltip,
   Label,
 } from "recharts";
+import { createDashboardPdf, downloadCompleteReport } from "../../utils/reportGenerator";
+import { Download } from "lucide-react";
 
 const Analytics = ({ testId, token }) => {
   const [analytics, setAnalytics] = useState(null);
@@ -84,15 +86,54 @@ const Analytics = ({ testId, token }) => {
     bins[binIndex].count += 1;
   });
 
+  const handleDownloadPDF = () => {
+    const chartData = {
+      testAnalytics: {
+        avgScore: avgScore,
+        avgPercentage: Number(analytics.avgPercentage ?? 0),
+        highestScore: highestScore,
+        lowestScore: lowestScore,
+        totalStudents: totalStudents,
+        totalSubmissions: scoreDistribution.length
+      },
+      scoreDistribution: bins
+    };
+    downloadCompleteReport(chartData);
+  };
+
+  const handleDownloadChart = () => {
+    createDashboardPdf([{ title: 'Test Score Distribution', data: bins }], { filename: 'test-score-distribution.pdf' });
+  };
+
   return (
   <div className="bg-white dark:bg-[#1f2937] rounded-3xl p-6 shadow-xl border border-gray-200 dark:border-gray-700 w-full transition duration-300 hover:scale-[1.01]">
-    {/* Title */}
-    <h3 className="text-xl font-bold mb-2 text-yellow-800 dark:text-white">
-      Test Analytics
-    </h3>
-    <p className="text-yellow-900 dark:text-gray-300 text-sm mb-4">
-      Overview of students who performed in this test
-    </p>
+    {/* Title and Download Button */}
+    <div className="flex justify-between items-center mb-4">
+      <div>
+        <h3 className="text-xl font-bold mb-2 text-yellow-800 dark:text-white">
+          Test Analytics
+        </h3>
+        <p className="text-yellow-900 dark:text-gray-300 text-sm">
+          Overview of students who performed in this test
+        </p>
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={handleDownloadChart}
+          className="px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1"
+        >
+          <Download className="w-4 h-4" />
+          Chart PDF
+        </button>
+        <button
+          onClick={handleDownloadPDF}
+          className="px-3 py-2 text-sm bg-emerald-600 text-white rounded hover:bg-emerald-700 flex items-center gap-1"
+        >
+          <Download className="w-4 h-4" />
+          Full Report
+        </button>
+      </div>
+    </div>
 
     {/* Stats */}
     <ul className="space-y-2 text-sm mb-6 text-yellow-800 dark:text-blue-200">
