@@ -544,7 +544,7 @@ export default function TeacherDashboard() {
                                   setIsViewModalOpen(true);
                                 }}
                               >
-                                View
+                                Analytics
                               </button>
                             </td>
                           </tr>
@@ -565,35 +565,7 @@ export default function TeacherDashboard() {
               </div>
             )}
 
-            {/* {activeTab === "submissions" &&
-              (selectedTest ? (
-                <ViewSubmissions testId={selectedTest} token={token} />
-              ) : (
-                <div className="bg-white dark:bg-[#1f2937] p-6 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200">
-                  <p className="text-center">
-                    Select a test from "Manage Tests" to view submissions.
-                  </p>
-                </div>
-              ))}
-
-            {activeTab === "analytics" &&
-              (selectedTest ? (
-                <Analytics testId={selectedTest} token={token} />
-              ) : (
-                <div className="bg-white dark:bg-[#1f2937] p-6 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200">
-                  <p className="text-center">
-                    Select a test from "Manage Tests" to view analytics.
-                  </p>
-                </div>
-              ))} */}
-
             {activeTab === "profile" && (
-              // <div className="p-6 rounded-3xl bg-white shadow-xl border border-gray-200">
-              //   <h3 className="text-xl font-bold mb-4 text-gray-800">My Profile</h3>
-              //   <Link to="/profile" className="text-blue-600 font-semibold hover:underline">
-              //     Go to Profile Page
-              //   </Link>
-              // </div>
               <div className="flex-1">
                 <ProfilePage />
               </div>
