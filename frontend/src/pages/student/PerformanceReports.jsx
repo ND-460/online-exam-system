@@ -11,6 +11,8 @@ import {
   Legend,
   Label,
 } from "recharts";
+import { createDashboardPdf, downloadCompleteReport } from "../../utils/reportGenerator";
+import { Download } from "lucide-react";
 
 export default function PerformanceReports({ token }) {
   const [performanceData, setPerformanceData] = useState([]);
@@ -54,14 +56,53 @@ export default function PerformanceReports({ token }) {
     fetchPerformance();
   }, [token]);
 
+  const handleDownloadPDF = () => {
+    const chartData = {
+      performanceData: performanceData,
+      status: status,
+      summary: {
+        totalTests: performanceData.length,
+        averageScore: performanceData.length > 0 ? 
+          (performanceData.reduce((sum, test) => sum + test.score, 0) / performanceData.length).toFixed(2) : 0,
+        latestScore: performanceData.length > 0 ? performanceData[performanceData.length - 1].score : 0
+      }
+    };
+    downloadCompleteReport(chartData);
+  };
+
+  const handleDownloadChart = () => {
+    createDashboardPdf([{ title: 'Student Performance Overview', data: performanceData }], { filename: 'student-performance-report.pdf' });
+  };
+
   return (
     <div className="bg-white dark:bg-[#1f2937] rounded-3xl p-6 shadow-xl border border-gray-200 dark:border-gray-700 w-full transition duration-300 hover:scale-[1.01]">
-      <h3 className="text-xl font-bold mb-2 text-yellow-800 dark:text-white">
-        Performance Reports
-      </h3>
-      <p className="text-yellow-900 dark:text-gray-300 text-sm mb-4">
-        Last 5 tests performance overview
-      </p>
+      {/* Title and Download Buttons */}
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <h3 className="text-xl font-bold mb-2 text-yellow-800 dark:text-white">
+            Performance Reports
+          </h3>
+          <p className="text-yellow-900 dark:text-gray-300 text-sm">
+            Last 5 tests performance overview
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={handleDownloadChart}
+            className="px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1"
+          >
+            <Download className="w-4 h-4" />
+            Chart PDF
+          </button>
+          <button
+            onClick={handleDownloadPDF}
+            className="px-3 py-2 text-sm bg-emerald-600 text-white rounded hover:bg-emerald-700 flex items-center gap-1"
+          >
+            <Download className="w-4 h-4" />
+            Full Report
+          </button>
+        </div>
+      </div>
 
       {/* Status Indicator */}
       {status && (

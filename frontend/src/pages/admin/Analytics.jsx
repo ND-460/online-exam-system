@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import AdminCharts from "../../components/AdminCharts";
 import axios from "axios";
-import { downloadCompleteReport, downloadChartDataAsCSV } from "../../utils/reportGenerator";
+import { downloadCompleteReport, downloadChartDataAsCSV, createDashboardPdf } from "../../utils/reportGenerator";
 
 export default function Analytics() {
   const [activeTab, setActiveTab] = useState("analytics");
@@ -177,14 +177,26 @@ export default function Analytics() {
               }}
             />
 
-            {/* Download Complete Report Button */}
-            <div className="mt-6">
+            {/* Download Buttons */}
+            <div className="mt-6 flex gap-4">
               <button
                 onClick={() => downloadCompleteReport(analyticsData)}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 <Download className="w-5 h-5" />
-                Download Complete Report
+                Complete Report
+              </button>
+              <button
+                onClick={() => createDashboardPdf([
+                  { title: 'System Analytics Overview', data: analyticsData?.systemOverview || {} },
+                  { title: 'User Activity', data: analyticsData?.userActivity || [] },
+                  { title: 'Performance Metrics', data: analyticsData?.performanceMetrics || [] },
+                  { title: 'Tests Per Period', data: analyticsData?.testsPerPeriod || [] }
+                ], { filename: 'admin-analytics-dashboard.pdf' })}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+              >
+                <Download className="w-5 h-5" />
+                Dashboard PDF
               </button>
             </div>
           </motion.div>

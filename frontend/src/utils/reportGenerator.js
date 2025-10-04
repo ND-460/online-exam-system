@@ -94,6 +94,154 @@ export const generateAdminReport = (systemData) => {
   return report;
 };
 
+// ================= Teacher & Student Analytics PDF (Demo Style) =================
+// These functions generate structured PDF-friendly HTML (no canvas) for ONLY
+// admin -> teacher/student analytics modals without touching other downloads.
+
+export const exportTeacherAnalyticsPdf = (teacher, comprehensive) => {
+  try {
+    if (!teacher) {
+      alert('Teacher data not ready yet.');
+      return;
+    }
+    const overview = comprehensive?.overview || {};
+    const testResults = comprehensive?.testResults || [];
+    const tests = comprehensive?.teacherTests || [];
+
+    const totalAvg = (() => {
+      const withSubs = testResults.filter(t => (t.submissionCount||0) > 0);
+      if (!withSubs.length) return 0;
+      const sum = withSubs.reduce((s,t)=> s + Number(t.averagePercentage||0), 0);
+      return Math.round((sum/withSubs.length)*100)/100;
+    })();
+
+    const styles = `
+      <style>
+        @page { size: A4 landscape; margin: 14mm; }
+        body { font-family: system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; margin:0; padding:0; color:#111827; }
+        h1 { font-size:24px; margin:0 0 4px; }
+        h2 { font-size:16px; margin:24px 0 8px; }
+        .subtitle { font-size:12px; color:#6b7280; margin-bottom:20px; }
+        .grid { display:grid; gap:12px; }
+        .grid-4 { grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); }
+        .card { background:#ffffff; border:1px solid #e5e7eb; border-radius:10px; padding:12px 14px; }
+        .metric-label { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:#64748b; }
+        .metric-value { font-size:22px; font-weight:600; margin-top:4px; }
+        table { width:100%; border-collapse:collapse; font-size:12px; }
+        th,td { padding:8px 10px; border-bottom:1px solid #e5e7eb; text-align:left; }
+        th { background:#f1f5f9; font-weight:600; font-size:11px; color:#334155; }
+        tr:last-child td { border-bottom:none; }
+        .badge-row { display:flex; gap:8px; flex-wrap:wrap; margin-top:4px; }
+        .badge { background:#f1f5f9; padding:4px 8px; font-size:10px; border-radius:9999px; border:1px solid #e2e8f0; }
+        .summary { display:flex; gap:28px; margin:24px 0 4px; }
+        .summary-item { text-align:center; }
+        .summary-item .val { font-size:28px; font-weight:700; }
+        .muted { color:#64748b; font-size:11px; }
+        .section { page-break-inside:avoid; }
+        .footer { margin-top:28px; font-size:10px; color:#94a3b8; text-align:center; }
+      </style>`;
+
+    const testsTableRows = testResults.map(r => `
+      <tr>
+        <td>${r.testName || '—'}</td>
+        <td>${r.submissionCount || 0}</td>
+        <td>${r.averagePercentage ? (Math.round(r.averagePercentage*100)/100)+'%' : '0%'}</td>
+        <td>${r.date ? new Date(r.date).toLocaleDateString() : '—'}</td>
+      </tr>`).join('') || '<tr><td colspan="4">No tests created.</td></tr>';
+
+    const doc = `<!DOCTYPE html><html><head><meta charset='utf-8'/>${styles}</head><body>
+      <h1>Teacher Analytics Report</h1>
+      <div class='subtitle'>Teacher: ${teacher.name || teacher.email || 'N/A'} • Generated: ${new Date().toLocaleString()}</div>
+      <div class='grid grid-4 section'>
+        <div class='card'><div class='metric-label'>Total Tests</div><div class='metric-value'>${overview.totalTests||0}</div></div>
+        <div class='card'><div class='metric-label'>Published</div><div class='metric-value'>${overview.publishedTests||0}</div></div>
+        <div class='card'><div class='metric-label'>Completed</div><div class='metric-value'>${overview.completedTests||0}</div></div>
+        <div class='card'><div class='metric-label'>Drafts</div><div class='metric-value'>${overview.draftTests||0}</div></div>
+        <div class='card'><div class='metric-label'>Total Submissions</div><div class='metric-value'>${overview.totalSubmissions||0}</div></div>
+        <div class='card'><div class='metric-label'>Average %</div><div class='metric-value'>${totalAvg}%</div></div>
+      </div>
+      <h2>Tests Overview</h2>
+      <table class='section'>
+        <thead><tr><th>Test</th><th>Submissions</th><th>Average %</th><th>Date</th></tr></thead>
+        <tbody>${testsTableRows}</tbody>
+      </table>
+      <div class='footer'>Confidential • ${location.hostname}</div>
+    </body></html>`;
+
+    const w = window.open('', '_blank');
+    if (!w) { alert('Allow popups to download PDF.'); return; }
+    w.document.open();
+    w.document.write(doc);
+    w.document.close();
+    w.onload = () => { w.focus(); w.print(); };
+  } catch (e) {
+    console.error('Teacher PDF generation failed', e);
+    alert('Failed to generate teacher PDF');
+  }
+};
+
+export const exportStudentAnalyticsPdf = (student, comprehensive) => {
+  try {
+    if (!student) { alert('Student data not ready yet.'); return; }
+    const counts = comprehensive?.counts || { upcoming:0, ongoing:0, completed:0 };
+    const results = comprehensive?.results || [];
+    const avgScore = comprehensive?.avgScore ?? 0;
+    const totalAssigned = (counts.upcoming||0)+(counts.ongoing||0)+(counts.completed||0);
+
+    const styles = `
+      <style>
+        @page { size:A4 portrait; margin:15mm; }
+        body { font-family: system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; margin:0; padding:0; color:#111827; }
+        h1 { font-size:24px; margin:0 0 6px; }
+        h2 { font-size:16px; margin:22px 0 8px; }
+        .subtitle { font-size:12px; color:#6b7280; margin-bottom:18px; }
+        .grid { display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); }
+        .card { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; }
+        .metric-label { font-size:11px; text-transform:uppercase; color:#64748b; letter-spacing:.5px; }
+        .metric-value { font-size:20px; font-weight:600; margin-top:4px; }
+        table { width:100%; border-collapse:collapse; font-size:12px; }
+        th,td { padding:8px 9px; border-bottom:1px solid #e5e7eb; text-align:left; }
+        th { background:#f8fafc; font-weight:600; font-size:11px; }
+        tr:last-child td { border-bottom:none; }
+        .footer { margin-top:26px; font-size:10px; text-align:center; color:#94a3b8; }
+        .section { page-break-inside:avoid; }
+      </style>`;
+
+    const resultsRows = results.slice(0,25).map(r => `
+      <tr>
+        <td>${r.testId?.testName || r.testName || '—'}</td>
+        <td>${r.score}</td>
+        <td>${r.outOfMarks || r.testId?.outOfMarks || 0}</td>
+      </tr>`).join('') || '<tr><td colspan="3">No test results yet.</td></tr>';
+
+    const doc = `<!DOCTYPE html><html><head><meta charset='utf-8'/>${styles}</head><body>
+      <h1>Student Analytics Report</h1>
+      <div class='subtitle'>Student: ${student.name || student.email || 'N/A'} • Generated: ${new Date().toLocaleString()}</div>
+      <div class='grid section'>
+        <div class='card'><div class='metric-label'>Assigned</div><div class='metric-value'>${totalAssigned}</div></div>
+        <div class='card'><div class='metric-label'>Completed</div><div class='metric-value'>${counts.completed||0}</div></div>
+        <div class='card'><div class='metric-label'>Ongoing</div><div class='metric-value'>${counts.ongoing||0}</div></div>
+        <div class='card'><div class='metric-label'>Upcoming</div><div class='metric-value'>${counts.upcoming||0}</div></div>
+        <div class='card'><div class='metric-label'>Average %</div><div class='metric-value'>${avgScore}%</div></div>
+      </div>
+      <h2>Recent Test Results</h2>
+      <table class='section'>
+        <thead><tr><th>Test</th><th>Score</th><th>Out Of</th></tr></thead>
+        <tbody>${resultsRows}</tbody>
+      </table>
+      <div class='footer'>Confidential • ${location.hostname}</div>
+    </body></html>`;
+
+    const w = window.open('', '_blank');
+    if (!w) { alert('Allow popups to download PDF.'); return; }
+    w.document.open(); w.document.write(doc); w.document.close();
+    w.onload = () => { w.focus(); w.print(); };
+  } catch (e) {
+    console.error('Student PDF generation failed', e);
+    alert('Failed to generate student PDF');
+  }
+};
+
 // Helper functions
 const calculateAverageScore = (results) => {
   if (!results || results.length === 0) return 0;
@@ -1036,227 +1184,317 @@ export const downloadCompleteReport = (data, filename = 'Analytics_Report') => {
 
 // Generic: print any HTML selection (by CSS selector) as PDF with current styles
 export const exportSelectionToPdf = async (selector = 'body', filename = 'report.pdf', options = {}) => {
+  let loadingToast = null;
+  let cancelled = false;
+  
   try {
-    const node = document.querySelector(selector) || document.body;
+    // Show loading indicator with cancel option
+    loadingToast = document.createElement('div');
+    loadingToast.id = 'pdf-loading-toast';
+    loadingToast.innerHTML = `
+      <div style="position: fixed; top: 20px; right: 20px; background: white; padding: 16px 24px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); z-index: 99999; display: flex; align-items: center; gap: 12px; font-family: system-ui, -apple-system, sans-serif; border: 1px solid #e5e7eb;">
+        <div style="width: 20px; height: 20px; border: 3px solid #e5e7eb; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+        <span style="color: #1f2937; font-weight: 500;">Generating PDF...</span>
+        <button id="cancel-pdf-btn" style="margin-left: 8px; padding: 4px 12px; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500;">Cancel</button>
+      </div>
+      <style>
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        #cancel-pdf-btn:hover {
+          background: #dc2626 !important;
+        }
+      </style>
+    `;
+    document.body.appendChild(loadingToast);
+    
+    // Add cancel handler
+    const cancelBtn = document.getElementById('cancel-pdf-btn');
+    if (cancelBtn) {
+      cancelBtn.onclick = () => {
+        cancelled = true;
+        if (loadingToast && loadingToast.parentNode) {
+          loadingToast.remove();
+        }
+      };
+    }
+    
+    // Wait a bit to ensure the loading indicator is visible
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    if (cancelled) return;
+    
+    const node = document.querySelector(selector);
+    if (!node) {
+      console.error('Element not found:', selector);
+      alert('Cannot find element to export. Please try again.');
+      if (loadingToast && loadingToast.parentNode) {
+        loadingToast.remove();
+      }
+      return;
+    }
+    
     const { landscape = false, includeCharts = true } = options || {};
 
-    // Capture exact screenshot/photograph of the analytics dashboard
+    // Capture with minimal DOM manipulation to avoid glitches
     try {
-      // Store original styles to restore later
-      const originalNodeStyle = {
-        width: node.style.width,
-        height: node.style.height,
-        overflow: node.style.overflow,
-        position: node.style.position,
-        zIndex: node.style.zIndex,
-        backgroundColor: node.style.backgroundColor,
-        transform: node.style.transform,
-        boxShadow: node.style.boxShadow
-      };
+      // Save scroll position to restore later
+      const scrollX = window.scrollX || window.pageXOffset;
+      const scrollY = window.scrollY || window.pageYOffset;
       
-      const originalBodyStyle = {
-        overflow: document.body.style.overflow,
-        backgroundColor: document.body.style.backgroundColor,
-        margin: document.body.style.margin,
-        padding: document.body.style.padding
-      };
+      // Wait a moment for any animations to complete
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      const originalHtmlStyle = {
-        overflow: document.documentElement.style.overflow,
-        backgroundColor: document.documentElement.style.backgroundColor,
-        margin: document.documentElement.style.margin,
-        padding: document.documentElement.style.padding
-      };
-
-      // Apply temporary styles for optimal capture
-      node.style.width = 'auto';
-      node.style.height = 'auto';
-      node.style.overflow = 'visible';
-      node.style.position = 'relative';
-      node.style.zIndex = '9999';
-      node.style.backgroundColor = 'transparent';
-      node.style.transform = 'none';
-      node.style.boxShadow = 'none';
-
-      document.body.style.overflow = 'hidden';
-      document.body.style.backgroundColor = '#f8fafc';
-      document.body.style.margin = '0';
-      document.body.style.padding = '0';
+      // Check if cancelled
+      if (cancelled) {
+        window.scrollTo(scrollX, scrollY);
+        return;
+      }
       
-      document.documentElement.style.overflow = 'hidden';
-      document.documentElement.style.backgroundColor = '#f8fafc';
-      document.documentElement.style.margin = '0';
-      document.documentElement.style.padding = '0';
-
-      // Wait for all content to fully load and render
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Get the actual dimensions
+      const captureWidth = Math.max(node.offsetWidth, node.scrollWidth);
+      const captureHeight = Math.max(node.offsetHeight, node.scrollHeight);
       
-      // Force all charts to re-render at optimal size
-      const chartContainers = node.querySelectorAll('.recharts-responsive-container');
-      chartContainers.forEach(container => {
-        // Trigger resize events for charts
-        const event = new Event('resize');
-        window.dispatchEvent(event);
-        
-        // Force chart dimensions
-        const svg = container.querySelector('svg');
-        if (svg) {
-          svg.style.width = '100%';
-          svg.style.height = '100%';
-          svg.style.display = 'block';
-        }
-      });
-      
-      // Wait for charts to stabilize after resize
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Get the actual dimensions after styling
-      const captureWidth = node.scrollWidth;
-      const captureHeight = node.scrollHeight;
-      
-      // Hide download buttons before capture
+      // Hide download buttons and loading indicators before capture
       const downloadButtons = node.querySelectorAll('button');
       const downloadButtonsToHide = Array.from(downloadButtons).filter(btn => 
         btn.textContent?.includes('Download') || 
-        btn.classList.toString().includes('download') ||
-        btn.textContent?.includes('Generating PDF')
+        btn.textContent?.includes('Generating') ||
+        btn.textContent?.includes('Cancel') ||
+        btn.classList.toString().includes('download')
       );
+      const originalButtonStates = downloadButtonsToHide.map(btn => ({
+        element: btn,
+        display: btn.style.display,
+        visibility: btn.style.visibility
+      }));
+      
       downloadButtonsToHide.forEach(btn => {
         btn.style.display = 'none';
+        btn.style.visibility = 'hidden';
       });
 
-      // Convert oklch colors to RGB/hex to fix html2canvas compatibility
+      // Utility: convert problematic styles (applied ONLY to cloned content to avoid UI glitches)
       const convertOklchToRgb = (element) => {
+        try {
         const computedStyle = window.getComputedStyle(element);
-        const properties = [
-          'color', 'backgroundColor', 'borderColor', 'borderTopColor', 
-          'borderRightColor', 'borderBottomColor', 'borderLeftColor',
-          'outlineColor', 'textDecorationColor', 'textShadow', 'boxShadow'
-        ];
-        
-        properties.forEach(prop => {
-          const value = computedStyle[prop];
-          if (value && value.includes('oklch')) {
-            // Convert oklch to appropriate fallback colors
-            switch (prop) {
+          const props = [
+            'color','backgroundColor','backgroundImage','borderColor','borderTopColor','borderRightColor','borderBottomColor','borderLeftColor','outlineColor','textDecorationColor','textShadow','boxShadow','fill','stroke'
+          ];
+          props.forEach(p => {
+            try {
+              const v = computedStyle[p];
+              if (!v) return;
+              if (v.includes('oklch') || (p === 'backgroundImage' && v.includes('gradient'))) {
+                switch (p) {
               case 'color':
-                element.style.color = '#000000';
-                break;
-              case 'backgroundColor':
-                element.style.backgroundColor = '#ffffff';
+                  case 'fill':
+                  case 'stroke': element.style[p] = '#1f2937'; break;
+                  case 'backgroundColor': element.style.backgroundColor = '#ffffff'; break;
+                  case 'backgroundImage':
+                    element.style.backgroundImage = 'none';
+                    if (!element.style.backgroundColor || element.style.backgroundColor === 'transparent' || element.style.backgroundColor === 'rgba(0, 0, 0, 0)') {
+                      element.style.backgroundColor = '#f9fafb';
+                    }
                 break;
               case 'borderColor':
               case 'borderTopColor':
               case 'borderRightColor':
               case 'borderBottomColor':
-              case 'borderLeftColor':
-                element.style[prop] = '#e5e7eb';
-                break;
-              case 'outlineColor':
-                element.style.outlineColor = '#3b82f6';
-                break;
-              case 'textDecorationColor':
-                element.style.textDecorationColor = '#000000';
-                break;
-              case 'textShadow':
-                element.style.textShadow = 'none';
-                break;
-              case 'boxShadow':
-                element.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
-                break;
-            }
-          }
-        });
+                  case 'borderLeftColor': element.style[p] = '#e5e7eb'; break;
+                  case 'outlineColor': element.style.outlineColor = '#3b82f6'; break;
+                  case 'textDecorationColor': element.style.textDecorationColor = '#1f2937'; break;
+                  case 'textShadow': element.style.textShadow = 'none'; break;
+                  case 'boxShadow': element.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08),0 1px 2px rgba(0,0,0,0.04)'; break;
+                }
+              }
+            } catch(_) {}
+          });
+        } catch(_) {}
       };
 
-      // Apply color conversion to all elements
-      const allElements = node.querySelectorAll('*');
-      allElements.forEach(convertOklchToRgb);
-      convertOklchToRgb(node);
+      // Check if cancelled before starting capture
+      if (cancelled) {
+        // Restore button states
+        originalButtonStates.forEach(state => {
+          state.element.style.display = state.display;
+          state.element.style.visibility = state.visibility;
+        });
+        // Restore scroll position
+        window.scrollTo(scrollX, scrollY);
+        return;
+      }
 
-      // Capture screenshot with simplified settings for better reliability
-      const canvas = await html2canvas(node, {
-        scale: 3, // High quality but more reliable
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#f8fafc', // Set background explicitly
-        width: captureWidth,
-        height: captureHeight,
-        scrollX: 0,
-        scrollY: 0,
-        logging: true, // Enable logging to debug issues
-        imageTimeout: 15000,
-        removeContainer: true,
-        foreignObjectRendering: false, // Disable for better compatibility
-        onclone: (clonedDoc) => {
-          try {
-            // Ensure cloned body and html have proper styling
-            if (clonedDoc.body) {
-              clonedDoc.body.style.overflow = 'hidden';
-              clonedDoc.body.style.backgroundColor = '#f8fafc';
-              clonedDoc.body.style.margin = '0';
-              clonedDoc.body.style.padding = '0';
-            }
-            
-            if (clonedDoc.documentElement) {
-              clonedDoc.documentElement.style.overflow = 'hidden';
-              clonedDoc.documentElement.style.backgroundColor = '#f8fafc';
-              clonedDoc.documentElement.style.margin = '0';
-              clonedDoc.documentElement.style.padding = '0';
-            }
+      // NEW APPROACH: Clone the node and print directly without canvas capture
+      // This avoids ALL html2canvas iframe/cloning issues
+      
+      // Clone the content (deep) - NO mutations to original UI
+      const clonedNode = node.cloneNode(true);
 
-            // Convert any remaining oklch colors in cloned document
-            const clonedElements = clonedDoc.querySelectorAll('*');
-            clonedElements.forEach(element => {
-              const computedStyle = window.getComputedStyle(element);
-              const color = computedStyle.color;
-              const backgroundColor = computedStyle.backgroundColor;
-              const borderColor = computedStyle.borderColor;
-              
-              if (color && color.includes('oklch')) {
-                element.style.color = '#000000';
-              }
-              if (backgroundColor && backgroundColor.includes('oklch')) {
-                element.style.backgroundColor = '#ffffff';
-              }
-              if (borderColor && borderColor.includes('oklch')) {
-                element.style.borderColor = '#e5e7eb';
-              }
-            });
-
-            // Ensure charts are visible
-            const clonedCharts = clonedDoc.querySelectorAll('.recharts-responsive-container');
-            clonedCharts.forEach(chart => {
-              chart.style.visibility = 'visible';
-              chart.style.opacity = '1';
-              chart.style.display = 'block';
-              
-              const svg = chart.querySelector('svg');
-              if (svg) {
-                svg.style.visibility = 'visible';
-                svg.style.opacity = '1';
-                svg.style.display = 'block';
-              }
-            });
-          } catch (cloneError) {
-            console.warn('Error in onclone:', cloneError);
-          }
+      // Remove any modal backdrops / overlays accidentally captured
+      clonedNode.querySelectorAll('[class*="backdrop"], .fixed, .absolute').forEach(el => {
+        // Keep only elements inside the target container hierarchy
+        if (!el.contains(clonedNode)) {
+          // skip
         }
       });
-
-      // Show download buttons again
-      downloadButtonsToHide.forEach(btn => {
-        btn.style.display = '';
+      
+      // Remove buttons and loading indicators from clone
+      const clonedButtons = clonedNode.querySelectorAll('.download-btn, button');
+      clonedButtons.forEach(btn => {
+        if (btn.textContent.includes('Download') || 
+            btn.textContent.includes('Cancel') ||
+            btn.textContent.includes('PDF') ||
+            btn.textContent.includes('Export')) {
+          btn.remove();
+        }
       });
+      
+      // Clean & normalize cloned content (colors, gradients, scroll areas, page breaks)
+      const clonedElements = clonedNode.querySelectorAll('*');
+      clonedElements.forEach(el => {
+        // Color / gradient normalization
+        convertOklchToRgb(el);
+        try {
+          const cs = window.getComputedStyle(el);
+          // Remove forced scroll containers so entire content prints (prevents cropped areas & white stripes)
+            if ([cs.overflow, cs.overflowY, cs.overflowX].some(v => v === 'auto' || v === 'scroll')) {
+              el.style.overflow = 'visible';
+              el.style.overflowY = 'visible';
+              el.style.overflowX = 'visible';
+              if (cs.maxHeight && cs.maxHeight !== 'none') el.style.maxHeight = 'none';
+              if (cs.height && /(px|rem|vh)$/.test(cs.height)) el.style.height = 'auto';
+            }
+          // Avoid page breaks inside cards / charts
+          const cls = (el.className || '').toString();
+          if (/recharts|card|chart|metrics|grid|flex/.test(cls)) {
+            el.classList.add('avoid-break');
+            el.style.breakInside = 'avoid';
+            el.style.pageBreakInside = 'avoid';
+          }
+        } catch(_) {}
+      });
+      // Also apply conversion to root cloned node
+      convertOklchToRgb(clonedNode);
+      
+      // Get all stylesheets to include
+      let styleContent = '';
+      try {
+        const sheets = Array.from(document.styleSheets);
+        sheets.forEach(sheet => {
+          try {
+            if (sheet.cssRules) {
+              const rules = Array.from(sheet.cssRules);
+              rules.forEach(rule => {
+                styleContent += rule.cssText + '\n';
+              });
+            }
+          } catch (e) {
+            // Skip external stylesheets that can't be accessed
+          }
+        });
+      } catch (e) {
+        console.warn('Could not extract some styles');
+      }
 
-      // Restore original styles
-      Object.assign(node.style, originalNodeStyle);
-      Object.assign(document.body.style, originalBodyStyle);
-      Object.assign(document.documentElement.style, originalHtmlStyle);
+      // Restore button states immediately to prevent glitches
+      originalButtonStates.forEach(state => {
+        state.element.style.display = state.display;
+        state.element.style.visibility = state.visibility;
+      });
       
-      const imgData = canvas.toDataURL('image/png', 1.0);
+      // Restore scroll position to prevent page jump
+      window.scrollTo(scrollX, scrollY);
       
-      // Create PDF with exact visual reproduction - like a photograph
+      // Check if cancelled after creating clone
+      if (cancelled) {
+        return;
+      }
+      
+      // Provide selector-specific layout tuning (admin analytics positioning fixes)
+      let additionalPrintStyles = '';
+      if (selector === '#admin-analytics-section') {
+        try {
+          // Light structural tweaks on clone (do NOT touch live DOM)
+          // Compress top spacing
+          clonedNode.style.paddingTop = '4px';
+          clonedNode.style.marginTop = '0';
+          // Reduce excessive vertical gaps
+          clonedNode.querySelectorAll('.mb-8, .mt-8, .my-8').forEach(el=>{ el.style.marginBottom='18px'; el.style.marginTop='18px'; });
+          // Normalize card heights for analytics summary cards if any inline grid
+          clonedNode.querySelectorAll('[class*="grid"] > div').forEach(el=>{
+            if (el.className && /shadow|rounded/.test(el.className)) {
+              el.style.minHeight = '72px';
+            }
+          });
+        } catch(_) {}
+        additionalPrintStyles = `
+          /* Admin analytics specific print adjustments */
+          #admin-analytics-section { background:#ffffff !important; }
+          #admin-analytics-section h1, #admin-analytics-section h2, #admin-analytics-section h3 { page-break-after: avoid; }
+          /* Force two-column layout for main charts row */
+          #admin-analytics-section .grid.grid-cols-10 { display:flex !important; gap:20px !important; }
+          #admin-analytics-section .grid.grid-cols-10 > div:first-child { flex:2 1 0; }
+          #admin-analytics-section .grid.grid-cols-10 > div:last-child { flex:1 1 0; }
+          /* Standardize chart heights to prevent large whitespace */
+          #admin-analytics-section .h-80 { height:320px !important; }
+          #admin-analytics-section .recharts-responsive-container, 
+          #admin-analytics-section .recharts-wrapper { min-height:300px !important; height:300px !important; }
+          /* Tighten cards spacing */
+          #admin-analytics-section .space-y-8 > * { margin-top:18px !important; margin-bottom:18px !important; }
+          /* Avoid page breaks inside key analytics blocks */
+          #admin-analytics-section .grid, 
+          #admin-analytics-section .recharts-wrapper, 
+          #admin-analytics-section .recharts-responsive-container { break-inside: avoid; page-break-inside: avoid; }
+          /* Shrink overall content slightly so first charts pair stays on same page */
+          @media print { #admin-analytics-section { transform: scale(.96); transform-origin: top left; } }
+        `;
+      } else if (selector === '#organization-detail') {
+        try {
+          // Fix chart sizing by copying exact runtime dimensions from original
+          const originalCharts = node.querySelectorAll('.recharts-wrapper');
+          const clonedCharts = clonedNode.querySelectorAll('.recharts-wrapper');
+          originalCharts.forEach((orig, i) => {
+            if (clonedCharts[i]) {
+              const rect = orig.getBoundingClientRect();
+              if (rect.width > 0 && rect.height > 0) {
+                clonedCharts[i].style.width = rect.width + 'px';
+                clonedCharts[i].style.height = rect.height + 'px';
+                // Ensure svg inside scales to explicit dimensions
+                const svg = clonedCharts[i].querySelector('svg');
+                if (svg) {
+                  svg.setAttribute('width', rect.width);
+                  svg.setAttribute('height', rect.height);
+                  svg.style.width = rect.width + 'px';
+                  svg.style.height = rect.height + 'px';
+                }
+              }
+            }
+          });
+          // Trim vertical gaps
+          clonedNode.querySelectorAll('.mb-8, .mt-8, .my-8, .space-y-8 > *').forEach(el => {
+            el.style.marginTop = '16px';
+            el.style.marginBottom = '16px';
+          });
+        } catch(_) {}
+        additionalPrintStyles = `
+          /* Organization detail print adjustments */
+          #organization-detail { background:#ffffff !important; }
+          #organization-detail .recharts-responsive-container, 
+          #organization-detail .recharts-wrapper { height:340px !important; min-height:340px !important; }
+          #organization-detail .recharts-wrapper svg { height:340px !important; }
+          #organization-detail h1, #organization-detail h2, #organization-detail h3 { page-break-after: avoid; }
+          /* Prevent charts splitting */
+          #organization-detail .recharts-wrapper, 
+          #organization-detail .recharts-responsive-container, 
+          #organization-detail .card, 
+          #organization-detail table { break-inside: avoid; page-break-inside: avoid; }
+          /* Slight scale to fit more charts per page without clipping legends */
+          @media print { #organization-detail { transform: scale(.97); transform-origin: top left; } }
+        `;
+      }
+
+      // Create print-ready HTML document with cloned content
       const doc = `
         <!DOCTYPE html>
         <html>
@@ -1264,82 +1502,60 @@ export const exportSelectionToPdf = async (selector = 'body', filename = 'report
             <title>${filename}</title>
             <meta charset="utf-8" />
             <style>
+              ${styleContent}
+              
               @page { 
-                size: A4 landscape; 
-                margin: 0; 
+                size: ${landscape ? 'A4 landscape' : 'A4 portrait'}; 
+                margin: 15mm; 
               }
-              * {
-                box-sizing: border-box;
-                margin: 0;
-                padding: 0;
+              @media print {
+                body {
+                margin: 0; 
+                  padding: 20px;
+                  background: white;
+                }
+                * {
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                  color-adjust: exact !important;
+                }
+                .no-print, button, .download-btn {
+                  display: none !important;
+                }
               }
               body { 
                 margin: 0; 
-                padding: 0; 
+                padding: 20px; 
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                background: #f8fafc;
-                overflow: hidden;
-                width: 100vw;
-                height: 100vh;
-              }
-              .screenshot-container {
-                width: 100%;
-                height: 100%;
-                display: flex;
-                align-items: flex-start;
-                justify-content: center;
-                background: #f8fafc;
-                padding: 20px;
-              }
-              .screenshot {
-                max-width: 100%;
-                max-height: 100%;
-                object-fit: contain;
-                object-position: top center;
-                border: none;
-                display: block;
-                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-                border-radius: 12px;
                 background: white;
+                overflow: auto;
+              }
+              .content-wrapper {
+                width: 100%;
+                background: white;
+                min-height: 100vh;
               }
               .header {
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                z-index: 10;
                 text-align: center;
-                padding: 8px;
+                padding: 20px;
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                 color: white;
-                font-size: 11px;
-                opacity: 0.95;
-                border-radius: 0 0 8px 8px;
+                margin-bottom: 20px;
+                border-radius: 8px;
               }
-              .header h1 {
-                margin: 0 0 2px 0;
-                font-size: 14px;
-                font-weight: 600;
-              }
+              .header h1 { margin: 0 0 6px 0; font-size: 22px; font-weight:600; letter-spacing:.5px; }
               .header .subtitle {
                 margin: 0;
-                opacity: 0.8;
-                font-size: 9px;
+                opacity: 0.9;
+                font-size: 14px;
               }
-              /* Print-specific styles */
+              /* Prevent page breaks inside key blocks */
+              .avoid-break, .recharts-wrapper, .card { page-break-inside: avoid; break-inside: avoid; }
+              /* Remove unexpected internal scrollbars in print */
               @media print {
-                body {
-                  -webkit-print-color-adjust: exact;
-                  print-color-adjust: exact;
-                }
-                .screenshot {
-                  width: auto;
-                  height: auto;
-                  max-width: 100%;
-                  max-height: 100%;
-                  object-fit: contain;
-                }
+                .avoid-break { overflow: visible !important; }
               }
+              ${additionalPrintStyles}
             </style>
           </head>
           <body>
@@ -1347,8 +1563,8 @@ export const exportSelectionToPdf = async (selector = 'body', filename = 'report
               <h1>Analytics Dashboard Report</h1>
               <div class="subtitle">Generated: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</div>
             </div>
-            <div class="screenshot-container">
-              <img src="${imgData}" alt="Analytics Dashboard - Exact Visual Copy" class="screenshot" />
+            <div class="content-wrapper" id="print-content">
+              <!-- Content will be inserted here -->
             </div>
           </body>
         </html>
@@ -1357,6 +1573,9 @@ export const exportSelectionToPdf = async (selector = 'body', filename = 'report
       const printWindow = window.open('', '_blank');
       if (!printWindow) {
         alert('Please allow pop-ups for PDF download.');
+        if (loadingToast && loadingToast.parentNode) {
+          loadingToast.remove();
+        }
         return;
       }
 
@@ -1364,73 +1583,74 @@ export const exportSelectionToPdf = async (selector = 'body', filename = 'report
       printWindow.document.write(doc);
       printWindow.document.close();
       
-      // Wait for image to load then print
-      printWindow.onload = () => {
+      // Insert cloned content into print window
         setTimeout(() => {
-          printWindow.focus();
-          printWindow.print();
-          printWindow.close();
-        }, 1000);
-      };
-    } catch (error) {
-      console.error('Error capturing screenshot:', error);
-      
-      // Try a simpler approach as fallback
-      try {
-        console.log('Trying simplified screenshot capture...');
-        const simpleCanvas = await html2canvas(node, {
-          scale: 2,
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: '#f8fafc',
-          logging: false,
-          imageTimeout: 10000
-        });
-        
-        const imgData = simpleCanvas.toDataURL('image/png', 1.0);
-        
-        // Create simple PDF
-        const simpleDoc = `
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <title>${filename}</title>
-              <meta charset="utf-8" />
-              <style>
-                @page { size: A4 landscape; margin: 0; }
-                body { margin: 0; padding: 20px; background: #f8fafc; }
-                .screenshot { max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-              </style>
-            </head>
-            <body>
-              <img src="${imgData}" alt="Analytics Dashboard" class="screenshot" />
-            </body>
-          </html>
-        `;
-
-        const printWindow = window.open('', '_blank');
-        if (printWindow) {
-          printWindow.document.open();
-          printWindow.document.write(simpleDoc);
-          printWindow.document.close();
-          printWindow.onload = () => {
+        try {
+          const container = printWindow.document.getElementById('print-content');
+          if (container && clonedNode) {
+            container.appendChild(clonedNode);
+            
+            // Wait a moment for rendering then print
             setTimeout(() => {
+              if (!cancelled) {
               printWindow.focus();
               printWindow.print();
+              }
+              // Remove loading toast
+              if (loadingToast && loadingToast.parentNode) {
+                loadingToast.remove();
+              }
+              
+              // Close print window after printing or on cancel
+              printWindow.onafterprint = () => {
               printWindow.close();
-            }, 500);
-          };
+              };
+            }, 1000);
+          } else {
+            console.error('Could not insert content into print window');
+            if (loadingToast && loadingToast.parentNode) {
+              loadingToast.remove();
+            }
+            printWindow.close();
+          }
+        } catch (insertError) {
+          console.error('Error inserting content:', insertError);
+          if (loadingToast && loadingToast.parentNode) {
+            loadingToast.remove();
+          }
+          if (printWindow) {
+            printWindow.close();
+          }
         }
-        return;
-      } catch (fallbackError) {
-        console.error('Fallback screenshot also failed:', fallbackError);
-        // Final fallback to HTML method
-        fallbackToHtmlMethod(node, filename, options);
-      }
-    }
+      }, 500);
+      
   } catch (error) {
-    console.error('Error exporting selection to PDF:', error);
-    alert('Failed to generate PDF. Please try again.');
+      console.error('Error generating PDF:', error);
+      
+      // Restore button states on error (already restored above, but just in case)
+      if (originalButtonStates && originalButtonStates.length > 0) {
+        originalButtonStates.forEach(state => {
+          state.element.style.display = state.display;
+          state.element.style.visibility = state.visibility;
+        });
+      }
+      
+      // Restore scroll position
+      if (typeof scrollX !== 'undefined' && typeof scrollY !== 'undefined') {
+        window.scrollTo(scrollX, scrollY);
+      }
+      
+      // Remove loading toast on error
+      if (loadingToast && loadingToast.parentNode) {
+        loadingToast.remove();
+      }
+      
+      // Show user-friendly error message
+      alert('Unable to generate PDF. Please try again or contact support if the issue persists.');
+    }
+  } catch (outerError) {
+    console.error('Fatal error in PDF export:', outerError);
+    alert('An unexpected error occurred. Please refresh the page and try again.');
   }
 };
 
@@ -1523,10 +1743,22 @@ const fallbackToHtmlMethod = (node, filename, options) => {
         try { w.focus(); } catch (_) {}
         try { w.print(); } catch (_) {}
         try { w.close(); } catch (_) {}
+        // Remove loading indicator
+        const toast = document.getElementById('pdf-loading-toast');
+        if (toast) toast.remove();
       }, 150);
     };
   } catch (err) {
     console.error('Error exporting selection to PDF:', err);
+    // Remove loading indicator on error
+    const toast = document.getElementById('pdf-loading-toast');
+    if (toast) toast.remove();
+  } finally {
+    // Ensure loading indicator is removed
+    setTimeout(() => {
+      const toast = document.getElementById('pdf-loading-toast');
+      if (toast) toast.remove();
+    }, 3000);
   }
 };
 

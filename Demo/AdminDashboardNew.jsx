@@ -9,7 +9,7 @@ import { useAuthStore } from "../../store/authStore";
 import { toast } from "react-toastify";
 import axios from "axios";
 import AdminAnalyticsCards from "../../components/AdminAnalyticsCards";
-import { downloadCompleteReport, createDashboardPdf, exportSelectionToPdf, exportTeacherAnalyticsPdf, exportStudentAnalyticsPdf } from "../../utils/reportGenerator";
+import { downloadCompleteReport, createDashboardPdf, exportSelectionToPdf } from "../../utils/reportGenerator";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line } from 'recharts';
 import AdminDashboardOverview from "../../components/AdminDashboardOverview";
 
@@ -163,7 +163,6 @@ export default function AdminDashboardNew() {
     const [teacherTests, setTeacherTests] = useState([]);
     const [testResults, setTestResults] = useState([]);
     const [overview, setOverview] = useState({ totalTests: 0, publishedTests: 0, draftTests: 0, completedTests: 0, totalSubmissions: 0 });
-    const fetchedRef = useRef(null); // Prevent duplicate fetches
 
     useEffect(() => {
       let cancelled = false;
@@ -177,23 +176,8 @@ export default function AdminDashboardNew() {
               setTeacherTests([]);
               setTestResults([]);
               setOverview({ totalTests: 0, publishedTests: 0, draftTests: 0, completedTests: 0, totalSubmissions: 0 });
-              setLoadingTA(false);
             }
             return;
-          }
-          
-          // Check if we're already fetching/fetched this teacher
-          if (fetchedRef.current === teacherDocId && (teacherTests.length > 0 || testResults.length > 0)) {
-            console.log('Data already loaded for this teacher, skipping fetch...');
-            return;
-          }
-          
-          // If it's a different teacher, reset and fetch
-          if (fetchedRef.current !== teacherDocId) {
-            fetchedRef.current = teacherDocId;
-            setTeacherTests([]);
-            setTestResults([]);
-            setOverview({ totalTests: 0, publishedTests: 0, draftTests: 0, completedTests: 0, totalSubmissions: 0 });
           }
           
           setLoadingTA(true);
@@ -1035,29 +1019,13 @@ export default function AdminDashboardNew() {
     const [counts, setCounts] = useState({ upcoming: 0, ongoing: 0, completed: 0 });
     const [results, setResults] = useState([]);
     const [avgScore, setAvgScore] = useState(0);
-    const fetchedRef = useRef(null); // Prevent duplicate fetches
 
     useEffect(() => {
       let cancelled = false;
       const run = async () => {
         try {
-          const userId = student?._id || student?.userId || student?.profileId;
-          
-          // Check if we're already fetching/fetched this student
-          if (fetchedRef.current === userId && (results.length > 0 || counts.completed > 0)) {
-            console.log('Data already loaded for this student, skipping fetch...');
-            return;
-          }
-          
-          // If it's a different student, reset and fetch
-          if (fetchedRef.current !== userId) {
-            fetchedRef.current = userId;
-            setCounts({ upcoming: 0, ongoing: 0, completed: 0 });
-            setResults([]);
-            setAvgScore(0);
-          }
-          
           setLoadingSA(true);
+          const userId = student?._id || student?.userId || student?.profileId;
           const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/student/tests/student/${userId}`, {
             headers: { Authorization: `Bearer ${token}` }
           });
@@ -1255,10 +1223,6 @@ export default function AdminDashboardNew() {
     
     // Auto-refresh organizations every 30 seconds when on analytics or organizations tab
     let orgIntervalId;
-    // Pause all background refreshes while any analytics modal is open to avoid blinking
-    if (analyticsTeacher || analyticsStudent) {
-      return () => {};
-    }
     if (activeTab === 'analytics' || activeTab === 'organizations') {
       orgIntervalId = setInterval(() => {
         fetchOrganizations();
@@ -1284,7 +1248,7 @@ export default function AdminDashboardNew() {
       if (orgIntervalId) clearInterval(orgIntervalId);
       document.removeEventListener('visibilitychange', visibilityHandler);
     };
-  }, [activeTab, analyticsTeacher, analyticsStudent]);
+  }, [activeTab]);
 
   // Initialize notifications
   useEffect(() => {
@@ -1805,8 +1769,8 @@ export default function AdminDashboardNew() {
 
               {/* Student Analytics Modal */}
               {analyticsStudent && (
-                <div id="student-analytics-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                  <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl p-6 relative max-h-[85vh] overflow-y-auto modal-content">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                  <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl p-6 relative max-h-[85vh] overflow-y-auto">
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="text-xl font-bold text-gray-800">{analyticsStudent.name || analyticsStudent.email || 'Student'} Analytics</h3>
                       <button className="text-gray-600 hover:text-gray-900" onClick={() => setAnalyticsStudent(null)}>
@@ -1822,8 +1786,38 @@ export default function AdminDashboardNew() {
                     />
                     <div className="mt-6 flex justify-between items-center">
                       <button
-                        onClick={() => {
-                          exportStudentAnalyticsPdf(analyticsStudent, analyticsStudent.comprehensiveData);
+                        onClick={async () => {
+                          const button = event.target;
+                          const originalText = button.innerHTML;
+                          const originalClass = button.className;
+                          
+                          try {
+                            // Show loading state
+                            button.innerHTML = '<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> Generating PDF...';
+                            button.disabled = true;
+                            button.style.opacity = '0.7';
+                            
+                            await exportSelectionToPdf('#student-analytics-modal .modal-content', `${analyticsStudent.name || 'Student'}_Analytics_Report.pdf`, { landscape: true, includeCharts: true });
+                            
+                            // Reset button
+                            button.innerHTML = originalText;
+                            button.disabled = false;
+                            button.style.opacity = '1';
+                            button.style.backgroundColor = '#2563eb'; // blue-600
+                            button.style.color = '#ffffff';
+                            button.className = originalClass;
+                          } catch (error) {
+                            console.error('Error generating PDF:', error);
+                            alert('Failed to generate PDF. Please try again.');
+                            
+                            // Reset button on error
+                            button.innerHTML = originalText;
+                            button.disabled = false;
+                            button.style.opacity = '1';
+                            button.style.backgroundColor = '#2563eb'; // blue-600
+                            button.style.color = '#ffffff';
+                            button.className = originalClass;
+                          }
                         }}
                         className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors"
                       >
@@ -2025,8 +2019,8 @@ export default function AdminDashboardNew() {
 
               {/* Teacher Analytics Modal */}
               {analyticsTeacher && (
-                <div id="teacher-analytics-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                  <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl p-6 relative max-h-[85vh] overflow-y-auto modal-content">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                  <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl p-6 relative max-h-[85vh] overflow-y-auto">
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="text-xl font-bold text-gray-800">{analyticsTeacher.name}'s Analytics</h3>
                       <button className="text-gray-600 hover:text-gray-900" onClick={() => setAnalyticsTeacher(null)}>
@@ -2043,8 +2037,36 @@ export default function AdminDashboardNew() {
                     />
                     <div className="mt-6 flex justify-between items-center">
                       <button
-                        onClick={() => {
-                          exportTeacherAnalyticsPdf(analyticsTeacher, analyticsTeacher.comprehensiveData);
+                        onClick={async () => {
+                          const button = event.target;
+                          const originalText = button.innerHTML;
+                          const originalClass = button.className;
+                          
+                          try {
+                            // Show loading state
+                            button.innerHTML = '<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> Generating PDF...';
+                            button.disabled = true;
+                            button.style.opacity = '0.7';
+                            
+                            await exportSelectionToPdf('#teacher-analytics-modal .modal-content', `${analyticsTeacher.name || 'Teacher'}_Analytics_Report.pdf`, { landscape: true, includeCharts: true });
+                            
+                            // Reset button
+                            button.innerHTML = originalText;
+                            button.disabled = false;
+                            button.style.opacity = '1';
+                            button.className = originalClass;
+                          } catch (error) {
+                            console.error('Error generating PDF:', error);
+                            alert('Failed to generate PDF. Please try again.');
+                            
+                            // Reset button on error
+                            button.innerHTML = originalText;
+                            button.disabled = false;
+                            button.style.opacity = '1';
+                            button.style.backgroundColor = '#2563eb'; // blue-600
+                            button.style.color = '#ffffff';
+                            button.className = originalClass;
+                          }
                         }}
                         className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors"
                       >
@@ -2381,10 +2403,10 @@ export default function AdminDashboardNew() {
               {/* Analytics Download Button */}
               <div className="flex justify-end">
                 <button
-                  onClick={async (e) => {
+                  onClick={async () => {
                     try {
                       // Show loading state
-                      const button = e.currentTarget;
+                      const button = event.target;
                       const originalText = button.innerHTML;
                       button.innerHTML = '<div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> Generating PDF...';
                       button.disabled = true;
