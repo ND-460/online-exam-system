@@ -35,8 +35,26 @@ export default function TeacherDashboard() {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery] = useDebounce(searchQuery, 900);
+    const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
   const navigate = useNavigate();
+
+  const Modal = ({ isOpen, onClose, children }) => {
+    if (!isOpen) return null;
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-white dark:bg-[#1f2937] rounded-2xl shadow-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto p-6 relative">
+          <button
+            onClick={onClose}
+            className="absolute top-3 right-3 text-gray-600 hover:text-red-500"
+          >
+            ✖
+          </button>
+          {children}
+        </div>
+      </div>
+    );
+  };
 
   const validateForm = () => {
     let newErrors = {};
@@ -213,8 +231,6 @@ export default function TeacherDashboard() {
       {[
         { id: "dashboard", label: "Dashboard", emoji: "🏠" },
         { id: "manage", label: "Manage Tests", emoji: "📝" },
-        { id: "submissions", label: "Submissions", emoji: "📂" },
-        { id: "analytics", label: "Analytics", emoji: "📊" },
         { id: "profile", label: "Profile", emoji: "👤" },
         { id: "invite", label: "Invite Students", emoji: "✉️" },
         { id: "logout", label: "Logout", emoji: "🚪" },
@@ -452,7 +468,10 @@ export default function TeacherDashboard() {
                               </button>
                               <button
                                 className="text-green-600 hover:underline"
-                                onClick={() => setSelectedTest(t._id)}
+                                onClick={() => {
+                                  setSelectedTest(t);
+                                  setIsViewModalOpen(true);
+                                }}
                               >
                                 View
                               </button>
@@ -475,7 +494,7 @@ export default function TeacherDashboard() {
               </div>
             )}
 
-            {activeTab === "submissions" &&
+            {/* {activeTab === "submissions" &&
               (selectedTest ? (
                 <ViewSubmissions testId={selectedTest} token={token} />
               ) : (
@@ -495,7 +514,7 @@ export default function TeacherDashboard() {
                     Select a test from "Manage Tests" to view analytics.
                   </p>
                 </div>
-              ))}
+              ))} */}
 
             {activeTab === "profile" && (
               // <div className="p-6 rounded-3xl bg-white shadow-xl border border-gray-200">
@@ -548,6 +567,27 @@ export default function TeacherDashboard() {
             setIsImportOpen(false);
           }}
         />
+         <Modal
+          isOpen={isViewModalOpen}
+          onClose={() => {
+            setIsViewModalOpen(false);
+            setSelectedTest(null);
+          }}
+        >
+          {selectedTest && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-xl font-bold mb-3">📂 Submissions</h2>
+                <ViewSubmissions testId={selectedTest._id} token={token} />
+              </div>
+              <hr />
+              <div>
+                <h2 className="text-xl font-bold mb-3">📊 Analytics</h2>
+                <Analytics testId={selectedTest._id} token={token} />
+              </div>
+            </div>
+          )}
+        </Modal>
       </main>
     </div>
   );
