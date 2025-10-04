@@ -35,7 +35,12 @@ export default function TeacherDashboard() {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery] = useDebounce(searchQuery, 900);
-    const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [sortOption, setSortOption] = useState("");
+
+  const [filterCategory, setFilterCategory] = useState("all");
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortOrder, setSortOrder] = useState("desc");
 
   const navigate = useNavigate();
 
@@ -126,6 +131,43 @@ export default function TeacherDashboard() {
     return teacherTests.filter((t) =>
       t.testName.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
     );
+  };
+  const getFilteredSortedTests = () => {
+    let filtered = [...tests]; // assuming tests is your list
+
+    // 🔍 Search
+    if (debouncedSearchQuery.trim() !== "") {
+      filtered = filtered.filter((t) =>
+        t.testName.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+      );
+    }
+
+    // 📂 Category filter
+    if (filterCategory !== "all") {
+      filtered = filtered.filter((t) => t.category === filterCategory);
+    }
+
+    // ↕️ Sorting
+    filtered.sort((a, b) => {
+      let aValue, bValue;
+
+      if (sortBy === "name") {
+        aValue = a.testName.toLowerCase();
+        bValue = b.testName.toLowerCase();
+      } else if (sortBy === "class") {
+        aValue = a.className.toLowerCase();
+        bValue = b.className.toLowerCase();
+      } else if (sortBy === "createdAt") {
+        aValue = new Date(a.createdAt);
+        bValue = new Date(b.createdAt);
+      }
+
+      if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return filtered;
   };
 
   const handleDeleteTest = async (test) => {
@@ -222,50 +264,50 @@ export default function TeacherDashboard() {
 
   return (
     <div className="flex h-screen bg-gradient-to-r from-blue-50 via-blue-100 to-white text-gray-900">
-  {/* Sidebar */}
-  <aside className="w-64 h-screen bg-white/90 backdrop-blur-md border-r border-gray-200 shadow-lg flex flex-col fixed left-0 top-0">
-    <div className="p-6 text-2xl font-bold tracking-tight text-yellow-800">
-      ExamVolt
-    </div>
-    <nav className="flex-1 flex flex-col gap-3 overflow-y-auto">
-      {[
-        { id: "dashboard", label: "Dashboard", emoji: "🏠" },
-        { id: "manage", label: "Manage Tests", emoji: "📝" },
-        { id: "profile", label: "Profile", emoji: "👤" },
-        { id: "invite", label: "Invite Students", emoji: "✉️" },
-        { id: "logout", label: "Logout", emoji: "🚪" },
-      ].map((tab) => (
-        <button
-          key={tab.id}
-          onClick={() => {
-            if (tab.id === "logout") {
-              handleLogout();
-            } else {
-              setActiveTab(tab.id);
-            }
-          }}
-          className={`w-full text-left px-4 py-2 rounded-xl font-medium transition
+      {/* Sidebar */}
+      <aside className="w-64 h-screen bg-white/90 backdrop-blur-md border-r border-gray-200 shadow-lg flex flex-col fixed left-0 top-0">
+        <div className="p-6 text-2xl font-bold tracking-tight text-yellow-800">
+          ExamVolt
+        </div>
+        <nav className="flex-1 flex flex-col gap-3 overflow-y-auto">
+          {[
+            { id: "dashboard", label: "Dashboard", emoji: "🏠" },
+            { id: "manage", label: "Manage Tests", emoji: "📝" },
+            { id: "profile", label: "Profile", emoji: "👤" },
+            { id: "invite", label: "Invite Students", emoji: "✉️" },
+            { id: "logout", label: "Logout", emoji: "🚪" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => {
+                if (tab.id === "logout") {
+                  handleLogout();
+                } else {
+                  setActiveTab(tab.id);
+                }
+              }}
+              className={`w-full text-left px-4 py-2 rounded-xl font-medium transition
             ${
               activeTab === tab.id
                 ? "bg-yellow-700 text-white shadow"
                 : "text-gray-700 hover:bg-gray-100"
             }`}
-        >
-          <span>{tab.emoji}</span> {tab.label}
-        </button>
-      ))}
-    </nav>
-  </aside>
+            >
+              <span>{tab.emoji}</span> {tab.label}
+            </button>
+          ))}
+        </nav>
+      </aside>
 
-  {/* Main Content */}
-  <main
-    className="flex-1 ml-64 p-8 overflow-y-auto space-y-8"
-    style={{
-      backgroundImage: `url("/images/back-image-min.jpg")`,
-      backgroundSize: "cover",
-      backgroundPosition: "center",
-    }}
-  >
+      {/* Main Content */}
+      <main
+        className="flex-1 ml-64 p-8 overflow-y-auto space-y-8"
+        style={{
+          backgroundImage: `url("/images/back-image-min.jpg")`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+      >
         {showAIGenerator ? (
           <AIQuestionGenerator
             onQuestionsGenerated={handleAIQuestionsGenerated}
@@ -425,15 +467,44 @@ export default function TeacherDashboard() {
                   Manage Tests
                 </h3>
 
-                {/* 🔍 Debounced Search */}
-                <div className="mb-4">
+                {/* Filters, Search & Sort */}
+                <div className="flex flex-wrap gap-4 mb-4">
                   <input
                     type="text"
                     placeholder="Search by test name..."
-                    className="bg-gray-50 border border-gray-300 text-gray-900 px-3 py-2 rounded w-full max-w-sm"
+                    className="bg-white border border-gray-300 text-gray-800 px-3 py-2 rounded flex-1 min-w-[180px]"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
+                  <select
+                    className="bg-white border border-gray-300 text-gray-800 px-3 py-2 rounded"
+                    value={filterCategory}
+                    onChange={(e) => setFilterCategory(e.target.value)}
+                  >
+                    <option value="all">All Categories</option>
+                    {[...new Set(tests.map((t) => t.category))].map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="bg-white border border-gray-300 text-gray-800 px-3 py-2 rounded"
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                  >
+                    <option value="createdAt">Date Created</option>
+                    <option value="name">Name</option>
+                    <option value="class">Class</option>
+                  </select>
+                  <select
+                    className="bg-white border border-gray-300 text-gray-800 px-3 py-2 rounded"
+                    value={sortOrder}
+                    onChange={(e) => setSortOrder(e.target.value)}
+                  >
+                    <option value="asc">Ascending</option>
+                    <option value="desc">Descending</option>
+                  </select>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -447,8 +518,8 @@ export default function TeacherDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {getFilteredTests().length ? (
-                        getFilteredTests().map((t) => (
+                      {getFilteredSortedTests().length > 0 ? (
+                        getFilteredSortedTests().map((t) => (
                           <tr key={t._id} className="hover:bg-gray-50">
                             <td>{t.testName}</td>
                             <td>{t.category}</td>
@@ -567,7 +638,7 @@ export default function TeacherDashboard() {
             setIsImportOpen(false);
           }}
         />
-         <Modal
+        <Modal
           isOpen={isViewModalOpen}
           onClose={() => {
             setIsViewModalOpen(false);
