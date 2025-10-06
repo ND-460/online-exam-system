@@ -637,6 +637,52 @@ router.get("/active/:userId?",auth, async (req, res) => {
 });
 
 
+router.get("/submission/:testId", auth, async (req, res) => {
+  try {
+    const { testId } = req.params;
+    let studentId = req.user?._id || req.user?.id;
 
+    if (!studentId) {
+      return res.status(400).json({ message: "Student ID missing in token" });
+    }
+    const studentProfile = await Student.findOne({ profileInfo: studentId });
+    const possibleIds = [
+      new mongoose.Types.ObjectId(studentId), 
+    ];
+    if (studentProfile) possibleIds.push(studentProfile._id); 
 
+    const result = await Result.findOne({
+      testId: new mongoose.Types.ObjectId(testId),
+      studentId: { $in: possibleIds },
+    });
+
+    if (!result) {
+      return res.status(404).json({ message: "Submission not found" });
+    }
+
+    const test = await Test.findById(testId);
+    if (!test) {
+      return res.status(404).json({ message: "Test not found" });
+    }
+
+    const submissionData = {
+      testName: test.testName,
+      category: test.category,
+      outOfMarks: test.outOfMarks,
+      questions: test.questions,
+      result: {
+        score: result.score,
+        outOfMarks: result.outOfMarks,
+        answers: result.answers,
+        durationTaken: result.durationTaken,
+        attemptedAt: result.attemptedAt,
+      },
+    };
+
+    res.status(200).json(submissionData);
+  } catch (err) {
+    console.error("Error fetching submission:", err);
+    res.status(500).json({ message: "Server error fetching submission" });
+  }
+});
 module.exports = router;
