@@ -363,14 +363,14 @@ router.post("/attempt-test/:testId", auth, async (req, res) => {
     if (test.submitBy.includes(userId)) {
       return res.status(400).json({ message: "Test already submitted" });
     }
-
-    // Evaluate answers and normalize to Result schema fields
     let score = 0;
     const evaluatedAnswers = [];
 
+    const totalMarks = test.questions.reduce((sum, q) => sum + (q.marks || 1), 0);
+
     test.questions.forEach((q, i) => {
       const submitted = answers[i];
-      const isCorrect = submitted === q.answer;
+      const isCorrect = Number(submitted) === Number(q.answer);
       if (isCorrect) score += q.marks || 1;
       evaluatedAnswers.push({
         question: q._id,
@@ -395,7 +395,7 @@ router.post("/attempt-test/:testId", auth, async (req, res) => {
             testId: test._id,
             testName: test.testName,
             score,
-            outOfMarks: test.questions.length,
+            outOfMarks: totalMarks,
             attemptedAt: date,
           },
         },
@@ -414,7 +414,7 @@ router.post("/attempt-test/:testId", auth, async (req, res) => {
       teacherId: test.teacherId,
       testName: test.testName,
       score,
-      outOfMarks: test.questions.length,
+      outOfMarks: totalMarks,
       answers: evaluatedAnswers,
       submittedAt: date,
     });
@@ -422,13 +422,14 @@ router.post("/attempt-test/:testId", auth, async (req, res) => {
     res.status(200).json({
       message: "Test submitted successfully",
       score,
-      total: test.questions.length,
+      total: totalMarks,
     });
   } catch (err) {
     console.error("Error in attempt-test:", err);
     res.status(500).json({ message: "Error submitting test" });
   }
 });
+
 
 
 /**
@@ -637,6 +638,52 @@ router.get("/active/:userId?",auth, async (req, res) => {
 });
 
 
+router.get("/submission/:testId", auth, async (req, res) => {
+  try {
+    const { testId } = req.params;
+    let studentId = req.user?._id || req.user?.id;
 
+    if (!studentId) {
+      return res.status(400).json({ message: "Student ID missing in token" });
+    }
+    const studentProfile = await Student.findOne({ profileInfo: studentId });
+    const possibleIds = [
+      new mongoose.Types.ObjectId(studentId), 
+    ];
+    if (studentProfile) possibleIds.push(studentProfile._id); 
 
+    const result = await Result.findOne({
+      testId: new mongoose.Types.ObjectId(testId),
+      studentId: { $in: possibleIds },
+    });
+
+    if (!result) {
+      return res.status(404).json({ message: "Submission not found" });
+    }
+
+    const test = await Test.findById(testId);
+    if (!test) {
+      return res.status(404).json({ message: "Test not found" });
+    }
+
+    const submissionData = {
+      testName: test.testName,
+      category: test.category,
+      outOfMarks: test.outOfMarks,
+      questions: test.questions,
+      result: {
+        score: result.score,
+        outOfMarks: result.outOfMarks,
+        answers: result.answers,
+        durationTaken: result.durationTaken,
+        attemptedAt: result.attemptedAt,
+      },
+    };
+
+    res.status(200).json(submissionData);
+  } catch (err) {
+    console.error("Error fetching submission:", err);
+    res.status(500).json({ message: "Server error fetching submission" });
+  }
+});
 module.exports = router;

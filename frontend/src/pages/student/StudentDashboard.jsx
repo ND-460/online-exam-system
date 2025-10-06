@@ -8,6 +8,7 @@ import { toast } from "react-toastify";
 import Editor from "@monaco-editor/react";
 import ProfilePage from "../ProfilePage";
 import PracticeArena from "./PracticeArena";
+import StudentSubmissionModal from "./StudentSubmissionModal";
 
 export default function StudentDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -28,6 +29,8 @@ export default function StudentDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery] = useDebounce(searchQuery, 900);
   const [loadingMyTests, setLoadingMyTests] = useState(false);
+  const [showSubmissionModal, setShowSubmissionModal] = useState(false);
+  const [selectedTestId, setSelectedTestId] = useState(null);
 
   const navigate = useNavigate();
   const { logout, user, token } = useAuthStore();
@@ -101,51 +104,49 @@ export default function StudentDashboard() {
   }, [activeTab]);
 
   const getFilteredSortedTests = () => {
-  let filtered = [...myTests];
+    let filtered = [...myTests];
 
-  // Apply status filter
-  if (filterStatus !== "all") {
-    filtered = filtered.filter((t) => t.status === filterStatus);
-  }
+    // Apply status filter
+    if (filterStatus !== "all") {
+      filtered = filtered.filter((t) => t.status === filterStatus);
+    }
 
-  // Apply category filter
-  if (filterCategory !== "all") {
-    filtered = filtered.filter((t) => t.category === filterCategory);
-  }
+    // Apply category filter
+    if (filterCategory !== "all") {
+      filtered = filtered.filter((t) => t.category === filterCategory);
+    }
 
-  // Apply search
-  if (debouncedSearchQuery.trim() !== "") {
-    filtered = filtered.filter((t) =>
-      t.testName.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
-    );
-  }
+    // Apply search
+    if (debouncedSearchQuery.trim() !== "") {
+      filtered = filtered.filter((t) =>
+        t.testName.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+      );
+    }
 
-  // Sorting
-  // Sorting
-filtered.sort((a, b) => {
-  let aValue, bValue;
+    // Sorting
+    // Sorting
+    filtered.sort((a, b) => {
+      let aValue, bValue;
 
-  if (sortBy === "name") {
-    aValue = a.testName.toLowerCase();
-    bValue = b.testName.toLowerCase();
-  } else if (sortBy === "scheduledAt") {
-    aValue = new Date(a.scheduledAt);
-    bValue = new Date(b.scheduledAt);
-  } else if (sortBy === "status") {
-    const order = { ongoing: 1, upcoming: 2, completed: 3, expired: 4 };
-    aValue = order[a.status] || 5;
-    bValue = order[b.status] || 5;
-  }
+      if (sortBy === "name") {
+        aValue = a.testName.toLowerCase();
+        bValue = b.testName.toLowerCase();
+      } else if (sortBy === "scheduledAt") {
+        aValue = new Date(a.scheduledAt);
+        bValue = new Date(b.scheduledAt);
+      } else if (sortBy === "status") {
+        const order = { ongoing: 1, upcoming: 2, completed: 3, expired: 4 };
+        aValue = order[a.status] || 5;
+        bValue = order[b.status] || 5;
+      }
 
-  if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
-  if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
-  return 0;
-});
+      if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
 
-
-  return filtered;
-};
-
+    return filtered;
+  };
 
   const languageMap = {
     JavaScript: "javascript",
@@ -182,7 +183,7 @@ filtered.sort((a, b) => {
             { id: "practice", label: "Practice", icon: "💻" },
             { id: "reports", label: "Reports", icon: "📊" },
             { id: "profile", label: "Profile", icon: "👤" },
-            { id: "logout", label: "Logout", icon: "🚪" }, 
+            { id: "logout", label: "Logout", icon: "🚪" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -431,9 +432,15 @@ filtered.sort((a, b) => {
                               Join Now
                             </button>
                           ) : test.status === "completed" ? (
-                            <span className="text-black-600 text-sm font-medium">
-                              Attempted
-                            </span>
+                            <button
+                              className="text-purple-700 text-sm font-medium hover:underline"
+                              onClick={() => {
+                                setSelectedTestId(test._id);
+                                setShowSubmissionModal(true);
+                              }}
+                            >
+                              View Submission
+                            </button>
                           ) : test.status === "upcoming" ? (
                             <span className="text-purple-600 text-sm font-medium">
                               Attempt at schedule
@@ -479,6 +486,11 @@ filtered.sort((a, b) => {
             <ProfilePage />
           </div>
         )}
+        <StudentSubmissionModal
+          testId={selectedTestId}
+          isOpen={showSubmissionModal}
+          onClose={() => setShowSubmissionModal(false)}
+        />
       </main>
     </div>
   );
