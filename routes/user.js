@@ -1484,9 +1484,14 @@ router.get("/admin/chart-data", auth, async (req, res) => {
     const Test = require("../model/Test");
     const Result = require("../model/Result");
 
-    // Daily logins by role (last 7 days) - simulated based on activity
+    // Daily logins by role (last 7 days) - simulated based on activity and user counts
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    // Get total counts of each user type for realistic simulation
+    const totalStudents = await User.countDocuments({ role: 'student', status: 'active' });
+    const totalTeachers = await User.countDocuments({ role: 'teacher', status: 'active' });
+    const totalAdmins = await User.countDocuments({ role: 'admin' });
     
     // Create date range for last 7 days
     const dailyLogins = [];
@@ -1501,19 +1506,24 @@ router.get("/admin/chart-data", auth, async (req, res) => {
       const dayEnd = new Date(date);
       dayEnd.setHours(23, 59, 59, 999);
       
-      // Student activity (based on test submissions)
-      const studentActivity = await Result.countDocuments({
+      // Student activity (based on test submissions + simulated)
+      const studentSubmissions = await Result.countDocuments({
         submittedAt: { $gte: dayStart, $lte: dayEnd }
       });
+      // Add simulated student logins (20-40% of total students)
+      const simulatedStudentLogins = Math.floor(totalStudents * (0.2 + Math.random() * 0.2));
+      const studentActivity = Math.max(studentSubmissions, simulatedStudentLogins);
       
-      // Teacher activity (based on test creation)
-      const teacherActivity = await Test.countDocuments({
+      // Teacher activity (based on test creation + simulated)
+      const teacherTestCreations = await Test.countDocuments({
         createdAt: { $gte: dayStart, $lte: dayEnd }
       });
+      // Add simulated teacher logins (30-60% of total teachers)
+      const simulatedTeacherLogins = Math.floor(totalTeachers * (0.3 + Math.random() * 0.3));
+      const teacherActivity = Math.max(teacherTestCreations, simulatedTeacherLogins);
       
-      // Admin activity (simulated - could be based on user management actions)
-      // For now, we'll simulate 1-3 admin logins per day
-      const adminActivity = Math.floor(Math.random() * 3) + 1;
+      // Admin activity (simulated - 50-80% of total admins)
+      const adminActivity = Math.max(1, Math.floor(totalAdmins * (0.5 + Math.random() * 0.3)));
       
       dailyLogins.push({
         date: dateStr,
@@ -1582,6 +1592,9 @@ router.get("/admin/chart-data", auth, async (req, res) => {
       },
       { $sort: { '_id.month': 1, '_id.day': 1 } }
     ]);
+
+    // Log the daily logins data for debugging
+    console.log('Daily Logins Data:', JSON.stringify(dailyLogins, null, 2));
 
     res.status(200).json({
       testsPerWeek,
