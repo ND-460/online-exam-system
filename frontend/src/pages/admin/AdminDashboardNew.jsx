@@ -1531,24 +1531,16 @@ export default function AdminDashboardNew() {
         <div className="relative z-10 p-8">
           {/* Header */}
           <div className="mb-8">
-            <h1 className={`text-3xl font-bold mb-2 ${activeTab === "analytics" ? "text-white" : "text-gray-800"}`}>
-              {activeTab === "dashboard" && "Dashboard"}
-              {activeTab === "teachers" && "Teacher"}
-              {activeTab === "students" && "Student"}
-              {activeTab === "organizations" && (params.orgId ? "Organization Details" : "Organization")}
-              {activeTab === "analytics" && "Analytics"}
-              
-              {activeTab === "profile" && "Profile"}
-            </h1>
-            <p className={`${activeTab === "analytics" ? "text-gray-200" : "text-gray-600"}`}>
-              {activeTab === "dashboard" && "Overview of your examination system"}
-              {activeTab === "teachers" && "Manage teachers and their activities"}
-              {activeTab === "students" && "Manage students and their progress"}
-              {activeTab === "organizations" && "Manage organizations and institutions"}
-              {activeTab === "analytics" && "System performance and insights"}
-              
-              {activeTab === "profile" && "Your profile information"}
-            </p>
+            <h1 className="text-3xl font-bold mb-2 text-white">
+  {activeTab === "dashboard" && "Dashboard"}
+  {activeTab === "teachers" && "Teacher"}
+  {activeTab === "students" && "Student"}
+  {activeTab === "organizations" && (params.orgId ? "Organization Details" : "Organization")}
+  {activeTab === "analytics" && "Analytics"}
+  {activeTab === "profile" && "Profile"}
+</h1>
+
+           
             </div>
 
           {/* Dashboard Content */}
